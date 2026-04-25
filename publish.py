@@ -76,6 +76,12 @@ def cmd_wechat_publish(args: argparse.Namespace) -> None:
     # Parse Markdown to HTML
     try:
         html_content = markdown.markdown(content, extensions=['fenced_code', 'tables', 'sane_lists'])
+        # Inject inline styles for WeChat editor compatibility
+        html_content = html_content.replace('<h1>', '<h1 style="font-size: 28px; font-weight: bold; margin-top: 20px; margin-bottom: 15px;">')
+        html_content = html_content.replace('<h2>', '<h2 style="font-size: 24px; font-weight: bold; margin-top: 20px; margin-bottom: 15px;">')
+        html_content = html_content.replace('<h3>', '<h3 style="font-size: 20px; font-weight: bold; margin-top: 20px; margin-bottom: 15px;">')
+        html_content = html_content.replace('<h4>', '<h4 style="font-size: 18px; font-weight: bold; margin-top: 20px; margin-bottom: 15px;">')
+        html_content = html_content.replace('<blockquote>', '<blockquote style="border-left: 4px solid #ccc; padding-left: 10px; color: #666; background-color: #f9f9f9; padding: 10px; margin: 10px 0;">')
         # We no longer strip \n here because the paste event handles HTML correctly,
         # and stripping \n was destroying formatting in <pre> code blocks.
     except Exception as e:
