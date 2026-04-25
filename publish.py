@@ -38,11 +38,10 @@ def cmd_wechat_publish(args: argparse.Namespace) -> None:
             state = 6
         elif line.startswith("# 插图"):
             state = 7
-        elif line.startswith("# 正文") or line.startswith("---"):
-            if line.startswith("# 正文"):
-                state = 3
-            else:
-                state = 0
+        elif line.startswith("# 正文"):
+            state = 3
+        elif line.startswith("---") and state != 3:
+            state = 0
         elif state == 1 and line.strip():
             title = line.strip()
             state = 0
