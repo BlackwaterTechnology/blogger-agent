@@ -61,9 +61,8 @@ def cmd_wechat_publish(args: argparse.Namespace) -> None:
     # Parse Markdown to HTML
     try:
         html_content = markdown.markdown(content, extensions=['fenced_code', 'tables', 'sane_lists'])
-        # Crucial: Remove all newlines from the generated HTML.
-        # ProseMirror interprets literal \n characters in injected HTML as extra paragraphs/line breaks!
-        html_content = html_content.replace('\n', '')
+        # We no longer strip \n here because the paste event handles HTML correctly,
+        # and stripping \n was destroying formatting in <pre> code blocks.
     except Exception as e:
         logger.warning(f"Failed to parse markdown, falling back to raw text: {e}")
         html_content = f"<p>{content.replace(chr(10), '<br>')}</p>"
@@ -180,8 +179,19 @@ def cmd_wechat_publish(args: argparse.Namespace) -> None:
                 selection.removeAllRanges();
                 selection.addRange(range);
                 
-                document.execCommand('insertHTML', false, html);
-                return "Filled via execCommand";
+                // document.execCommand('insertHTML') strips format in newer WeChat editor versions.
+                // Simulate a paste event with clipboardData instead.
+                const dt = new DataTransfer();
+                dt.setData('text/html', html);
+                dt.setData('text/plain', content);
+                const pasteEvent = new ClipboardEvent('paste', {{
+                    bubbles: true,
+                    cancelable: true,
+                    clipboardData: dt
+                }});
+                editor.dispatchEvent(pasteEvent);
+                
+                return "Filled via paste event";
             }}
             
             return "Filled basic inputs, but could not find rich text editor.";
