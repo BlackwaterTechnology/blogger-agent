@@ -19,6 +19,8 @@ def cmd_wechat_publish(args: argparse.Namespace) -> None:
     title = ""
     author = ""
     collection = "AI"
+    cover_filename = ""
+    illustration_filename = ""
     desc_lines = []
     content_lines = []
     
@@ -32,6 +34,10 @@ def cmd_wechat_publish(args: argparse.Namespace) -> None:
             state = 4
         elif line.startswith("# 集合"):
             state = 5
+        elif line.startswith("# 封面"):
+            state = 6
+        elif line.startswith("# 插图"):
+            state = 7
         elif line.startswith("# 正文") or line.startswith("---"):
             if line.startswith("# 正文"):
                 state = 3
@@ -46,6 +52,12 @@ def cmd_wechat_publish(args: argparse.Namespace) -> None:
         elif state == 5 and line.strip():
             collection = line.strip()
             state = 0
+        elif state == 6 and line.strip():
+            cover_filename = line.strip()
+            state = 0
+        elif state == 7 and line.strip():
+            illustration_filename = line.strip()
+            state = 0
         elif state == 4:
             desc_lines.append(line)
         elif state == 3:
@@ -53,6 +65,10 @@ def cmd_wechat_publish(args: argparse.Namespace) -> None:
             
     content = "\n".join(content_lines).strip()
     desc = "\n".join(desc_lines).strip()
+    
+    payload_dir = Path(args.payload)
+    cover_path = payload_dir / cover_filename if cover_filename and (payload_dir / cover_filename).exists() else None
+    illustration_path = payload_dir / illustration_filename if illustration_filename and (payload_dir / illustration_filename).exists() else None
     
     if desc:
         if len(desc) < 60 or len(desc) > 120:
@@ -208,6 +224,98 @@ def cmd_wechat_publish(args: argparse.Namespace) -> None:
     except Exception as e:
         logger.warning(f"JS injection failed: {e}")
         
+    if illustration_path:
+        logger.info(f"Found illustration image: {illustration_path}. Inserting before first heading...")
+        try:
+            applescript_copy = f'set the clipboard to (read (POSIX file "{illustration_path.absolute()}") as TIFF picture)'
+            system_chrome._run_osascript(applescript_copy)
+            
+            js_move_cursor = """
+            (function() {
+                try {
+                    let editor = document.querySelector('.ProseMirror');
+                    if (!editor) return "Editor not found";
+                    
+                    editor.focus();
+                    const selection = window.getSelection();
+                    const range = document.createRange();
+                    
+                    const h1 = editor.querySelector('h1, h2, h3');
+                    if (h1) {
+                        range.setStartBefore(h1);
+                        range.collapse(true);
+                    } else {
+                        range.selectNodeContents(editor);
+                        range.collapse(true);
+                    }
+                    
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    return "Cursor moved";
+                } catch(e) {
+                    return e.message;
+                }
+            })();
+            """
+            system_chrome.execute_javascript(w_idx, t_idx, js_move_cursor, settle_seconds=0.5)
+            
+            applescript_paste = '''
+            tell application "System Events"
+                tell process "Google Chrome"
+                    set frontmost to true
+                    keystroke "v" using {command down}
+                end tell
+            end tell
+            '''
+            system_chrome._run_osascript(applescript_paste)
+            logger.info("Successfully initiated illustration image paste/upload.")
+            time.sleep(2.0)
+        except Exception as e:
+            logger.warning(f"Failed to insert illustration image: {e}")
+
+    if cover_path:
+        logger.info(f"Found cover image: {cover_path}. Inserting at the end of the article...")
+        try:
+            applescript_copy = f'set the clipboard to (read (POSIX file "{cover_path.absolute()}") as TIFF picture)'
+            system_chrome._run_osascript(applescript_copy)
+            
+            js_move_cursor_end = """
+            (function() {
+                try {
+                    let editor = document.querySelector('.ProseMirror');
+                    if (!editor) return "Editor not found";
+                    
+                    editor.focus();
+                    const selection = window.getSelection();
+                    const range = document.createRange();
+                    
+                    range.selectNodeContents(editor);
+                    range.collapse(false); // Move to end
+                    
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    return "Cursor moved to end";
+                } catch(e) {
+                    return e.message;
+                }
+            })();
+            """
+            system_chrome.execute_javascript(w_idx, t_idx, js_move_cursor_end, settle_seconds=0.5)
+            
+            applescript_paste = '''
+            tell application "System Events"
+                tell process "Google Chrome"
+                    set frontmost to true
+                    keystroke "v" using {command down}
+                end tell
+            end tell
+            '''
+            system_chrome._run_osascript(applescript_paste)
+            logger.info("Successfully initiated cover image paste/upload.")
+            time.sleep(2.0)
+        except Exception as e:
+            logger.warning(f"Failed to insert cover image: {e}")
+        
     logger.info("Putting content into clipboard for manual pasting if needed.")
     
     # As a fallback, we copy the rich text to clipboard so the user can just press Cmd+V.
@@ -254,6 +362,184 @@ def cmd_wechat_publish(args: argparse.Namespace) -> None:
             time.sleep(delay)
         logger.warning(f"[{name}] Failed to complete within {max_steps} steps.")
         return False
+
+    logger.info("Setting up cover...")
+    js_cover_setup = """
+    (function() {
+        try {
+            function clickReactElement(el) {
+                if (!el) return false;
+                const key = Object.keys(el).find(k => k.startsWith('__reactProps$') || k.startsWith('__reactEventHandlers$'));
+                if (key && el[key] && el[key].onClick) {
+                    el[key].onClick({
+                        preventDefault: () => {},
+                        stopPropagation: () => {},
+                        nativeEvent: new MouseEvent('click', {bubbles: true, cancelable: true}),
+                        isDefaultPrevented: () => false,
+                        isPropagationStopped: () => false,
+                        target: el,
+                        currentTarget: el
+                    });
+                    return true;
+                }
+                el.click();
+                return true;
+            }
+
+            let state = { is_done: false };
+            let action = '';
+
+            const coverPreview = document.querySelector('.js_cover_preview_square, .cover_preview_wrapper, .js_cover_preview_new, .first_appmsg_cover');
+            if (coverPreview && coverPreview.clientHeight > 0) {
+                state.is_done = true;
+                action = 'Cover already set';
+                return JSON.stringify({state: state, action: action, is_done: true});
+            }
+
+            if (window.__wechat_automation_cover_done_clicked && (Date.now() - window.__wechat_automation_cover_done_clicked < 5000)) {
+                action = 'Waiting for cover preview to render...';
+                return JSON.stringify({state: state, action: action, is_done: false});
+            }
+
+            const dialogs = Array.from(document.querySelectorAll('.weui-desktop-dialog'));
+            const activeDialog = dialogs.find(d => d.style.display !== 'none' && d.clientHeight > 0);
+            
+            if (activeDialog) {
+                const btns = Array.from(activeDialog.querySelectorAll('button'));
+                
+                // Check if it's the Select Image dialog
+                const isImageDialog = activeDialog.innerText.includes('Select an image') || activeDialog.innerText.includes('选择图片');
+                
+                if (isImageDialog) {
+                    const nextBtn = btns.find(b => b.innerText.includes('Next') || b.innerText.includes('下一步'));
+                    if (nextBtn && nextBtn.clientHeight > 0) {
+                        const items = Array.from(activeDialog.querySelectorAll('.appmsg_content_img_item'));
+                        const selected = items.find(i => i.classList.contains('selected') || i.querySelector('.selected'));
+                        
+                        if (!selected && items.length > 0) {
+                            clickReactElement(items[items.length - 1]);
+                            action = 'Selected last image in dialog (cover)';
+                            return JSON.stringify({state: state, action: action, is_done: false});
+                        }
+                        
+                        if (selected && !nextBtn.classList.contains('weui-desktop-btn_disabled')) {
+                            setTimeout(() => clickReactElement(nextBtn), 200);
+                            action = 'Clicked Next in image dialog';
+                            return JSON.stringify({state: state, action: action, is_done: false});
+                        }
+                    }
+                } else {
+                    // It's probably the crop dialog.
+                    const doneBtn = btns.find(b => b.innerText.includes('Confirm') || b.innerText.includes('Done') || b.innerText.includes('完成') || b.innerText.includes('确定') || b.innerText.includes('Next') || b.innerText.includes('下一步'));
+                    if (doneBtn && doneBtn.clientHeight > 0 && !doneBtn.classList.contains('weui-desktop-btn_disabled')) {
+                        window.__wechat_automation_cover_done_clicked = Date.now();
+                        setTimeout(() => clickReactElement(doneBtn), 200);
+                        action = 'Clicked Done in crop dialog';
+                        return JSON.stringify({state: state, action: action, is_done: false});
+                    }
+                }
+                
+                action = 'Waiting in dialog...';
+                return JSON.stringify({state: state, action: action, is_done: false});
+            }
+
+            // Find the "Choose from content" buttons
+            const selectBtns = Array.from(document.querySelectorAll('.js_selectCoverFromContent'));
+            
+            // Try to click any selectBtn that has positive height (meaning it's visible)
+            const visibleSelectBtn = selectBtns.find(b => b.clientHeight > 0 || b.offsetWidth > 0);
+            if (visibleSelectBtn) {
+                clickReactElement(visibleSelectBtn);
+                action = 'Clicked Choose from content';
+                return JSON.stringify({state: state, action: action, is_done: false});
+            }
+            
+            // If not visible, we might need to rely on React click, or we need to open the dropdown.
+            // Let's try to just click them anyway (sometimes they have 0 height but click works)
+            // But to avoid looping infinitely clicking a hidden button, we should trigger hover first.
+            
+            const emptyCover = document.querySelector('.select-cover__btn');
+            const filledCoverWrap = document.querySelector('.js_chooseCoverWrap');
+            
+            let hovered = false;
+            
+            if (emptyCover && (emptyCover.clientHeight > 0 || emptyCover.offsetWidth > 0)) {
+                const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true, cancelable: true });
+                emptyCover.dispatchEvent(mouseEnterEvent);
+                clickReactElement(emptyCover);
+                hovered = true;
+            }
+            
+            if (filledCoverWrap && (filledCoverWrap.clientHeight > 0 || filledCoverWrap.offsetWidth > 0)) {
+                const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true, cancelable: true });
+                filledCoverWrap.dispatchEvent(mouseEnterEvent);
+                clickReactElement(filledCoverWrap);
+                hovered = true;
+            }
+            
+            // After hovering, just blindly click the select button (try the last one first, usually the empty cover one is later in DOM)
+            if (selectBtns.length > 0) {
+                // we will click the active one if we can guess it, but we can just click all of them!
+                for (let btn of selectBtns) {
+                    clickReactElement(btn);
+                }
+                action = 'Hovered cover area and clicked Choose from content';
+                return JSON.stringify({state: state, action: action, is_done: false});
+            }
+
+            action = 'Cover UI not found';
+            return JSON.stringify({state: state, action: action, is_done: false});
+        } catch (e) {
+            return JSON.stringify({state: {error: e.toString()}, action: 'Error: ' + e.toString(), is_done: false});
+        }
+    })();
+    """
+    if cover_path:
+        run_ui_state_machine("Cover Setup", js_cover_setup, max_steps=15)
+        
+        logger.info("Deleting the cover image from the end of the article...")
+        js_delete_cover = """
+        (function() {
+            try {
+                let editor = document.querySelector('.ProseMirror');
+                if (!editor) return "Editor not found";
+                
+                const imgs = Array.from(editor.querySelectorAll('img'));
+                if (imgs.length > 0) {
+                    const lastImg = imgs[imgs.length - 1];
+                    
+                    editor.focus();
+                    const selection = window.getSelection();
+                    const range = document.createRange();
+                    
+                    range.selectNode(lastImg);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    
+                    return "READY_TO_CUT";
+                }
+                return "No images found to delete";
+            } catch(e) {
+                return e.message;
+            }
+        })();
+        """
+        del_res = system_chrome.execute_javascript(w_idx, t_idx, js_delete_cover, settle_seconds=0.5)
+        if del_res == "READY_TO_CUT":
+            applescript_cut = '''
+            tell application "System Events"
+                tell process "Google Chrome"
+                    set frontmost to true
+                    delay 0.5
+                    keystroke "x" using {command down}
+                end tell
+            end tell
+            '''
+            system_chrome._run_osascript(applescript_cut)
+            time.sleep(0.5)
+            logger.info("Delete cover image result: Cut the selected image")
+        else:
+            logger.info(f"Delete cover image result: {del_res}")
 
     logger.info("Setting up Originality (Original)...")
     js_original_setup = """
@@ -595,7 +881,27 @@ def cmd_wechat_publish(args: argparse.Namespace) -> None:
         }}
     }})();
     """
-    run_ui_state_machine("Collection Setup", js_collection_setup, max_steps=8)
+    if collection:
+        run_ui_state_machine("Collection Setup", js_collection_setup, max_steps=8)
+        
+    logger.info("Saving as draft...")
+    js_save_draft = """
+    (function() {
+        try {
+            const buttons = Array.from(document.querySelectorAll('button, a.weui-desktop-btn, a[href="javascript:;"], div.weui-desktop-btn'));
+            const saveDraft = buttons.find(b => b.innerText && (b.innerText.includes('Save as draft') || b.innerText.includes('保存草稿')));
+            if (saveDraft) {
+                saveDraft.click();
+                return "Clicked Save as draft";
+            }
+            return "Save as draft button not found";
+        } catch(e) {
+            return e.message;
+        }
+    })();
+    """
+    save_res = system_chrome.execute_javascript(w_idx, t_idx, js_save_draft, settle_seconds=1.0)
+    logger.info(f"Save as draft result: {save_res}")
 
 def main():
     parser = argparse.ArgumentParser(description="WeChat Publish Script")

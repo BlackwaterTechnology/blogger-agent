@@ -12,10 +12,10 @@
 AI
 
 # 封面
-/tmp/test_cover.png
+封面-cover.png
 
 # 插图
-/tmp/test_illustration.png
+插图-illustration.png
 
 ---
 
