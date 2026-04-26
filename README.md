@@ -57,16 +57,39 @@ Add the server configuration to your `~/.gemini/settings.json` file:
 Once added, the AI agent will natively have access to the `publish_article` tool. You can just ask: 
 *"Write a technical article about Python Decorators and publish it to WeChat."*
 
-## 📦 Manual Installation & Usage
+## 🤖 Open Agent Skills Integration (2026 Standard)
+
+If your Agent relies on the traditional `SKILL.md` instruction mechanism rather than MCP, you can install the Blogger Agent Skill using the 2026 Open Agent Skills Specification.
+
+### 1. Universal Installation via GitHub CLI (Recommended)
+GitHub's `gh skill` command is the standard way to distribute skills to compatible Agents:
+```bash
+# Install to all identified Agents
+gh skill install BlackwaterTechnology/blogger-agent
+
+# Or target a specific Agent
+gh skill install BlackwaterTechnology/blogger-agent --agent claude-code
+```
+
+### 2. Agent-Specific Manual Installation
+
+| Agent | Default Skill Path | Core Command |
+| :--- | :--- | :--- |
+| **OpenClaw** | `~/.openclaw/skills/` | `claw skill add BlackwaterTechnology/blogger-agent` |
+| **Claude Code** | `~/.claude/skills/` | `gh skill install BlackwaterTechnology/blogger-agent --agent claude-code` |
+| **Gemini CLI** | `$GEMINI_SKILLS_PATH` | `gemini skill install BlackwaterTechnology/blogger-agent` |
+| **Codex** | `~/.../Codex/skills/` | Use IDE Plugin Market or `gh skill` |
+
+> [!TIP]
+> **Security Audit**: When installing skills from third-party repositories, you can use `gh skill audit BlackwaterTechnology/blogger-agent` to review the shell execution permissions requested by the `SKILL.md` before installation.
+
+## 📦 Manual Installation & CLI Usage
+
+If you prefer to run the script manually in your terminal without an AI Agent:
 
 1. **Environment Setup**:
    ```bash
    make install
-   ```
-
-   *(Optional)* To install the Agent Skill locally for Antigravity:
-   ```bash
-   make install-skill
    ```
 
 2. **Run Publishing Script (CLI Mode)**:
