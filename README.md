@@ -62,12 +62,13 @@ Once added, the AI agent will natively have access to the `publish_article` tool
 If your Agent relies on the traditional `SKILL.md` instruction mechanism rather than MCP, you can install the Blogger Agent Skill using the 2026 Open Agent Skills Specification.
 
 ### 1. Universal Installation via GitHub CLI (Recommended)
-GitHub's `gh skill` command is the standard way to distribute skills to compatible Agents:
+GitHub's `gh skill` command is the standard way to distribute skills to compatible Agents. By default, the 2026 Open Agent Skills Specification defines `~/.agent/skills/` as the universal standard path. Platforms that natively follow this standard (such as **Antigravity**) require zero configuration.
+
 ```bash
-# Install to all identified Agents
+# Install to the universal standard path (~/.agent/skills/)
 gh skill install BlackwaterTechnology/blogger-agent
 
-# Or target a specific Agent
+# Or target a specific Agent that uses a custom path
 gh skill install BlackwaterTechnology/blogger-agent --agent claude-code
 ```
 
@@ -75,6 +76,7 @@ gh skill install BlackwaterTechnology/blogger-agent --agent claude-code
 
 | Agent | Default Skill Path | Core Command |
 | :--- | :--- | :--- |
+| **Antigravity** 🌟 | `~/.agent/skills/` | `gh skill install BlackwaterTechnology/blogger-agent` |
 | **OpenClaw** | `~/.openclaw/skills/` | `claw skill add BlackwaterTechnology/blogger-agent` |
 | **Claude Code** | `~/.claude/skills/` | `gh skill install BlackwaterTechnology/blogger-agent --agent claude-code` |
 | **Gemini CLI** | `$GEMINI_SKILLS_PATH` | `gemini skill install BlackwaterTechnology/blogger-agent` |
