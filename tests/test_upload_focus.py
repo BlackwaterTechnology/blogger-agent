@@ -59,7 +59,7 @@ print(f"Trigger space: {out} {err}")
 time.sleep(1.5)
 
 # Now check if Open dialog exists and upload!
-abs_path = "/Users/linwang/src/github/xiluo/skills/blogger/test_data/image.png"
+abs_path = "/Users/linwang/src/github/xiluo/skills/blogger/articles/test_data/illustration.png"
 
 upload_script = f'''
 tell application "System Events"

@@ -24,7 +24,7 @@ It offers two primary interfaces for Agents:
 *   **`pyproject.toml`**: Standard Python packaging and dependency management.
 *   **`Makefile`**: Standard orchestration for development tasks (`make install`, etc.).
 *   **`SKILL.md`**: The traditional Agent Skill definition (2026 Open Agent Skills compatible).
-*   **`test_data/`**: Directory containing sample markdown articles and assets for testing the publishing flow.
+*   **`articles/test_data/`**: Directory containing sample markdown articles and assets for testing the publishing flow.
 
 ## Usage
 
@@ -47,7 +47,7 @@ uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger
 make install
 
 # Run Publisher manually
-blogger --payload test_data
+blogger --payload articles/test_data/
 ```
 
 ## Development Context & Guidelines

@@ -6,7 +6,7 @@ from .platforms.wechat import WechatPublisher
 
 def main():
     parser = argparse.ArgumentParser(description="Blogger Agent Publish Script")
-    parser.add_argument("--payload", default="test_data", help="Directory containing the article markdown files")
+    parser.add_argument("--payload", default="articles/test_data", help="Directory containing the article markdown files")
     parser.add_argument("--platform", default="wechat", choices=["wechat", "juejin", "csdn"], help="Target platform to publish to")
     args = parser.parse_args()
     
