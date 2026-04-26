@@ -2,7 +2,9 @@
 
 ## Project Overview
 
-`blogger` is a standalone automation project extracted from `auto-register-accounts`. Its primary purpose is to automate the publishing of articles to WeChat Official Accounts (微信公众号). This standalone setup enables independent research, modular development, and cleaner codebase refinements.
+`blogger` is an AI agent automation project. The ultimate vision of this project is to allow a user to provide a topic or viewpoint, from which an AI Agent will automatically generate a complete article and publish it to mainstream blog platforms such as WeChat Official Accounts (微信公众号), Juejin (稀土掘金), and CSDN.
+
+Currently, the project focuses on the core capability of automating the publishing of local Markdown articles to WeChat Official Accounts. This standalone setup (originally extracted from `auto-register-accounts`) enables independent research, modular development, and cleaner codebase refinements towards the ultimate multi-platform AI agent vision.
 
 ## Architecture
 
