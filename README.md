@@ -23,19 +23,38 @@ Currently, the core publishing mechanism relies on:
 *   **Python** for orchestration and Markdown parsing.
 *   **Browser Automation** via `rookiepy` and `ChromeDomController` (AppleScript) to interact directly with existing Chrome sessions on macOS. This avoids the need for complex login simulations.
 
-## 🔌 Claude Code / MCP Integration
+## 🔌 MCP Integration (Claude Code / Cursor / Codex / Gemini CLI)
 
-This project acts as an **MCP (Model Context Protocol) Server**. You can install and use it directly inside **Claude Code** or **Cursor** without manual Git cloning or dependency management.
+This project acts as an **MCP (Model Context Protocol) Server**. You can install and use it directly inside modern AI IDEs and CLIs without manual Git cloning or dependency management. 
+
+By leveraging `uvx`, the AI agent will securely download the code directly from GitHub, isolate the dependencies, and start the MCP server.
 
 ### For Claude Code
-
-Run the following command in your Claude Code terminal. It will use `uvx` to fetch the code from GitHub, isolate dependencies, and start the MCP server automatically:
-
+Run the following command in your Claude Code terminal:
 ```bash
 claude mcp add blogger-agent uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger-mcp
 ```
 
-Once added, Claude will natively have access to the `publish_article` tool. You can just ask Claude: 
+### For Codex CLI
+Run the native MCP add command in your terminal:
+```bash
+codex mcp add blogger-agent -- uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger-mcp
+```
+
+### For Gemini CLI
+Add the server configuration to your `~/.gemini/settings.json` file:
+```json
+{
+  "mcpServers": {
+    "blogger-agent": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/BlackwaterTechnology/blogger-agent.git", "blogger-mcp"]
+    }
+  }
+}
+```
+
+Once added, the AI agent will natively have access to the `publish_article` tool. You can just ask: 
 *"Write a technical article about Python Decorators and publish it to WeChat."*
 
 ## 📦 Manual Installation & Usage
