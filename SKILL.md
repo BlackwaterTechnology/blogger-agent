@@ -130,7 +130,7 @@ illustration.png
 
 ```bash
 cd /Users/linwang/src/github/xiluo/skills/blogger
-python3 publish.py --payload ./payload_dir
+blogger --payload ./payload_dir
 ```
 
 该脚本将自动接管 Google Chrome（使用 macOS 的 AppleScript 和 ChromeDomController），自动寻找或打开微信公众号后台（`mp.weixin.qq.com`），并将你生成的 Markdown 渲染、注入文本、设置原创、设置合集并上传封面插图。
@@ -150,5 +150,5 @@ python3 publish.py --payload ./payload_dir
 1. 扩写大纲并生成 60-120 字的简介。
 2. 使用 Canva 子进程生成一个包含 "Agent Automation" 字样的封面图，保存为 `payload_dir/cover.png`。
 3. 创建 `payload_dir/ARC-AGI-文章.md`，填充所需标签。
-4. 执行 `python3 publish.py --payload ./payload_dir`。
+4. 执行 `blogger --payload ./payload_dir`。
 5. 等待脚本完成，向用户报告草稿已保存，并提醒其在手机或浏览器预览确认。

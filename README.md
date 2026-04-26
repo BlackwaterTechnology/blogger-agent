@@ -27,12 +27,12 @@ Currently, the core publishing mechanism relies on:
 
 1. **Environment Setup**:
    ```bash
-   pip install -r requirements.txt
+   pip install -e .
    ```
 
 2. **Run Publishing Script (Current capabilities)**:
    ```bash
-   python3 publish.py --payload test_data
+   blogger --payload test_data
    ```
 
 ## 🤝 Contributing

@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blogger"
+version = "0.1.0"
+description = "AI Agent automation project for multi-platform article publishing."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "loguru",
+    "markdown",
+    "rookiepy"
+]
+
+[project.scripts]
+blogger = "blogger.cli:main"
