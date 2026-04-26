@@ -1,15 +1,15 @@
 ---
-name: wechat-publisher
-description: 自动化微信公众号发布 skill。当用户需要写文章、分享经验、或发布内容到微信公众号时触发。此 skill 会优化文章结构、生成标题和插图（使用 PlantUML 或 Canva），生成特定格式的 Markdown 并利用 Python 脚本自动将草稿发布到微信公众平台。
+name: blogger-agent
+description: 多平台文章自动化发布 skill。当用户需要写文章、分享经验、或发布内容到博客平台（微信公众号、掘金、CSDN等）时触发。此 skill 会优化文章结构、生成标题和插图（使用 PlantUML 或 Canva），生成特定格式的 Markdown 并利用 Python CLI 工具自动将文章草稿发布到目标平台。
 ---
 
-# WeChat Publisher
+# Blogger Agent
 
 ## Overview
 
-将任意输入内容（文章草稿、对话、观点、代码笔记等）转化为结构完整的微信公众号文章，自动生成插图和封面，并调用本地脚本自动推送到微信公众号草稿箱。
+将任意输入内容（文章草稿、对话、观点、代码笔记等）转化为结构完整的技术文章，自动生成插图和封面，并调用本地工具自动推送到各大主流博客平台（目前已支持微信公众号，后续将扩展掘金、CSDN 等）。
 
-与纯界面的浏览器自动化不同，此 skill 使用的是封装好的 `publish.py` 脚本，Agent 只需准备好标准的 Payload 目录即可，无需手动逐步控制浏览器 UI。
+与纯界面的浏览器自动化不同，此 skill 使用的是封装好的 `blogger` CLI 工具，Agent 只需准备好标准的 Payload 目录即可，无需手动逐步控制浏览器 UI。
 
 ## Required Tools/Servers
 

@@ -27,7 +27,12 @@ Currently, the core publishing mechanism relies on:
 
 1. **Environment Setup**:
    ```bash
-   pip install -e .
+   make install
+   ```
+
+   *(Optional)* To install the Agent Skill locally for Antigravity:
+   ```bash
+   make install-skill
    ```
 
 2. **Run Publishing Script (Current capabilities)**:
