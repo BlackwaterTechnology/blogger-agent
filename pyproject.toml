@@ -11,8 +11,10 @@ requires-python = ">=3.9"
 dependencies = [
     "loguru",
     "markdown",
-    "rookiepy"
+    "rookiepy",
+    "mcp"
 ]
 
 [project.scripts]
 blogger = "blogger.cli:main"
+blogger-mcp = "blogger.mcp_server:main"

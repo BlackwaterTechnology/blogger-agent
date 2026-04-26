@@ -23,7 +23,22 @@ Currently, the core publishing mechanism relies on:
 *   **Python** for orchestration and Markdown parsing.
 *   **Browser Automation** via `rookiepy` and `ChromeDomController` (AppleScript) to interact directly with existing Chrome sessions on macOS. This avoids the need for complex login simulations.
 
-## 📦 Installation & Usage
+## 🔌 Claude Code / MCP Integration
+
+This project acts as an **MCP (Model Context Protocol) Server**. You can install and use it directly inside **Claude Code** or **Cursor** without manual Git cloning or dependency management.
+
+### For Claude Code
+
+Run the following command in your Claude Code terminal. It will use `uvx` to fetch the code from GitHub, isolate dependencies, and start the MCP server automatically:
+
+```bash
+claude mcp add blogger-agent uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger-mcp
+```
+
+Once added, Claude will natively have access to the `publish_article` tool. You can just ask Claude: 
+*"Write a technical article about Python Decorators and publish it to WeChat."*
+
+## 📦 Manual Installation & Usage
 
 1. **Environment Setup**:
    ```bash
@@ -35,7 +50,7 @@ Currently, the core publishing mechanism relies on:
    make install-skill
    ```
 
-2. **Run Publishing Script (Current capabilities)**:
+2. **Run Publishing Script (CLI Mode)**:
    ```bash
    blogger --payload test_data
    ```
