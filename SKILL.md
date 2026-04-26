@@ -148,6 +148,6 @@ uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger
 **执行流程**：
 1. 扩写大纲并生成 60-120 字的简介。
 2. 使用 Canva 子进程生成一个包含 "Agent Automation" 字样的封面图，保存为 `payload_dir/cover.png`。
-3. 创建 `payload_dir/ARC-AGI-文章.md`，填充所需标签。
+3. 创建 `payload_dir/你的文章标题拼音或英文.md`（文件名应当具备实际含义，不要照搬模板），填充所需标签。
 4. 执行 `uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger --payload ./payload_dir`。
 5. 等待脚本完成，向用户报告草稿已保存，并提醒其在手机或浏览器预览确认。
