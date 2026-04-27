@@ -68,6 +68,11 @@ def main():
         logger.info("Initiating WeChat publishing flow...")
         publisher = WechatPublisher()
         publisher.publish(article_data)
+    elif args.platform == "juejin":
+        from .platforms.juejin import JuejinPublisher
+        logger.info("Initiating Juejin publishing flow...")
+        publisher = JuejinPublisher()
+        publisher.publish(article_data)
     else:
         logger.warning(f"Platform '{args.platform}' is currently not implemented.")
 

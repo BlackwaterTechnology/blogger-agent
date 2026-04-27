@@ -7,7 +7,7 @@ name = "blogger"
 version = "0.1.0"
 description = "AI Agent automation project for multi-platform article publishing."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "loguru",
     "markdown",
