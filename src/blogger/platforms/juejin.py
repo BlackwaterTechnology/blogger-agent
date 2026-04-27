@@ -316,17 +316,45 @@ class JuejinPublisher:
             except Exception as e:
                 logger.warning(f"Failed to upload cover image: {e}")
 
-        # 6. Fill Publish Dialog Data (Category, Tags, Desc)
-        # Note: In an actual robust implementation, you would map `article_data['category']` 
-        # to the actual DOM elements. Here we use a generic state machine to select the first 
-        # category and first tag if not specified, and fill the description.
-        js_publish_dialog = f"""
+        # 6. Fill Publish Dialog Data (Summary, Category)
+        logger.info("Setting up Publish Dialog (Summary & Category)...")
+        js_publish_dialog_part1 = f"""
         (function() {{
             try {{
                 const desc = {json.dumps(desc)};
-                let state = {{}};
                 let action = [];
                 
+                function clickReactElement(el) {{
+                    if (!el) return false;
+                    const key = Object.keys(el).find(k => k.startsWith('__reactProps$') || k.startsWith('__reactEventHandlers$'));
+                    if (key && el[key] && el[key].onClick) {{
+                        el[key].onClick({{
+                            preventDefault: () => {{}},
+                            stopPropagation: () => {{}},
+                            nativeEvent: new MouseEvent('click', {{bubbles: true, cancelable: true}}),
+                            isDefaultPrevented: () => false,
+                            isPropagationStopped: () => false,
+                            target: el,
+                            currentTarget: el
+                        }});
+                        return true;
+                    }}
+                    el.click();
+                    return true;
+                }}
+                
+                function setReactInputValue(input, value) {{
+                    let lastValue = input.value;
+                    input.value = value;
+                    let event = new Event('input', {{ bubbles: true }});
+                    event.simulated = true;
+                    let tracker = input._valueTracker;
+                    if (tracker) {{
+                        tracker.setValue(lastValue);
+                    }}
+                    input.dispatchEvent(event);
+                }}
+
                 // Fill Abstract/Summary
                 const textareas = Array.from(document.querySelectorAll('.byte-input__textarea, textarea'));
                 const summaryInput = textareas.find(t => t.placeholder && t.placeholder.includes('摘要')) || textareas[0];
@@ -335,23 +363,205 @@ class JuejinPublisher:
                     summaryInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
                     action.push("Filled summary");
                 }}
+
+                const rows = Array.from(document.querySelectorAll('.form-item, .byte-form-item'));
                 
-                // Select category (后端 by default if none selected)
-                const categoryItems = Array.from(document.querySelectorAll('.category-list .item'));
-                const hasSelectedCategory = categoryItems.some(i => i.classList.contains('active'));
-                if (!hasSelectedCategory && categoryItems.length > 0) {{
-                    const backendCat = categoryItems.find(c => c.innerText.includes('后端'));
-                    if (backendCat) backendCat.click();
-                    else categoryItems[0].click();
-                    action.push("Selected default category");
+                // 1. Category (分类) - Default: 人工智能
+                const catRow = rows.find(r => r.innerText.includes('分类'));
+                if (catRow) {{
+                    const items = Array.from(catRow.querySelectorAll('.item'));
+                    const aiItem = items.find(i => i.innerText.trim() === '人工智能');
+                    if (aiItem && !aiItem.classList.contains('active')) {{
+                        clickReactElement(aiItem);
+                        action.push("Selected category: 人工智能");
+                    }} else if (!items.some(i => i.classList.contains('active')) && items.length > 0) {{
+                        items[0].click();
+                        action.push("Selected fallback category");
+                    }}
                 }}
                 
-                return JSON.stringify({{state: state, action: action.join(", "), is_done: true}});
+                // 2. Type into Tag input (标签) to trigger API search
+                const tagRow = rows.find(r => r.innerText.includes('标签'));
+                if (tagRow) {{
+                    const input = tagRow.querySelector('input');
+                    if (input) {{
+                        setReactInputValue(input, '人工智能');
+                        input.dispatchEvent(new Event('focus', {{bubbles: true}}));
+                        clickReactElement(input);
+                        action.push("Typed into tag input");
+                    }}
+                }}
+                
+                return action.join(", ");
             }} catch (err) {{
-                return JSON.stringify({{ error: err.message, is_done: false }});
+                return "Error: " + err.message;
             }}
         }})();
         """
-        self.run_ui_state_machine("Publish Dialog Setup", w_idx, t_idx, js_publish_dialog, max_steps=5)
+        res1 = self.chrome.execute_javascript(w_idx, t_idx, js_publish_dialog_part1, settle_seconds=1.0)
+        logger.info(f"Publish Dialog Part 1: {res1}")
+        
+        # 7. Wait for Juejin Tag API to return options
+        logger.info("Waiting 1.5s for Juejin to query tags...")
+        time.sleep(1.5)
 
-        logger.info("Juejin article is ready in draft/publish dialog. Awaiting manual confirmation to submit.")
+        # 8. Click the resolved Tag option
+        logger.info("Clicking the resolved tag option...")
+        js_publish_dialog_part2 = f"""
+        (function() {{
+            try {{
+                let action = [];
+                function clickReactElement(el) {{
+                    if (!el) return false;
+                    const key = Object.keys(el).find(k => k.startsWith('__reactProps$') || k.startsWith('__reactEventHandlers$'));
+                    if (key && el[key] && el[key].onClick) {{
+                        el[key].onClick({{
+                            preventDefault: () => {{}},
+                            stopPropagation: () => {{}},
+                            nativeEvent: new MouseEvent('click', {{bubbles: true, cancelable: true}}),
+                            isDefaultPrevented: () => false,
+                            isPropagationStopped: () => false,
+                            target: el,
+                            currentTarget: el
+                        }});
+                        return true;
+                    }}
+                    el.click();
+                    return true;
+                }}
+                
+                // 2b. Click the resolved Tag option
+                // Dropdowns are attached to body via React Portals.
+                // We MUST filter out elements inside .form-item to avoid clicking the Category button instead!
+                const allOptions = Array.from(document.querySelectorAll('.byte-select-option, .item, li'));
+                const options = allOptions.filter(el => !el.closest('.form-item') && !el.closest('.byte-form-item'));
+                const tagOption = options.find(o => o.innerText.trim() === '人工智能');
+                if (tagOption) {{
+                    clickReactElement(tagOption);
+                    action.push("Selected tag option: 人工智能");
+                }}
+                
+                // Close dropdown to persist selection natively without closing the dialog
+                const safeArea = document.querySelector('.form-item, .byte-form-item');
+                if (safeArea) {{
+                    safeArea.click();
+                }}
+                
+                return action.join(", ");
+            }} catch (err) {{
+                return "Error: " + err.message;
+            }}
+        }})();
+        """
+        res2 = self.chrome.execute_javascript(w_idx, t_idx, js_publish_dialog_part2, settle_seconds=1.0)
+        logger.info(f"Publish Dialog Part 2: {res2}")
+        
+        # 9. Wait for tag to process to avoid blur cancellation
+        logger.info("Waiting 0.5s for Juejin to process tag selection...")
+        time.sleep(0.5)
+
+        # 10. Fill Publish Dialog Data (Collection, Topic)
+        logger.info("Setting up Publish Dialog (Collection & Topic)...")
+        js_publish_dialog_part3 = f"""
+        (function() {{
+            try {{
+                let action = [];
+                const rows = Array.from(document.querySelectorAll('.form-item, .byte-form-item'));
+                
+                function clickReactElement(el) {{
+                    if (!el) return false;
+                    const key = Object.keys(el).find(k => k.startsWith('__reactProps$') || k.startsWith('__reactEventHandlers$'));
+                    if (key && el[key] && el[key].onClick) {{
+                        el[key].onClick({{
+                            preventDefault: () => {{}},
+                            stopPropagation: () => {{}},
+                            nativeEvent: new MouseEvent('click', {{bubbles: true, cancelable: true}}),
+                            isDefaultPrevented: () => false,
+                            isPropagationStopped: () => false,
+                            target: el,
+                            currentTarget: el
+                        }});
+                        return true;
+                    }}
+                    el.click();
+                    return true;
+                }}
+                
+                function setReactInputValue(input, value) {{
+                    let lastValue = input.value;
+                    input.value = value;
+                    let event = new Event('input', {{ bubbles: true }});
+                    event.simulated = true;
+                    let tracker = input._valueTracker;
+                    if (tracker) {{
+                        tracker.setValue(lastValue);
+                    }}
+                    input.dispatchEvent(event);
+                }}
+                
+                function selectDropdownOption(row, searchTexts) {{
+                    const input = row.querySelector('input');
+                    if (!input) return;
+                    for (const searchText of searchTexts) {{
+                        setReactInputValue(input, searchText);
+                        input.dispatchEvent(new Event('focus', {{bubbles: true}}));
+                        clickReactElement(input);
+                        
+                        const options = Array.from(document.querySelectorAll('.byte-select-option'));
+                        const option = options.find(o => o.innerText.trim() === searchText);
+                        if (option) {{
+                            clickReactElement(option);
+                            action.push("Selected option: " + searchText);
+                        }} else {{
+                            const optionInc = options.find(o => o.innerText.includes(searchText));
+                            if (optionInc) {{
+                                clickReactElement(optionInc);
+                                action.push("Selected option: " + searchText);
+                            }}
+                        }}
+                    }}
+                }}
+                
+                // 3. Collection (收录至专栏) - Default: AI, agent
+                const colRow = rows.find(r => r.innerText.includes('收录至专栏'));
+                if (colRow) {{
+                    selectDropdownOption(colRow, ['AI', 'agent']);
+                }}
+                
+                // 4. Topic (创作话题) - Default: AI 编程
+                const topicRow = rows.find(r => r.innerText.includes('创作话题'));
+                if (topicRow) {{
+                    selectDropdownOption(topicRow, ['AI 编程']);
+                }}
+                
+                // Close dropdown to persist selection natively and unblock UI
+                const safeArea2 = document.querySelector('.form-item, .byte-form-item');
+                if (safeArea2) {{
+                    safeArea2.click();
+                }}
+                
+                return action.join(", ");
+            }} catch (err) {{
+                return "Error: " + err.message;
+            }}
+        }})();
+        """
+        res3 = self.chrome.execute_javascript(w_idx, t_idx, js_publish_dialog_part3, settle_seconds=1.0)
+        logger.info(f"Publish Dialog Part 3: {res3}")
+
+        logger.info("Juejin article configuration complete. Submitting article...")
+        
+        # 11. Final Submit
+        js_submit = """
+        (function() {{
+            const buttons = Array.from(document.querySelectorAll('button, .byte-btn'));
+            const submitBtn = buttons.find(b => b.innerText.includes('确定并发布') || b.innerText === '发布文章' || b.innerText === '确认发布');
+            if (submitBtn) {{
+                submitBtn.click();
+                return "Clicked submit button: " + submitBtn.innerText;
+            }}
+            return "Submit button not found";
+        }})();
+        """
+        res_submit = self.chrome.execute_javascript(w_idx, t_idx, js_submit, settle_seconds=2.0)
+        logger.info(f"Publish final result: {res_submit}")
