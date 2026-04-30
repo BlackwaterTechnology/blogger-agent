@@ -8,7 +8,7 @@ install: ## Install the package in editable mode
 
 install-skill: ## Install or update the Agent SKILL locally
 	mkdir -p ~/.agent/skills/blogger-agent
-	cp SKILL.md ~/.agent/skills/blogger-agent/SKILL.md
+	cp skills/blogger-agent/SKILL.md ~/.agent/skills/blogger-agent/SKILL.md
 	@echo "✅ Skill successfully installed/updated in ~/.agent/skills/blogger-agent/"
 
 clean: ## Clean up Python cache and build files

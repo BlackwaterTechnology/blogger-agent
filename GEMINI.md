@@ -23,7 +23,7 @@ It offers two primary interfaces for Agents:
     *   **`platforms/`**: Platform-specific publisher state machines (e.g., `wechat.py`).
 *   **`pyproject.toml`**: Standard Python packaging and dependency management.
 *   **`Makefile`**: Standard orchestration for development tasks (`make install`, etc.).
-*   **`SKILL.md`**: The traditional Agent Skill definition (2026 Open Agent Skills compatible).
+*   **`skills/blogger-agent/SKILL.md`**: The traditional Agent Skill definition (2026 Open Agent Skills compatible).
 *   **`articles/test_data/`**: Directory containing sample markdown articles and assets for testing the publishing flow.
 
 ## Usage
