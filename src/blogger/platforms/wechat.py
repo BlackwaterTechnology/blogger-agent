@@ -883,6 +883,109 @@ class WechatPublisher:
         if collection:
             self.run_ui_state_machine("Collection Setup", w_idx, t_idx, js_collection_setup, max_steps=8)
             
+        logger.info("Setting up Creation Source (AI Generated)...")
+        js_creation_source_setup = """
+        (function() {
+            try {
+                function clickReactElement(el) {
+                    if (!el) return false;
+                    const key = Object.keys(el).find(k => k.startsWith('__reactProps$') || k.startsWith('__reactEventHandlers$'));
+                    if (key && el[key] && el[key].onClick) {
+                        el[key].onClick({
+                            preventDefault: () => {},
+                            stopPropagation: () => {},
+                            nativeEvent: new MouseEvent('click', {bubbles: true, cancelable: true}),
+                            isDefaultPrevented: () => false,
+                            isPropagationStopped: () => false,
+                            target: el,
+                            currentTarget: el
+                        });
+                        return true;
+                    }
+                    el.click();
+                    return true;
+                }
+
+                let state = { is_dialog_open: false, is_done: false };
+                let action = '';
+
+                const dialogs = Array.from(document.querySelectorAll('.weui-desktop-dialog'));
+                const sourceDialog = dialogs.find(d => d.style.display !== 'none' && d.clientHeight > 0 && (d.innerText.includes('Creation Source') || d.innerText.includes('创作声明')));
+                
+                if (!sourceDialog) {
+                    state.is_dialog_open = false;
+                    
+                    if (window.__wechat_automation_source_confirm && (Date.now() - window.__wechat_automation_source_confirm < 5000)) {
+                        state.is_done = true;
+                        action = 'Creation Source setup successful (dialog closed)';
+                        return JSON.stringify({state: state, action: action, is_done: true});
+                    }
+                    
+                    const allClickables = Array.from(document.querySelectorAll('a, span, div, li'));
+                    const sourceClickable = allClickables.find(el => {
+                        const t = el.innerText || '';
+                        return (t.includes('Creation Source') || t.includes('创作声明')) && 
+                               (t.includes('Not added') || t.includes('未添加') || t.includes('未声明') || t.includes('未设置')) &&
+                               el.clientHeight > 0 && el.children.length < 15;
+                    });
+                    
+                    if (sourceClickable) {
+                        const innerClickable = Array.from(sourceClickable.querySelectorAll('a, span, div')).find(el => {
+                            const t = el.innerText || '';
+                            return (t.includes('Not added') || t.includes('未添加') || t.includes('未声明') || t.includes('未设置')) && el.clientHeight > 0;
+                        });
+                        
+                        clickReactElement(innerClickable || sourceClickable);
+                        action = 'Clicked Creation Source row to open dialog';
+                        return JSON.stringify({state: state, action: action, is_done: false});
+                    }
+                    
+                    state.is_done = true;
+                    action = 'Creation Source seems already set or not found, skipping';
+                    return JSON.stringify({state: state, action: action, is_done: true});
+                }
+                
+                state.is_dialog_open = true;
+                
+                const labels = Array.from(sourceDialog.querySelectorAll('label'));
+                const aiLabel = labels.find(l => {
+                    const t = l.innerText || '';
+                    return t.includes('内容由AI生成') || t.includes('AI-generated') || t.includes('AI generated');
+                });
+                
+                if (aiLabel) {
+                    const radio = aiLabel.querySelector('input[type="radio"]');
+                    const isChecked = radio ? radio.checked : aiLabel.classList.contains('weui-desktop-form__radio_checked') || (aiLabel.querySelector('.weui-desktop-form__radio_checked') !== null);
+                    
+                    if (!isChecked) {
+                        if (radio) {
+                            radio.click();
+                        } else {
+                            clickReactElement(aiLabel);
+                        }
+                        action = 'Selected AI Generated radio button';
+                        return JSON.stringify({state: state, action: action, is_done: false});
+                    }
+                }
+                
+                const btns = Array.from(sourceDialog.querySelectorAll('button'));
+                const confirmBtn = btns.find(b => b.innerText.includes('Confirm') || b.innerText.includes('确定'));
+                if (confirmBtn && !confirmBtn.classList.contains('weui-desktop-btn_disabled')) {
+                    setTimeout(() => clickReactElement(confirmBtn), 200);
+                    window.__wechat_automation_source_confirm = Date.now();
+                    action = 'Clicked Confirm in Creation Source dialog';
+                    return JSON.stringify({state: state, action: action, is_done: false});
+                }
+                
+                action = 'Waiting in Creation Source dialog...';
+                return JSON.stringify({state: state, action: action, is_done: false});
+            } catch (e) {
+                return JSON.stringify({state: {error: e.toString()}, action: 'Error: ' + e.toString(), is_done: false});
+            }
+        })();
+        """
+        self.run_ui_state_machine("Creation Source Setup", w_idx, t_idx, js_creation_source_setup, max_steps=8)
+
         logger.info("Saving as draft...")
         js_save_draft = """
         (function() {
