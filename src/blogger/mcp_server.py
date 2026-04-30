@@ -47,7 +47,7 @@ def publish_article(
         content: The main content of the article in Markdown format.
         platform: The target platform. Currently 'wechat' and 'juejin' are supported.
         summary: A brief summary of the article (must be 60-120 chars for WeChat).
-        collection: The name of the collection/tag to add this article to.
+        collection: The name of the collection/tag to add this article to. Must be either 'AI' or 'Agent'.
         author: The author's name.
         cover_path: Optional absolute path to a cover image.
         illustration_path: Optional absolute path to an illustration image.
