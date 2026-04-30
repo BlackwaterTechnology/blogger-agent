@@ -12,7 +12,7 @@ The ultimate goal of this project is to create a fully autonomous content creati
 ## 🚀 Features (Current & Planned)
 
 - [x] **WeChat Official Account (微信公众号)**: Automated publishing using AppleScript and Chrome browser automation.
-- [ ] **Juejin (稀土掘金)**: Automated publishing (Planned).
+- [x] **Juejin (稀土掘金)**: Automated publishing (Planned).
 - [ ] **CSDN**: Automated publishing (Planned).
 - [ ] **AI Article Generation**: Integration with LLMs (e.g., Claude, GPT-4, Gemini) to autonomously write content based on a prompt (Planned).
 - [ ] **Multi-platform Orchestration**: Distribute a single article across multiple platforms with platform-specific formatting adjustments.

@@ -744,6 +744,27 @@ class WechatPublisher:
                         return JSON.stringify({state: state, action: action, is_done: false});
                     }
                 } else {
+                    // Try to find "Recent [Name]" or "最近使用 [Name]" element
+                    const recentContainers = Array.from(rewardDialog.querySelectorAll('div, p, span, a')).filter(el => {
+                        const text = (el.innerText || '').trim();
+                        // Look for elements that start with "Recent " or "最近" but are not too long
+                        return (text.startsWith('Recent ') || text.startsWith('最近')) && text.length < 30 && el.children.length <= 3;
+                    });
+                    
+                    if (recentContainers.length > 0) {
+                        // The actual clickable element might be a child (e.g., an <a> tag) or the container itself
+                        const target = recentContainers[0].querySelector('a, .name') || recentContainers[0].lastElementChild || recentContainers[0];
+                        
+                        // We only want to click if it hasn't been selected yet.
+                        // Assuming selecting it populates the search input or enables the confirm button.
+                        const searchInput = rewardDialog.querySelector('input.weui-desktop-form__input');
+                        if (searchInput && searchInput.value === '') {
+                            clickReactElement(target);
+                            action = 'Clicked recent account (' + target.innerText + ')';
+                            return JSON.stringify({state: state, action: action, is_done: false});
+                        }
+                    }
+
                     const searchInput = rewardDialog.querySelector('input.weui-desktop-form__input');
                     if (searchInput) {
                         const activeDropdownItems = Array.from(document.querySelectorAll('.weui-desktop-dropdown__list li, .weui-desktop-picker__list li'));
@@ -763,8 +784,8 @@ class WechatPublisher:
                 }
                 
                 const btns = Array.from(rewardDialog.querySelectorAll('button'));
-                const confirmBtn = btns.find(b => b.innerText.includes('Confirm') || b.innerText.includes('确定'));
-                if (confirmBtn && !confirmBtn.classList.contains('weui-desktop-btn_disabled')) {
+                const confirmBtn = btns.find(b => b.innerText.includes('Confirm') || b.innerText.includes('确定') || b.innerText.includes('Done'));
+                if (confirmBtn && !confirmBtn.classList.contains('weui-desktop-btn_disabled') && !confirmBtn.disabled) {
                     setTimeout(() => clickReactElement(confirmBtn), 200);
                     action = 'Clicked Confirm';
                     return JSON.stringify({state: state, action: action, is_done: false});
@@ -921,23 +942,55 @@ class WechatPublisher:
                         return JSON.stringify({state: state, action: action, is_done: true});
                     }
                     
-                    const allClickables = Array.from(document.querySelectorAll('a, span, div, li'));
-                    const sourceClickable = allClickables.find(el => {
-                        const t = el.innerText || '';
-                        return (t.includes('Creation Source') || t.includes('创作声明')) && 
-                               (t.includes('Not added') || t.includes('未添加') || t.includes('未声明') || t.includes('未设置')) &&
-                               el.clientHeight > 0 && el.children.length < 15;
+                    const allLabels = Array.from(document.querySelectorAll('label, span, div'));
+                    const sourceLabel = allLabels.find(el => {
+                        const t = el.innerText ? el.innerText.trim() : '';
+                        return t === '创作声明' || t === 'Creation Source';
                     });
                     
-                    if (sourceClickable) {
-                        const innerClickable = Array.from(sourceClickable.querySelectorAll('a, span, div')).find(el => {
-                            const t = el.innerText || '';
-                            return (t.includes('Not added') || t.includes('未添加') || t.includes('未声明') || t.includes('未设置')) && el.clientHeight > 0;
-                        });
+                    if (sourceLabel) {
+                        let container = sourceLabel.parentElement;
+                        let isUnset = false;
+                        let searchDepth = 0;
                         
-                        clickReactElement(innerClickable || sourceClickable);
-                        action = 'Clicked Creation Source row to open dialog';
-                        return JSON.stringify({state: state, action: action, is_done: false});
+                        while(container && container.tagName.toLowerCase() !== 'body' && searchDepth < 5) {
+                            const t = container.innerText || '';
+                            if (t.includes('未声明') || t.includes('Not added') || t.includes('未设置') || t.includes('未添加')) {
+                                isUnset = true;
+                                break;
+                            }
+                            container = container.parentElement;
+                            searchDepth++;
+                        }
+                        
+                        if (isUnset && container && container.tagName.toLowerCase() !== 'body') {
+                            const clickables = Array.from(container.querySelectorAll('a, i, svg, span')).filter(el => el.clientHeight > 0);
+                            const unstatedEl = clickables.find(el => {
+                                const t = el.innerText || '';
+                                return t.includes('未声明') || t.includes('未设置') || t.includes('未添加') || t.includes('Not added');
+                            });
+                            
+                            const iconEl = clickables.find(el => el.tagName.toLowerCase() === 'svg' || el.tagName.toLowerCase() === 'i' || el.classList.contains('weui-icon'));
+                            
+                            const targets = [iconEl, unstatedEl, container].filter(Boolean);
+                            
+                            for (let target of targets) {
+                                clickReactElement(target);
+                                try {
+                                    target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                                    target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                                    target.click();
+                                } catch (e) {}
+                                
+                                if (target.parentElement) {
+                                    clickReactElement(target.parentElement);
+                                    target.parentElement.click();
+                                }
+                            }
+                            
+                            action = 'Clicked Creation Source row to open dialog';
+                            return JSON.stringify({state: state, action: action, is_done: false});
+                        }
                     }
                     
                     state.is_done = true;
