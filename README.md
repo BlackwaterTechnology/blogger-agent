@@ -96,7 +96,7 @@ If you prefer to run the script manually in your terminal without an AI Agent:
 
 2. **Run Publishing Script (CLI Mode)**:
    ```bash
-   blogger --payload articles/test_data/
+   blogger --payload articles/test_data/ --platform {wechat,juejin,csdn}
    ```
 
 ## 🤝 Contributing
