@@ -57,12 +57,29 @@ class JuejinPublisher:
         if "editor" not in url:
             logger.info("Not currently on the editor page. Navigating to drafts...")
             try:
-                self.chrome.set_tab_url(w_idx, t_idx, "https://juejin.cn/editor/drafts/new", settle_seconds=3.0)
+                self.chrome.set_tab_url(w_idx, t_idx, "https://juejin.cn/editor/drafts/new", settle_seconds=1.0)
             except Exception as e:
                 logger.warning(f"Failed to navigate: {e}")
                 
-            logger.info("Waiting 5 seconds for editor to fully load...")
-            time.sleep(5)
+            logger.info("Waiting for editor to fully load...")
+            js_check_loaded = """
+            (function() {
+                const titleInput = document.querySelector('.title-input');
+                const editor = document.querySelector('.CodeMirror textarea') || document.querySelector('.bytemd-editor');
+                if (titleInput && editor) {
+                    return "LOADED";
+                }
+                return "LOADING";
+            })();
+            """
+            for _ in range(15):
+                try:
+                    res = self.chrome.execute_javascript(w_idx, t_idx, js_check_loaded, settle_seconds=0.5)
+                    if res == "LOADED":
+                        break
+                except Exception:
+                    pass
+                time.sleep(1.0)
             
         # 3. Inject Content via PBCOPY and Cmd+V
         # First, inject the Title via JS
