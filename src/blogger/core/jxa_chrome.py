@@ -27,7 +27,7 @@ function run() {{
                     win.index = 1;
                     win.activeTabIndex = t + 1; // activeTabIndex is 1-indexed in JXA Chrome dictionary
                     chrome.activate();
-                    return w + "\\n" + t;
+                    return win.id() + "\\n" + tab.id();
                 }}
             }}
         }}
@@ -47,8 +47,8 @@ function run() {{
 
     def execute_javascript(
         self,
-        window_index: int,
-        tab_index: int,
+        window_id: int,
+        tab_id: int,
         javascript: str,
         *,
         settle_seconds: float = 0.5,
@@ -57,9 +57,16 @@ function run() {{
         script = f"""
 function run() {{
     var chrome = Application("{self.app_name}");
-    var win = chrome.windows[{window_index}];
-    var tab = win.tabs[{tab_index}];
-    win.activeTabIndex = {tab_index} + 1;
+    var win = chrome.windows.byId({window_id});
+    var tab = win.tabs.byId({tab_id});
+    
+    for (var i = 0; i < win.tabs.length; i++) {{
+        if (win.tabs[i].id() === {tab_id}) {{
+            win.activeTabIndex = i + 1;
+            break;
+        }}
+    }}
+    
     delay({settle_seconds});
     return tab.execute({{javascript: {escaped_js}}});
 }}
@@ -77,8 +84,8 @@ function run() {{
 
     def set_tab_url(
         self,
-        window_index: int,
-        tab_index: int,
+        window_id: int,
+        tab_id: int,
         url: str,
         *,
         settle_seconds: float = 1.0,
@@ -87,9 +94,16 @@ function run() {{
         script = f"""
 function run() {{
     var chrome = Application("{self.app_name}");
-    var win = chrome.windows[{window_index}];
-    var tab = win.tabs[{tab_index}];
-    win.activeTabIndex = {tab_index} + 1;
+    var win = chrome.windows.byId({window_id});
+    var tab = win.tabs.byId({tab_id});
+    
+    for (var i = 0; i < win.tabs.length; i++) {{
+        if (win.tabs[i].id() === {tab_id}) {{
+            win.activeTabIndex = i + 1;
+            break;
+        }}
+    }}
+    
     tab.url = {escaped_url};
     delay({settle_seconds});
     return tab.url();
@@ -97,11 +111,11 @@ function run() {{
 """
         return self._run_jxa(script).strip()
 
-    def get_tab_url(self, window_index: int, tab_index: int) -> str:
+    def get_tab_url(self, window_id: int, tab_id: int) -> str:
         script = f"""
 function run() {{
     var chrome = Application("{self.app_name}");
-    return chrome.windows[{window_index}].tabs[{tab_index}].url();
+    return chrome.windows.byId({window_id}).tabs.byId({tab_id}).url();
 }}
 """
         return self._run_jxa(script).strip()
