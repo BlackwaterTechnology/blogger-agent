@@ -92,9 +92,9 @@ blogger generate-diagram --type mermaid --input payload_dir/cover.mmd --output p
 
 ### Step 3: 构造 Payload 目录
 
-1. 在当前项目下（或系统临时目录）创建一个 `payload_dir`（如 `test_data_auto`）。
-2. 确保所有生成的封面和插图都已经放置在该目录中。
-3. **关键步骤**：在 `payload_dir` 中创建并写入一个固定文件名为 `ARC-AGI-文章.md` 的文件。
+1. **确定保存位置**：默认情况下，必须在当前项目目录下的 `articles/` 文件夹中，以**文章标题**为名创建一个专属子目录作为 Payload 目录（例如 `articles/OpenAI的四层分层架构/`）。如果用户在对话中明确指定了保存位置参数，则以用户指定的路径为准。
+2. 确保所有生成的封面和插图都已经放置在该专属目录中。
+3. **关键步骤**：在该专属目录中创建并写入 Markdown 文件（例如 `artical.md` 或使用文章标题本身命名）。
 
 **Markdown 格式规范（必须严格遵守）**：
 
@@ -129,7 +129,7 @@ illustration.png
 内容准备就绪后，使用 bash 运行发布命令（借助 `uvx` 实现零安装执行）：
 
 ```bash
-uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger --payload ./payload_dir
+uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger --payload ./articles/你的文章标题目录
 ```
 
 该脚本将自动接管 Google Chrome（使用 macOS 的 AppleScript 和 ChromeDomController），自动寻找或打开微信公众号后台（`mp.weixin.qq.com`），并将你生成的 Markdown 渲染、注入文本、设置原创、设置合集并上传封面插图。
@@ -147,7 +147,7 @@ uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger
 
 **执行流程**：
 1. 扩写大纲并生成 60-120 字的简介。
-2. 使用 AI 图像生成工具（或 Mermaid 兜底）生成封面和插图，分别保存为 `payload_dir/cover.png` 和 `payload_dir/illustration.png`。
-3. 创建 `payload_dir/你的文章标题拼音或英文.md`（文件名应当具备实际含义，不要照搬模板），填充所需标签。
-4. 执行 `uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger --payload ./payload_dir`。
+2. 使用 AI 图像生成工具（或 Mermaid 兜底）生成封面和插图，分别保存为 `articles/Agent自动化/cover.png` 和 `articles/Agent自动化/illustration.png`。
+3. 创建 `articles/Agent自动化/artical.md`（或者以文章标题命名），填充所需标签。
+4. 执行 `uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger --payload ./articles/Agent自动化`。
 5. 等待脚本完成，向用户报告草稿已保存，并提醒其在手机或浏览器预览确认。
