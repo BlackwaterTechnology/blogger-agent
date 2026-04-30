@@ -81,6 +81,107 @@ class WechatPublisher:
                 logger.info(f"Now on tab: {url}")
             except Exception as e:
                 logger.warning(f"Could not re-resolve WeChat tab: {e}")
+        else:
+            logger.info("Already on the editor page. Attempting to click 'Create New Content' for series article...")
+            js_create_new = """
+            (function() {
+                try {
+                    function clickReactElement(el) {
+                        if (!el) return false;
+                        const key = Object.keys(el).find(k => k.startsWith('__reactProps$') || k.startsWith('__reactEventHandlers$'));
+                        if (key && el[key] && el[key].onClick) {
+                            el[key].onClick({
+                                preventDefault: () => {},
+                                stopPropagation: () => {},
+                                nativeEvent: new MouseEvent('click', {bubbles: true, cancelable: true}),
+                                isDefaultPrevented: () => false,
+                                isPropagationStopped: () => false,
+                                target: el,
+                                currentTarget: el
+                            });
+                            return true;
+                        }
+                        el.click();
+                        return true;
+                    }
+
+                    let state = { is_done: false };
+                    let action = '';
+
+                    const allEls = Array.from(document.querySelectorAll('div, span, a, li, button'));
+                    
+                    // Step 1: Check if "Write new article" is visible
+                    const writeNewArticleBtn = allEls.find(el => {
+                        if (!el.innerText) return false;
+                        const text = el.innerText.trim();
+                        return (text === 'Write new article' || 
+                                text === '写新图文' || 
+                                text === '写新内容') && 
+                                el.clientHeight > 0 && 
+                                el.children.length <= 3 && 
+                                (el.tagName === 'LI' || el.tagName === 'DIV' || el.tagName === 'A');
+                    });
+
+                    if (writeNewArticleBtn) {
+                        clickReactElement(writeNewArticleBtn);
+                        action = "Clicked 'Write new article' menu option";
+                        return JSON.stringify({state: state, action: action, is_done: true});
+                    }
+
+                    // Step 2: Hover or Click "+ Create New Content"
+                    const createBtn = allEls.find(el => {
+                        if (!el.innerText) return false;
+                        const text = el.innerText.trim();
+                        return (text === '+ Create New Content' || 
+                                text === 'Create New Content' || 
+                                text === '+ 写新图文' || 
+                                text === '写新图文' || 
+                                text === '+ 新建消息' || 
+                                text === '新建消息' ||
+                                text === '+ 写新内容' ||
+                                text === '写新内容') && 
+                                el.clientHeight > 0 && 
+                                el.children.length <= 3;
+                    });
+                    
+                    if (createBtn) {
+                        const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true, cancelable: true });
+                        createBtn.dispatchEvent(mouseEnterEvent);
+                        clickReactElement(createBtn);
+                        action = "Hovered/Clicked main '+ Create New Content' button, waiting for dropdown...";
+                        return JSON.stringify({state: state, action: action, is_done: false});
+                    }
+                    
+                    const fallbackBtn = allEls.find(el => {
+                        if (!el.innerText) return false;
+                        const text = el.innerText;
+                        return (text.includes('Create New Content') || text.includes('写新图文') || text.includes('写新内容') || text.includes('新建消息')) && el.clientHeight > 0 && el.children.length === 0;
+                    });
+                    
+                    if (fallbackBtn) {
+                        let target = fallbackBtn;
+                        if (fallbackBtn.parentElement && fallbackBtn.parentElement.clientHeight > 0) {
+                            target = fallbackBtn.parentElement;
+                        }
+                        const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true, cancelable: true });
+                        target.dispatchEvent(mouseEnterEvent);
+                        clickReactElement(target);
+                        action = "Hovered/Clicked fallback button, waiting for dropdown...";
+                        return JSON.stringify({state: state, action: action, is_done: false});
+                    }
+                    
+                    action = "UI not found, retrying...";
+                    return JSON.stringify({state: state, action: action, is_done: false});
+                } catch(e) {
+                    return JSON.stringify({state: {error: e.toString()}, action: 'Error: ' + e.toString(), is_done: false});
+                }
+            })();
+            """
+            try:
+                self.run_ui_state_machine("Create Series Article", w_idx, t_idx, js_create_new, max_steps=8, delay=1.0)
+                time.sleep(2)
+            except Exception as e:
+                logger.warning(f"Failed to execute create new content UI state machine: {e}")
                 
         js_inject = f"""
         (function() {{
