@@ -12,7 +12,8 @@ dependencies = [
     "loguru",
     "markdown",
     "rookiepy",
-    "mcp"
+    "mcp",
+    "python-frontmatter"
 ]
 
 [project.scripts]

@@ -102,28 +102,25 @@ blogger generate-diagram --type mermaid --input payload_dir/cover.mmd --output p
 此格式由 `publish.py` 内部的状态机进行严格解析，任何不符合格式的排版都将导致解析失败。
 
 ```markdown
-# 标题
-这里是文章的标题
-# 作者
-Agent
-# 简介
-这里是文章简介，长度必须严格控制在 60 到 120 个字符之间。
-# 集合
-AI
-# 封面
-cover.png
-# 插图
-illustration.png
-# 正文
+---
+title: "这里是文章的标题"
+author: "Agent"
+desc: "这里是文章简介，长度必须严格控制在 60 到 120 个字符之间。"
+collection: "AI"
+cover: "cover.png"
+illustration: "illustration.png"
+---
+
 这里开始是文章的正文内容。
 可以包含 Markdown 的各种语法，如加粗、代码块等。
 内容会自动解析为 HTML 格式并保留。
 ```
 
 注意事项：
-- 标题标识如 `# 标题`, `# 作者`, `# 简介` 等必须精确匹配，且独占一行。
-- `封面` 和 `插图` 下方填写的是相对于 payload 目录的文件名。**这两项都是必填的**，不得留空（如果不得已，两处可以填同一个文件名）。
-- 从 `# 正文` 以下的所有内容，均会被视为微信公众号文章正文。
+- 必须在 Markdown 文件头部使用标准的 YAML Front Matter 格式（由 `---` 包围）。
+- `title`, `author`, `desc`, `collection`, `cover`, `illustration` 这些字段名必须准确无误。
+- `cover` 和 `illustration` 填写的是相对于 payload 目录的文件名。**这两项都是必填的**，不得留空（如果不得已，两处可以填同一个文件名）。
+- 从第二个 `---` 以下的所有内容，均会被视为微信公众号文章正文。
 
 ### Step 4: 执行发布脚本
 
