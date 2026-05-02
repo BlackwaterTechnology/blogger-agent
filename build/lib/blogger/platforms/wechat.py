@@ -81,6 +81,107 @@ class WechatPublisher:
                 logger.info(f"Now on tab: {url}")
             except Exception as e:
                 logger.warning(f"Could not re-resolve WeChat tab: {e}")
+        else:
+            logger.info("Already on the editor page. Attempting to click 'Create New Content' for series article...")
+            js_create_new = """
+            (function() {
+                try {
+                    function clickReactElement(el) {
+                        if (!el) return false;
+                        const key = Object.keys(el).find(k => k.startsWith('__reactProps$') || k.startsWith('__reactEventHandlers$'));
+                        if (key && el[key] && el[key].onClick) {
+                            el[key].onClick({
+                                preventDefault: () => {},
+                                stopPropagation: () => {},
+                                nativeEvent: new MouseEvent('click', {bubbles: true, cancelable: true}),
+                                isDefaultPrevented: () => false,
+                                isPropagationStopped: () => false,
+                                target: el,
+                                currentTarget: el
+                            });
+                            return true;
+                        }
+                        el.click();
+                        return true;
+                    }
+
+                    let state = { is_done: false };
+                    let action = '';
+
+                    const allEls = Array.from(document.querySelectorAll('div, span, a, li, button'));
+                    
+                    // Step 1: Check if "Write new article" is visible
+                    const writeNewArticleBtn = allEls.find(el => {
+                        if (!el.innerText) return false;
+                        const text = el.innerText.trim();
+                        return (text === 'Write new article' || 
+                                text === '写新图文' || 
+                                text === '写新内容') && 
+                                el.clientHeight > 0 && 
+                                el.children.length <= 3 && 
+                                (el.tagName === 'LI' || el.tagName === 'DIV' || el.tagName === 'A');
+                    });
+
+                    if (writeNewArticleBtn) {
+                        clickReactElement(writeNewArticleBtn);
+                        action = "Clicked 'Write new article' menu option";
+                        return JSON.stringify({state: state, action: action, is_done: true});
+                    }
+
+                    // Step 2: Hover or Click "+ Create New Content"
+                    const createBtn = allEls.find(el => {
+                        if (!el.innerText) return false;
+                        const text = el.innerText.trim();
+                        return (text === '+ Create New Content' || 
+                                text === 'Create New Content' || 
+                                text === '+ 写新图文' || 
+                                text === '写新图文' || 
+                                text === '+ 新建消息' || 
+                                text === '新建消息' ||
+                                text === '+ 写新内容' ||
+                                text === '写新内容') && 
+                                el.clientHeight > 0 && 
+                                el.children.length <= 3;
+                    });
+                    
+                    if (createBtn) {
+                        const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true, cancelable: true });
+                        createBtn.dispatchEvent(mouseEnterEvent);
+                        clickReactElement(createBtn);
+                        action = "Hovered/Clicked main '+ Create New Content' button, waiting for dropdown...";
+                        return JSON.stringify({state: state, action: action, is_done: false});
+                    }
+                    
+                    const fallbackBtn = allEls.find(el => {
+                        if (!el.innerText) return false;
+                        const text = el.innerText;
+                        return (text.includes('Create New Content') || text.includes('写新图文') || text.includes('写新内容') || text.includes('新建消息')) && el.clientHeight > 0 && el.children.length === 0;
+                    });
+                    
+                    if (fallbackBtn) {
+                        let target = fallbackBtn;
+                        if (fallbackBtn.parentElement && fallbackBtn.parentElement.clientHeight > 0) {
+                            target = fallbackBtn.parentElement;
+                        }
+                        const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true, cancelable: true });
+                        target.dispatchEvent(mouseEnterEvent);
+                        clickReactElement(target);
+                        action = "Hovered/Clicked fallback button, waiting for dropdown...";
+                        return JSON.stringify({state: state, action: action, is_done: false});
+                    }
+                    
+                    action = "UI not found, retrying...";
+                    return JSON.stringify({state: state, action: action, is_done: false});
+                } catch(e) {
+                    return JSON.stringify({state: {error: e.toString()}, action: 'Error: ' + e.toString(), is_done: false});
+                }
+            })();
+            """
+            try:
+                self.run_ui_state_machine("Create Series Article", w_idx, t_idx, js_create_new, max_steps=8, delay=1.0)
+                time.sleep(2)
+            except Exception as e:
+                logger.warning(f"Failed to execute create new content UI state machine: {e}")
                 
         js_inject = f"""
         (function() {{
@@ -782,6 +883,141 @@ class WechatPublisher:
         if collection:
             self.run_ui_state_machine("Collection Setup", w_idx, t_idx, js_collection_setup, max_steps=8)
             
+        logger.info("Setting up Creation Source (AI Generated)...")
+        js_creation_source_setup = """
+        (function() {
+            try {
+                function clickReactElement(el) {
+                    if (!el) return false;
+                    const key = Object.keys(el).find(k => k.startsWith('__reactProps$') || k.startsWith('__reactEventHandlers$'));
+                    if (key && el[key] && el[key].onClick) {
+                        el[key].onClick({
+                            preventDefault: () => {},
+                            stopPropagation: () => {},
+                            nativeEvent: new MouseEvent('click', {bubbles: true, cancelable: true}),
+                            isDefaultPrevented: () => false,
+                            isPropagationStopped: () => false,
+                            target: el,
+                            currentTarget: el
+                        });
+                        return true;
+                    }
+                    el.click();
+                    return true;
+                }
+
+                let state = { is_dialog_open: false, is_done: false };
+                let action = '';
+
+                const dialogs = Array.from(document.querySelectorAll('.weui-desktop-dialog'));
+                const sourceDialog = dialogs.find(d => d.style.display !== 'none' && d.clientHeight > 0 && (d.innerText.includes('Creation Source') || d.innerText.includes('创作声明')));
+                
+                if (!sourceDialog) {
+                    state.is_dialog_open = false;
+                    
+                    if (window.__wechat_automation_source_confirm && (Date.now() - window.__wechat_automation_source_confirm < 5000)) {
+                        state.is_done = true;
+                        action = 'Creation Source setup successful (dialog closed)';
+                        return JSON.stringify({state: state, action: action, is_done: true});
+                    }
+                    
+                    const allLabels = Array.from(document.querySelectorAll('label, span, div'));
+                    const sourceLabel = allLabels.find(el => {
+                        const t = el.innerText ? el.innerText.trim() : '';
+                        return t === '创作声明' || t === 'Creation Source';
+                    });
+                    
+                    if (sourceLabel) {
+                        let container = sourceLabel.parentElement;
+                        let isUnset = false;
+                        let searchDepth = 0;
+                        
+                        while(container && container.tagName.toLowerCase() !== 'body' && searchDepth < 5) {
+                            const t = container.innerText || '';
+                            if (t.includes('未声明') || t.includes('Not added') || t.includes('未设置') || t.includes('未添加')) {
+                                isUnset = true;
+                                break;
+                            }
+                            container = container.parentElement;
+                            searchDepth++;
+                        }
+                        
+                        if (isUnset && container && container.tagName.toLowerCase() !== 'body') {
+                            const clickables = Array.from(container.querySelectorAll('a, i, svg, span')).filter(el => el.clientHeight > 0);
+                            const unstatedEl = clickables.find(el => {
+                                const t = el.innerText || '';
+                                return t.includes('未声明') || t.includes('未设置') || t.includes('未添加') || t.includes('Not added');
+                            });
+                            
+                            const iconEl = clickables.find(el => el.tagName.toLowerCase() === 'svg' || el.tagName.toLowerCase() === 'i' || el.classList.contains('weui-icon'));
+                            
+                            const targets = [iconEl, unstatedEl, container].filter(Boolean);
+                            
+                            for (let target of targets) {
+                                clickReactElement(target);
+                                try {
+                                    target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                                    target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                                    target.click();
+                                } catch (e) {}
+                                
+                                if (target.parentElement) {
+                                    clickReactElement(target.parentElement);
+                                    target.parentElement.click();
+                                }
+                            }
+                            
+                            action = 'Clicked Creation Source row to open dialog';
+                            return JSON.stringify({state: state, action: action, is_done: false});
+                        }
+                    }
+                    
+                    state.is_done = true;
+                    action = 'Creation Source seems already set or not found, skipping';
+                    return JSON.stringify({state: state, action: action, is_done: true});
+                }
+                
+                state.is_dialog_open = true;
+                
+                const labels = Array.from(sourceDialog.querySelectorAll('label'));
+                const aiLabel = labels.find(l => {
+                    const t = l.innerText || '';
+                    return t.includes('内容由AI生成') || t.includes('AI-generated') || t.includes('AI generated');
+                });
+                
+                if (aiLabel) {
+                    const radio = aiLabel.querySelector('input[type="radio"]');
+                    const isChecked = radio ? radio.checked : aiLabel.classList.contains('weui-desktop-form__radio_checked') || (aiLabel.querySelector('.weui-desktop-form__radio_checked') !== null);
+                    
+                    if (!isChecked) {
+                        if (radio) {
+                            radio.click();
+                        } else {
+                            clickReactElement(aiLabel);
+                        }
+                        action = 'Selected AI Generated radio button';
+                        return JSON.stringify({state: state, action: action, is_done: false});
+                    }
+                }
+                
+                const btns = Array.from(sourceDialog.querySelectorAll('button'));
+                const confirmBtn = btns.find(b => b.innerText.includes('Confirm') || b.innerText.includes('确定'));
+                if (confirmBtn && !confirmBtn.classList.contains('weui-desktop-btn_disabled')) {
+                    setTimeout(() => clickReactElement(confirmBtn), 200);
+                    window.__wechat_automation_source_confirm = Date.now();
+                    action = 'Clicked Confirm in Creation Source dialog';
+                    return JSON.stringify({state: state, action: action, is_done: false});
+                }
+                
+                action = 'Waiting in Creation Source dialog...';
+                return JSON.stringify({state: state, action: action, is_done: false});
+            } catch (e) {
+                return JSON.stringify({state: {error: e.toString()}, action: 'Error: ' + e.toString(), is_done: false});
+            }
+        })();
+        """
+        self.run_ui_state_machine("Creation Source Setup", w_idx, t_idx, js_creation_source_setup, max_steps=8)
+
         logger.info("Saving as draft...")
         js_save_draft = """
         (function() {

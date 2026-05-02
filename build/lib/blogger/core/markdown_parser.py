@@ -1,62 +1,25 @@
 from pathlib import Path
 from loguru import logger
 import markdown
+import frontmatter
 
 def parse_markdown_payload(md_path: Path) -> dict:
     if not md_path.exists():
         raise FileNotFoundError(f"Markdown file not found: {md_path}")
         
-    text = md_path.read_text(encoding="utf-8")
-    lines = text.split("\n")
+    try:
+        post = frontmatter.load(md_path)
+    except Exception as e:
+        logger.error(f"Failed to parse Front Matter in {md_path}: {e}")
+        raise ValueError(f"Invalid Front Matter format in {md_path}") from e
     
-    title = ""
-    author = ""
-    collection = "AI"
-    cover_filename = ""
-    illustration_filename = ""
-    desc_lines = []
-    content_lines = []
-    
-    state = 0
-    for line in lines:
-        if line.startswith("# 标题"):
-            state = 1
-        elif line.startswith("# 作者"):
-            state = 2
-        elif line.startswith("# 简介"):
-            state = 4
-        elif line.startswith("# 集合"):
-            state = 5
-        elif line.startswith("# 封面"):
-            state = 6
-        elif line.startswith("# 插图"):
-            state = 7
-        elif line.startswith("# 正文"):
-            state = 3
-        elif line.startswith("---") and state != 3:
-            state = 0
-        elif state == 1 and line.strip():
-            title = line.strip()
-            state = 0
-        elif state == 2 and line.strip():
-            author = line.strip()
-            state = 0
-        elif state == 5 and line.strip():
-            collection = line.strip()
-            state = 0
-        elif state == 6 and line.strip():
-            cover_filename = line.strip()
-            state = 0
-        elif state == 7 and line.strip():
-            illustration_filename = line.strip()
-            state = 0
-        elif state == 4:
-            desc_lines.append(line)
-        elif state == 3:
-            content_lines.append(line)
-            
-    content = "\n".join(content_lines).strip()
-    desc = "\n".join(desc_lines).strip()
+    title = post.metadata.get("title", "")
+    author = post.metadata.get("author", "")
+    collection = post.metadata.get("collection", "AI")
+    desc = post.metadata.get("desc", "")
+    cover_filename = post.metadata.get("cover", "")
+    illustration_filename = post.metadata.get("illustration", "")
+    content = post.content.strip()
     
     if desc:
         if len(desc) < 60 or len(desc) > 120:
