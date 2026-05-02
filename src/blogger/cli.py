@@ -19,7 +19,7 @@ def main():
     # Publish command
     publish_parser = subparsers.add_parser("publish", help="Publish an article payload")
     publish_parser.add_argument("--payload", default="articles/test_data", help="Directory containing the article markdown files")
-    publish_parser.add_argument("--platform", default="wechat", help="Target platform(s) to publish to, comma-separated (e.g. wechat,juejin)")
+    publish_parser.add_argument("--platform", default="wechat", help="Target platform(s) to publish to, comma-separated (e.g. wechat,juejin,csdn)")
 
     # Diagram command
     diagram_parser = subparsers.add_parser("generate-diagram", help="Generate an image from diagram text")
@@ -75,6 +75,11 @@ def main():
             from .platforms.juejin import JuejinPublisher
             logger.info("Initiating Juejin publishing flow...")
             publisher = JuejinPublisher()
+            publisher.publish(article_data)
+        elif platform == "csdn":
+            from .platforms.csdn import CsdnPublisher
+            logger.info("Initiating CSDN publishing flow...")
+            publisher = CsdnPublisher()
             publisher.publish(article_data)
         else:
             logger.warning(f"Platform '{platform}' is currently not implemented or unknown.")
