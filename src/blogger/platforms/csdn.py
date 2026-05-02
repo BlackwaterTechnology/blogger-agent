@@ -606,21 +606,23 @@ class CsdnPublisher:
                 except Exception as e:
                     logger.warning(f"  [tag={tag_name}] AppleScript failed: {e}")
 
-        # Close tag panel before moving to categories
+        # Close tag panel by clicking the X button before moving to categories
         js_close_tag_panel = """
         (function() {
             const panel = document.querySelector('.mark_selection_box');
             if (panel && panel.clientHeight > 0) {
-                const publishBody = document.querySelector('.modal__publish-article .modal__inner-2, .modal__publish-article');
-                if (publishBody) {
-                    publishBody.click();
-                    return "Clicked outside tag panel";
+                // Click the X close button inside the tag panel
+                const closeBtn = panel.querySelector('button.modal__close-button');
+                if (closeBtn) {
+                    closeBtn.click();
+                    return "Clicked close button";
                 }
             }
-            return "Tag panel already closed or not found";
+            return "Tag panel already closed or no close button";
         })();
         """
-        self.chrome.execute_javascript(w_idx, t_idx, js_close_tag_panel, settle_seconds=1.0)
+        res_close = self.chrome.execute_javascript(w_idx, t_idx, js_close_tag_panel, settle_seconds=1.0)
+        logger.info(f"Close tag panel: {res_close}")
         time.sleep(0.5)
 
         # ============================================================
