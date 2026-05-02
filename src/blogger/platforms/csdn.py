@@ -465,18 +465,7 @@ class CsdnPublisher:
         """
         self.chrome.execute_javascript(w_idx, t_idx, js_publish_dialog_1, settle_seconds=1.5)
 
-        # 6.2 Category Configuration (分类专栏)
-        # CSDN Category UI structure (from DOM diagnosis):
-        #   .tag__box (inside the publish dialog, for the "分类专栏" section)
-        #     .tag__item-list — currently selected categories (span.tag__name + delete btn)
-        #     button.tag__btn-tag "新建分类专栏" — actually opens the EXISTING category list
-        #     .tag__option-box — each existing category (clickable to toggle)
-        #       label.tag__option-label > input.tag__option-chk (checkbox, height=0 but functional)
-        #
-        # Strategy: Click "新建分类专栏" to expand the list, then click matching .tag__option-box items.
-        logger.info("Setting up Category via checkbox selection...")
-        
-        # Parse collection into a list
+        # Parse collection into a list (used by both tags and categories)
         if isinstance(collection, str):
             collection_list = [c.strip() for c in collection.replace('，', ',').replace(' ', ',').split(',') if c.strip()]
         elif isinstance(collection, list):
@@ -484,184 +473,30 @@ class CsdnPublisher:
         else:
             collection_list = [str(collection).strip()]
 
-        # Step 1: Find the category .tag__box (distinct from the tag section's .mark_selection)
-        # Click "新建分类专栏" to expand the dropdown list of existing categories
-        js_open_cat_list = """
-        (function() {
-            const dialog = document.querySelector('.modal__publish-article, .modal__inner-1');
-            if (!dialog) return "NO_DIALOG";
-            
-            // Find the category form entry (contains "分类专栏")
-            const formEntries = Array.from(dialog.querySelectorAll('.form-entry')).filter(d => 
-                d.innerText && d.innerText.includes('分类专栏')
-            );
-            if (formEntries.length === 0) return "NO_CAT_SECTION";
-            
-            const catEntry = formEntries[0];
-            
-            // Click the "新建分类专栏" button to expand the list
-            const btn = catEntry.querySelector('button.tag__btn-tag');
-            if (btn) {
-                btn.click();
-                return "EXPANDED";
-            }
-            return "NO_EXPAND_BTN";
-        })();
-        """
-        res_open = self.chrome.execute_javascript(w_idx, t_idx, js_open_cat_list, settle_seconds=1.0)
-        logger.info(f"Expand category list: {res_open}")
-        time.sleep(0.5)
-        
-        # Step 2: Clear existing selected categories, then select the desired ones
-        js_set_categories = ";\n".join([f"""
-        (function() {{
-            const dialog = document.querySelector('.modal__publish-article, .modal__inner-1');
-            if (!dialog) return JSON.stringify({{action: "NO_DIALOG"}});
-            
-            const catEntry = Array.from(dialog.querySelectorAll('.form-entry')).find(d => 
-                d.innerText && d.innerText.includes('分类专栏')
-            );
-            if (!catEntry) return JSON.stringify({{action: "NO_CAT_SECTION"}});
-            
-            const tagBox = catEntry.querySelector('.tag__box');
-            if (!tagBox) return JSON.stringify({{action: "NO_TAG_BOX"}});
-            
-            let action = [];
-            const catName = {json.dumps(cat_name)};
-            
-            // Find the checkbox for this category
-            const allCheckboxes = Array.from(tagBox.querySelectorAll('input.tag__option-chk'));
-            for (const cb of allCheckboxes) {{
-                const labelEl = cb.closest('.tag__option-box, .tag__option-label, label');
-                const labelText = labelEl ? (labelEl.innerText || '').trim() : '';
-                if (labelText === catName) {{
-                    if (!cb.checked) {{
-                        // Click the parent option-box div (more reliable than clicking the hidden checkbox)
-                        const optionBox = cb.closest('.tag__option-box');
-                        if (optionBox) {{
-                            optionBox.click();
-                            action.push("Clicked option-box for: " + catName);
-                        }} else {{
-                            cb.click();
-                            action.push("Clicked checkbox for: " + catName);
-                        }}
-                    }} else {{
-                        action.push("Already selected: " + catName);
-                    }}
-                    return JSON.stringify({{action: action.join(", ")}});
-                }}
-            }}
-            
-            action.push("Category not found in list: " + catName);
-            return JSON.stringify({{action: action.join(", ")}});
-        }})();
-        """ for cat_name in collection_list[:3]])
-        
-        # First clear any incorrectly selected categories
-        js_clear_cats = """
-        (function() {
-            const dialog = document.querySelector('.modal__publish-article, .modal__inner-1');
-            if (!dialog) return "NO_DIALOG";
-            
-            const catEntry = Array.from(dialog.querySelectorAll('.form-entry')).find(d => 
-                d.innerText && d.innerText.includes('分类专栏')
-            );
-            if (!catEntry) return "NO_CAT_SECTION";
-            
-            const tagBox = catEntry.querySelector('.tag__box');
-            if (!tagBox) return "NO_TAG_BOX";
-            
-            let cleared = 0;
-            // Uncheck all currently selected categories
-            const checkedBoxes = Array.from(tagBox.querySelectorAll('input.tag__option-chk:checked'));
-            for (const cb of checkedBoxes) {
-                const optionBox = cb.closest('.tag__option-box');
-                if (optionBox) { optionBox.click(); } else { cb.click(); }
-                cleared++;
-            }
-            
-            // Also try clicking delete buttons on selected items
-            const deleteBtns = Array.from(tagBox.querySelectorAll('.tag__btn-tag-delete'));
-            for (const btn of deleteBtns) {
-                btn.click();
-                cleared++;
-            }
-            
-            return "Cleared " + cleared + " categories";
-        })();
-        """
-        res_clear = self.chrome.execute_javascript(w_idx, t_idx, js_clear_cats, settle_seconds=0.5)
-        logger.info(f"Clear categories: {res_clear}")
-        time.sleep(0.5)
-        
-        # Re-expand the list (clearing may have collapsed it)
-        self.chrome.execute_javascript(w_idx, t_idx, js_open_cat_list, settle_seconds=0.5)
-        time.sleep(0.5)
-        
-        # Now select desired categories one by one
-        for cat_name in collection_list[:3]:
-            logger.info(f"Selecting category: {cat_name!r}")
-            js_select_cat = f"""
-            (function() {{
-                const dialog = document.querySelector('.modal__publish-article, .modal__inner-1');
-                if (!dialog) return JSON.stringify({{action: "NO_DIALOG"}});
-                
-                const catEntry = Array.from(dialog.querySelectorAll('.form-entry')).find(d => 
-                    d.innerText && d.innerText.includes('分类专栏')
-                );
-                if (!catEntry) return JSON.stringify({{action: "NO_CAT_SECTION"}});
-                
-                const tagBox = catEntry.querySelector('.tag__box');
-                if (!tagBox) return JSON.stringify({{action: "NO_TAG_BOX"}});
-                
-                const catName = {json.dumps(cat_name)};
-                
-                // Find matching option-box
-                const optionBoxes = Array.from(tagBox.querySelectorAll('.tag__option-box'));
-                for (const box of optionBoxes) {{
-                    const text = (box.innerText || '').trim();
-                    if (text === catName) {{
-                        const cb = box.querySelector('input.tag__option-chk');
-                        if (cb && cb.checked) {{
-                            return JSON.stringify({{action: "Already selected: " + catName}});
-                        }}
-                        box.click();
-                        return JSON.stringify({{action: "Selected: " + catName}});
-                    }}
-                }}
-                
-                return JSON.stringify({{action: "Not found: " + catName}});
-            }})();
-            """
-            res_cat = self.chrome.execute_javascript(w_idx, t_idx, js_select_cat, settle_seconds=0.5)
-            logger.info(f"  Category result: {res_cat}")
-            time.sleep(0.3)
-
-        # 6.5 Tags Configuration
-        # CSDN Tag UI structure (from DOM diagnosis):
-        #   .mark_selection_box (NOT a dialog, it's an inline panel)
-        #     .mark_add_tag_left (UL) — category sidebar: 推荐, Python, 人工智能, etc.
-        #     .mark_add_tag_right — right panel with checkboxes (input.tag__option-chk)
+        # ============================================================
+        # 6.2 Tags Configuration (文章标签) — MUST run BEFORE categories
+        # ============================================================
+        # CSDN Tag UI structure:
+        #   .mark_selection_box (inline panel, NOT a dialog)
+        #     .mark_add_tag_left (UL) — category sidebar
+        #     .mark_add_tag_right — right panel with checkboxes
         #     input.el-input__inner with placeholder "请输入文字搜索，Enter键入可添加自定义标签"
         #   .mark_selection_box_selectTag — shows selected count
-        #
-        # Strategy: Use the search input to type each tag and press Enter.
         logger.info("Setting up Tags via CSDN tag search input...")
 
         # JS to click "添加文章标签" button to open the tag panel
         js_click_add_tag = """
         (function() {
-            const btn = document.querySelector('button.tag__btn-tag');
-            if (btn && btn.innerText.includes('添加文章标签')) {
-                btn.click();
-                return "CLICKED";
-            }
+            // Specifically find the button with "添加文章标签" text
+            const btns = Array.from(document.querySelectorAll('button.tag__btn-tag'));
+            const tagBtn = btns.find(b => b.innerText && b.innerText.includes('添加文章标签'));
+            if (tagBtn) { tagBtn.click(); return "CLICKED"; }
             // Fallback: broader search
             const candidates = Array.from(document.querySelectorAll('button, div, span')).filter(b =>
                 b.innerText && b.innerText.replace(/\\s+/g, '').includes('添加文章标签')
             );
-            const tagBtn = candidates.find(b => b.tagName === 'BUTTON') || candidates[candidates.length - 1];
-            if (tagBtn) { tagBtn.click(); return "CLICKED_FALLBACK"; }
+            const btn = candidates.find(b => b.tagName === 'BUTTON') || candidates[candidates.length - 1];
+            if (btn) { btn.click(); return "CLICKED_FALLBACK"; }
             return "NOT_FOUND";
         })();
         """
@@ -678,8 +513,6 @@ class CsdnPublisher:
         """
 
         # JS to find and focus the tag search input — ONLY focus, do NOT touch .value
-        # Manipulating .value directly breaks Vue's v-model binding,
-        # causing subsequent Enter events to be silently ignored.
         js_focus_tag_input = """
         (function() {
             const inputs = Array.from(document.querySelectorAll('input.el-input__inner, input[type="text"]'));
@@ -701,7 +534,7 @@ class CsdnPublisher:
         panel_visible = False
         for attempt in range(10):
             res_panel = self.chrome.execute_javascript(w_idx, t_idx, js_check_panel, settle_seconds=0.3)
-            if res_panel and res_panel.startswith("VISIBLE"):
+            if res_panel and str(res_panel).startswith("VISIBLE"):
                 panel_visible = True
                 logger.info(f"Tag panel appeared: {res_panel}")
                 break
@@ -710,31 +543,8 @@ class CsdnPublisher:
         if not panel_visible:
             logger.warning("Tag panel (.mark_selection_box) did not appear, skipping tags.")
         else:
-            # Step 3: Clear any existing tags first
-            js_clear_existing = """
-            (function() {
-                let cleared = 0;
-                const closeBtns = Array.from(document.querySelectorAll('.mark_selection_box .el-tag .el-icon-close, .mark_selection_box .el-tag__close'));
-                for (const btn of closeBtns) {
-                    btn.click();
-                    cleared++;
-                }
-                const checkedBoxes = Array.from(document.querySelectorAll('input.tag__option-chk:checked'));
-                for (const cb of checkedBoxes) {
-                    cb.click();
-                    cleared++;
-                }
-                return "Cleared " + cleared + " existing tags";
-            })();
-            """
-            res_clear = self.chrome.execute_javascript(w_idx, t_idx, js_clear_existing, settle_seconds=0.5)
-            logger.info(f"Clear existing tags: {res_clear}")
-            time.sleep(0.5)
-
-            # Step 4: For each tag, use search input to type and press Enter
+            # Step 3: For each tag, use search input to type and press Enter
             # CSDN placeholder: "请输入文字搜索，Enter键入可添加自定义标签"
-            # CRITICAL: We must NOT use JS to modify input.value — it breaks Vue v-model.
-            # Instead, use purely physical AppleScript: Cmd+A (select all) → type → Enter.
             for tag_name in collection_list[:3]:
                 logger.info(f"Adding tag: {tag_name!r}")
 
@@ -746,7 +556,7 @@ class CsdnPublisher:
                     logger.warning(f"  [tag={tag_name}] Search input not found, skipping.")
                     continue
 
-                # All-physical AppleScript: select-all → type tag → wait → Enter
+                # All-physical AppleScript: select-all → type → Esc (dismiss autocomplete) → Enter
                 applescript_type_and_enter = f'''
                 tell application "System Events"
                     tell process "Google Chrome"
@@ -758,6 +568,9 @@ class CsdnPublisher:
                         -- Type the tag name (replaces selected text)
                         keystroke "{tag_name}"
                         delay 1.5
+                        -- Escape to dismiss autocomplete dropdown (keeps input text)
+                        key code 53
+                        delay 0.3
                         -- Press Enter to confirm the custom tag
                         keystroke return
                         delay 0.8
@@ -771,17 +584,20 @@ class CsdnPublisher:
                     logger.warning(f"  [tag={tag_name}] AppleScript type+enter failed: {e}")
                     continue
 
-        # 6.6 Close Tag Panel by clicking outside or pressing Esc
-        # The tag panel (.mark_selection_box) is NOT a dialog, so we just click elsewhere to close it
+                # Recovery: if Escape accidentally closed the tag panel, re-open it
+                res_panel_check = self.chrome.execute_javascript(w_idx, t_idx, js_check_panel, settle_seconds=0.3)
+                if not res_panel_check or not str(res_panel_check).startswith("VISIBLE"):
+                    logger.info("  Tag panel closed, re-opening...")
+                    self.chrome.execute_javascript(w_idx, t_idx, js_click_add_tag, settle_seconds=0.5)
+                    time.sleep(0.5)
+
+        # Close tag panel before moving to categories
         js_close_tag_panel = """
         (function() {
-            // Click on a neutral area outside the tag panel to close it
             const panel = document.querySelector('.mark_selection_box');
             if (panel && panel.clientHeight > 0) {
-                // Click on the publish dialog body (outside the tag area)
                 const publishBody = document.querySelector('.modal__publish-article .modal__inner-2, .modal__publish-article');
                 if (publishBody) {
-                    // Click at a point below the tag section
                     publishBody.click();
                     return "Clicked outside tag panel";
                 }
@@ -790,6 +606,103 @@ class CsdnPublisher:
         })();
         """
         self.chrome.execute_javascript(w_idx, t_idx, js_close_tag_panel, settle_seconds=1.0)
+        time.sleep(0.5)
+
+        # ============================================================
+        # 6.3 Category Configuration (分类专栏) — runs AFTER tags
+        # ============================================================
+        # CSDN Category UI structure:
+        #   .form-entry containing "分类专栏" label
+        #     .tag__box
+        #       .tag__item-list — currently selected categories
+        #       button.tag__btn-tag "新建分类专栏" — expands existing category list
+        #       .tag__option-box — each existing category (clickable to toggle)
+        #         input.tag__option-chk (checkbox)
+        logger.info("Setting up Category via checkbox selection...")
+
+        # Click "新建分类专栏" to expand the category list
+        js_open_cat_list = """
+        (function() {
+            const dialog = document.querySelector('.modal__publish-article, .modal__inner-1');
+            if (!dialog) return "NO_DIALOG";
+            const formEntries = Array.from(dialog.querySelectorAll('.form-entry')).filter(d => 
+                d.innerText && d.innerText.includes('分类专栏')
+            );
+            if (formEntries.length === 0) return "NO_CAT_SECTION";
+            const catEntry = formEntries[0];
+            const btn = catEntry.querySelector('button.tag__btn-tag');
+            if (btn) { btn.click(); return "EXPANDED"; }
+            return "NO_EXPAND_BTN";
+        })();
+        """
+        res_open = self.chrome.execute_javascript(w_idx, t_idx, js_open_cat_list, settle_seconds=1.0)
+        logger.info(f"Expand category list: {res_open}")
+        time.sleep(0.5)
+
+        # Clear existing selected categories (scoped to catEntry only)
+        js_clear_cats = """
+        (function() {
+            const dialog = document.querySelector('.modal__publish-article, .modal__inner-1');
+            if (!dialog) return "NO_DIALOG";
+            const catEntry = Array.from(dialog.querySelectorAll('.form-entry')).find(d => 
+                d.innerText && d.innerText.includes('分类专栏')
+            );
+            if (!catEntry) return "NO_CAT_SECTION";
+            const tagBox = catEntry.querySelector('.tag__box');
+            if (!tagBox) return "NO_TAG_BOX";
+            let cleared = 0;
+            // Only clear checkboxes WITHIN the category tagBox (not global)
+            const checkedBoxes = Array.from(tagBox.querySelectorAll('input.tag__option-chk:checked'));
+            for (const cb of checkedBoxes) {
+                const optionBox = cb.closest('.tag__option-box');
+                if (optionBox) { optionBox.click(); } else { cb.click(); }
+                cleared++;
+            }
+            const deleteBtns = Array.from(tagBox.querySelectorAll('.tag__btn-tag-delete'));
+            for (const btn of deleteBtns) { btn.click(); cleared++; }
+            return "Cleared " + cleared + " categories";
+        })();
+        """
+        res_clear = self.chrome.execute_javascript(w_idx, t_idx, js_clear_cats, settle_seconds=0.5)
+        logger.info(f"Clear categories: {res_clear}")
+        time.sleep(0.5)
+        
+        # Re-expand the list (clearing may have collapsed it)
+        self.chrome.execute_javascript(w_idx, t_idx, js_open_cat_list, settle_seconds=0.5)
+        time.sleep(0.5)
+        
+        # Select desired categories one by one
+        for cat_name in collection_list[:3]:
+            logger.info(f"Selecting category: {cat_name!r}")
+            js_select_cat = f"""
+            (function() {{
+                const dialog = document.querySelector('.modal__publish-article, .modal__inner-1');
+                if (!dialog) return JSON.stringify({{action: "NO_DIALOG"}});
+                const catEntry = Array.from(dialog.querySelectorAll('.form-entry')).find(d => 
+                    d.innerText && d.innerText.includes('分类专栏')
+                );
+                if (!catEntry) return JSON.stringify({{action: "NO_CAT_SECTION"}});
+                const tagBox = catEntry.querySelector('.tag__box');
+                if (!tagBox) return JSON.stringify({{action: "NO_TAG_BOX"}});
+                const catName = {json.dumps(cat_name)};
+                const optionBoxes = Array.from(tagBox.querySelectorAll('.tag__option-box'));
+                for (const box of optionBoxes) {{
+                    const text = (box.innerText || '').trim();
+                    if (text === catName) {{
+                        const cb = box.querySelector('input.tag__option-chk');
+                        if (cb && cb.checked) {{
+                            return JSON.stringify({{action: "Already selected: " + catName}});
+                        }}
+                        box.click();
+                        return JSON.stringify({{action: "Selected: " + catName}});
+                    }}
+                }}
+                return JSON.stringify({{action: "Not found: " + catName}});
+            }})();
+            """
+            res_cat = self.chrome.execute_javascript(w_idx, t_idx, js_select_cat, settle_seconds=0.5)
+            logger.info(f"  Category result: {res_cat}")
+            time.sleep(0.3)
 
         # 7. Final Submit
         logger.info("CSDN article configuration complete. Submitting article...")
