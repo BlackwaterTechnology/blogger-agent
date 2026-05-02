@@ -543,7 +543,23 @@ class CsdnPublisher:
         if not panel_visible:
             logger.warning("Tag panel (.mark_selection_box) did not appear, skipping tags.")
         else:
-            # Step 3: For each tag, use search input to type and press Enter
+            # Step 3: Clear any existing selected tags first
+            js_clear_existing = """
+            (function() {
+                let cleared = 0;
+                // Only remove the X buttons on already-selected tag pills
+                const closeBtns = Array.from(document.querySelectorAll(
+                    '.mark_selection .el-tag .el-icon-close, .mark_selection .el-tag__close'
+                ));
+                for (const btn of closeBtns) { btn.click(); cleared++; }
+                return "Cleared " + cleared + " existing tags";
+            })();
+            """
+            res_clear = self.chrome.execute_javascript(w_idx, t_idx, js_clear_existing, settle_seconds=0.5)
+            logger.info(f"Clear existing tags: {res_clear}")
+            time.sleep(0.5)
+
+            # Step 4: For each tag, use search input to type and press Enter
             # CSDN placeholder: "请输入文字搜索，Enter键入可添加自定义标签"
             for tag_name in collection_list[:3]:
                 logger.info(f"Adding tag: {tag_name!r}")
@@ -556,22 +572,25 @@ class CsdnPublisher:
                     logger.warning(f"  [tag={tag_name}] Search input not found, skipping.")
                     continue
 
-                # All-physical AppleScript: select-all → type → Esc (dismiss autocomplete) → Enter
+                # Single AppleScript: type → Up (deselect autocomplete) → Enter.
+                # PROBLEM: el-autocomplete highlights the first suggestion by default.
+                # Pressing Enter with a highlighted item selects that item (e.g. "segmentfault")
+                # instead of adding the typed text as a custom tag.
+                # FIX: Press Up arrow BEFORE Enter to deselect (highlightedIndex: 0 → -1).
+                # With no item highlighted, Enter triggers "添加自定义标签" behavior.
+                # All in ONE AppleScript call to preserve input focus.
                 applescript_type_and_enter = f'''
                 tell application "System Events"
                     tell process "Google Chrome"
                         set frontmost to true
                         delay 0.3
-                        -- Select all existing text in input (overwrites on type)
                         keystroke "a" using {{command down}}
                         delay 0.2
-                        -- Type the tag name (replaces selected text)
                         keystroke "{tag_name}"
-                        delay 1.5
-                        -- Escape to dismiss autocomplete dropdown (keeps input text)
-                        key code 53
-                        delay 0.3
-                        -- Press Enter to confirm the custom tag
+                        delay 0.8
+                        -- Deselect any highlighted autocomplete item
+                        key code 126
+                        delay 0.2
                         keystroke return
                         delay 0.8
                     end tell
@@ -579,17 +598,9 @@ class CsdnPublisher:
                 '''
                 try:
                     subprocess.run(["osascript", "-e", applescript_type_and_enter], check=True)
-                    logger.info(f"  [tag={tag_name}] Typed and confirmed via AppleScript")
+                    logger.info(f"  [tag={tag_name}] Typed + Enter via AppleScript")
                 except Exception as e:
-                    logger.warning(f"  [tag={tag_name}] AppleScript type+enter failed: {e}")
-                    continue
-
-                # Recovery: if Escape accidentally closed the tag panel, re-open it
-                res_panel_check = self.chrome.execute_javascript(w_idx, t_idx, js_check_panel, settle_seconds=0.3)
-                if not res_panel_check or not str(res_panel_check).startswith("VISIBLE"):
-                    logger.info("  Tag panel closed, re-opening...")
-                    self.chrome.execute_javascript(w_idx, t_idx, js_click_add_tag, settle_seconds=0.5)
-                    time.sleep(0.5)
+                    logger.warning(f"  [tag={tag_name}] AppleScript failed: {e}")
 
         # Close tag panel before moving to categories
         js_close_tag_panel = """
