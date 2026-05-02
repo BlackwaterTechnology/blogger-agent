@@ -559,8 +559,18 @@ class CsdnPublisher:
             logger.info(f"Clear existing tags: {res_clear}")
             time.sleep(0.5)
 
-            # Step 4: For each tag, use search input to type and press Enter
+            # Step 4: For each tag, paste via clipboard and press Enter
             # CSDN placeholder: "请输入文字搜索，Enter键入可添加自定义标签"
+            #
+            # WHY PASTE instead of keystroke:
+            # AppleScript `keystroke "Agent"` types character by character.
+            # el-autocomplete searches after EACH character and auto-highlights
+            # a suggestion (e.g. typing "A" → highlights "AI").
+            # When Enter is pressed, it selects the highlighted suggestion
+            # instead of adding the custom tag.
+            # PASTE (Cmd+V) is instant — all characters appear at once.
+            # With a 50ms delay before Enter, autocomplete hasn't appeared yet,
+            # so Enter correctly triggers the "添加自定义标签" behavior.
             for tag_name in collection_list[:3]:
                 logger.info(f"Adding tag: {tag_name!r}")
 
@@ -572,33 +582,27 @@ class CsdnPublisher:
                     logger.warning(f"  [tag={tag_name}] Search input not found, skipping.")
                     continue
 
-                # Single AppleScript: type → Up (deselect autocomplete) → Enter.
-                # PROBLEM: el-autocomplete highlights the first suggestion by default.
-                # Pressing Enter with a highlighted item selects that item (e.g. "segmentfault")
-                # instead of adding the typed text as a custom tag.
-                # FIX: Press Up arrow BEFORE Enter to deselect (highlightedIndex: 0 → -1).
-                # With no item highlighted, Enter triggers "添加自定义标签" behavior.
-                # All in ONE AppleScript call to preserve input focus.
-                applescript_type_and_enter = f'''
+                # Copy tag name to system clipboard
+                subprocess.run(["pbcopy"], input=tag_name.encode(), check=True)
+
+                # Paste + Enter in one AppleScript call
+                applescript_paste_and_enter = '''
                 tell application "System Events"
                     tell process "Google Chrome"
                         set frontmost to true
                         delay 0.3
-                        keystroke "a" using {{command down}}
-                        delay 0.2
-                        keystroke "{tag_name}"
-                        delay 0.8
-                        -- Deselect any highlighted autocomplete item
-                        key code 126
-                        delay 0.2
-                        keystroke return
-                        delay 0.8
+                        keystroke "a" using {command down}
+                        delay 0.1
+                        keystroke "v" using {command down}
+                        delay 0.05
+                        key code 36
+                        delay 1.0
                     end tell
                 end tell
                 '''
                 try:
-                    subprocess.run(["osascript", "-e", applescript_type_and_enter], check=True)
-                    logger.info(f"  [tag={tag_name}] Typed + Enter via AppleScript")
+                    subprocess.run(["osascript", "-e", applescript_paste_and_enter], check=True)
+                    logger.info(f"  [tag={tag_name}] Pasted + Enter via clipboard")
                 except Exception as e:
                     logger.warning(f"  [tag={tag_name}] AppleScript failed: {e}")
 
