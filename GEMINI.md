@@ -54,3 +54,47 @@ blogger --payload articles/test_data/
 
 *   **Extensibility**: When adding new platforms (like Juejin or CSDN), create a new class in `src/blogger/platforms/` that conforms to the publisher pattern, and register it in the CLI parser and MCP tool definitions.
 *   **No Framework Overhead**: Keep dependencies minimal. Ensure that any newly added logic is abstracted cleanly from the `WechatPublisher` state machine.
+
+## Browser Automation Lessons Learned
+
+### CSDN 标签设置 — el-autocomplete 组件自动化
+
+CSDN 的文章标签输入框是 Element UI 的 `el-autocomplete` 组件（placeholder: "请输入文字搜索，Enter键入可添加自定义标签"）。以下是自动化过程中踩过的坑和最终解决方案。
+
+#### 核心问题
+
+`el-autocomplete` 在**每个字符输入后立即搜索**（debounce=300ms），并**自动高亮第一个建议**。按 Enter 时会选中高亮的建议而非添加自定义标签。例如：输入 "Agent" 时，输入 "A" 后 autocomplete 就高亮了 "AI"，Enter 选中了 "AI" 而不是 "Agent"。
+
+#### 失败方案记录
+
+| 方案 | 做法 | 失败原因 |
+|---|---|---|
+| **Escape 关闭下拉** | 打字 → `key code 53`(Esc) → Enter | Esc 冒泡关闭了父级发布对话框（modal） |
+| **JS 隐藏下拉 + 分离 Enter** | AppleScript 打字 → JS `display:none` → AppleScript Enter | `execute_javascript` 通过 JXA 调用会**抢走 Chrome input 焦点**，后续 Enter 打空 |
+| **Up 箭头取消高亮** | 打字 → `key code 126`(↑) → Enter | el-autocomplete 的 debounce=0 或极短，打字过程中 autocomplete 已出现并高亮，Up 时机不对 |
+| **缩短延迟** | `keystroke "Agent"` → `delay 0.05` → Enter | AppleScript `keystroke` 是逐字符发送的，0.05s 时文字可能还没打完，导致标签错位 |
+| **纯 JS KeyboardEvent** | JS 设值 + `dispatchEvent(new KeyboardEvent('keydown', {key:'Enter'}))` | Vue 不响应合成的 KeyboardEvent |
+
+#### ✅ 最终方案：剪贴板粘贴
+
+```python
+# 1. 复制到系统剪贴板（Python）
+subprocess.run(["pbcopy"], input=tag_name.encode(), check=True)
+
+# 2. Cmd+A 全选 → Cmd+V 粘贴 → Enter（AppleScript）
+# 粘贴是即时的，50ms 后 Enter 时 autocomplete 还没出现
+keystroke "a" using {command down}   # 选中旧文本
+delay 0.1
+keystroke "v" using {command down}   # 粘贴（瞬间完成）
+delay 0.05                           # autocomplete 需要 300ms+，此时还没出现
+key code 36                          # Enter → 走"添加自定义标签"路径
+```
+
+**为什么有效**：`Cmd+V` 粘贴是一次性写入所有字符（不是逐字符），50ms 后按 Enter 时 autocomplete 的 debounce 定时器还没触发，下拉还没出现，所以 Enter 走的是 input 原生的"添加自定义标签"路径。
+
+#### 通用规则
+
+1. **绝不在 AppleScript 操作间插入 JS 调用**：`execute_javascript`（通过 JXA/osascript）会导致 Chrome 的 input 失去焦点。打字和 Enter 必须在同一个 AppleScript 调用中。
+2. **粘贴优于打字**：对于有 autocomplete/下拉联想的输入框，用 `pbcopy` + `Cmd+V` 代替 `keystroke`，避免逐字符输入触发搜索。
+3. **面板关闭用精确按钮**：标签面板的关闭使用 `button.modal__close-button`（X 按钮），不要点击面板外部（可能点到其他控件）或按 Escape（会关闭父 modal）。
+4. **先标签后分类**：标签和分类共用 `button.tag__btn-tag` 类名，必须先设置标签并关闭面板后再设置分类，避免 DOM 选择器互相干扰。
