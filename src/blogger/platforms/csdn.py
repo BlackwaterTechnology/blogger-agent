@@ -66,21 +66,21 @@ class CsdnPublisher:
             js_check_loaded = """
             (function() {
                 const titleInput = document.querySelector('.article-bar__title, input[placeholder*="标题"]');
-                const editor = document.querySelector('.editor, .CodeMirror');
+                const editor = document.querySelector('.editor, .CodeMirror, textarea[class*="editor"]');
                 if (titleInput && editor) {
                     return "LOADED";
                 }
                 return "LOADING";
             })();
             """
-            for _ in range(15):
+            for _ in range(20):
                 try:
-                    res = self.chrome.execute_javascript(w_idx, t_idx, js_check_loaded, settle_seconds=0.5)
+                    res = self.chrome.execute_javascript(w_idx, t_idx, js_check_loaded, settle_seconds=0.1)
                     if res == "LOADED":
                         break
                 except Exception:
                     pass
-                time.sleep(1.0)
+                time.sleep(0.5)
             
         # 3. Inject Content
         js_inject_title = f"""
