@@ -630,77 +630,56 @@ class CsdnPublisher:
         # ============================================================
         # CSDN Category UI structure:
         #   .form-entry containing "分类专栏" label
-        #     .tag__box
+        #     .tag__box (h=32px, acts as anchor)
         #       .tag__item-list — currently selected categories
-        #       button.tag__btn-tag "新建分类专栏" — expands existing category list
-        #       .tag__option-box — each existing category (clickable to toggle)
-        #         input.tag__option-chk (checkbox)
+        #       button.tag__btn-tag "新建分类专栏" — opens NEW category input (NOT expand!)
+        #       .tag__options-content (position:absolute, top:32px, z-index:2) — floating panel
+        #         .tag__option-box — each existing category
+        #           input.tag__option-chk (checkbox) — must click THIS directly, not parent
+        #
+        # IMPORTANT: Do NOT click "新建分类专栏" — it opens a tiny input for creating
+        # a new category, not for expanding the existing list. The checkbox list
+        # (.tag__options-content) is always present in DOM as a floating panel.
+        # Must click input.tag__option-chk directly (not .tag__option-box) for Vue to react.
         logger.info("Setting up Category via checkbox selection...")
 
-        # Click "新建分类专栏" to expand the category list
-        js_open_cat_list = """
-        (function() {
-            const dialog = document.querySelector('.modal__publish-article, .modal__inner-1');
-            if (!dialog) return "NO_DIALOG";
-            const formEntries = Array.from(dialog.querySelectorAll('.form-entry')).filter(d => 
-                d.innerText && d.innerText.includes('分类专栏')
-            );
-            if (formEntries.length === 0) return "NO_CAT_SECTION";
-            const catEntry = formEntries[0];
-            const btn = catEntry.querySelector('button.tag__btn-tag');
-            if (btn) { btn.click(); return "EXPANDED"; }
-            return "NO_EXPAND_BTN";
-        })();
-        """
-        res_open = self.chrome.execute_javascript(w_idx, t_idx, js_open_cat_list, settle_seconds=1.0)
-        logger.info(f"Expand category list: {res_open}")
-        time.sleep(0.5)
-
-        # Clear existing selected categories (scoped to catEntry only)
+        # Step 1: Clear existing selected categories by clicking their checked checkboxes
         js_clear_cats = """
         (function() {
             const dialog = document.querySelector('.modal__publish-article, .modal__inner-1');
             if (!dialog) return "NO_DIALOG";
-            const catEntry = Array.from(dialog.querySelectorAll('.form-entry')).find(d => 
+            const catEntry = Array.from(dialog.querySelectorAll('.form-entry')).find(d =>
                 d.innerText && d.innerText.includes('分类专栏')
             );
             if (!catEntry) return "NO_CAT_SECTION";
             const tagBox = catEntry.querySelector('.tag__box');
             if (!tagBox) return "NO_TAG_BOX";
             let cleared = 0;
-            // Only clear checkboxes WITHIN the category tagBox (not global)
             const checkedBoxes = Array.from(tagBox.querySelectorAll('input.tag__option-chk:checked'));
             for (const cb of checkedBoxes) {
-                const optionBox = cb.closest('.tag__option-box');
-                if (optionBox) { optionBox.click(); } else { cb.click(); }
+                cb.click();
                 cleared++;
             }
-            const deleteBtns = Array.from(tagBox.querySelectorAll('.tag__btn-tag-delete'));
-            for (const btn of deleteBtns) { btn.click(); cleared++; }
             return "Cleared " + cleared + " categories";
         })();
         """
         res_clear = self.chrome.execute_javascript(w_idx, t_idx, js_clear_cats, settle_seconds=0.5)
         logger.info(f"Clear categories: {res_clear}")
         time.sleep(0.5)
-        
-        # Re-expand the list (clearing may have collapsed it)
-        self.chrome.execute_javascript(w_idx, t_idx, js_open_cat_list, settle_seconds=0.5)
-        time.sleep(0.5)
-        
-        # Select desired categories one by one
+
+        # Step 2: Select desired categories by clicking their checkboxes directly
         for cat_name in collection_list[:3]:
             logger.info(f"Selecting category: {cat_name!r}")
             js_select_cat = f"""
             (function() {{
                 const dialog = document.querySelector('.modal__publish-article, .modal__inner-1');
-                if (!dialog) return JSON.stringify({{action: "NO_DIALOG"}});
-                const catEntry = Array.from(dialog.querySelectorAll('.form-entry')).find(d => 
+                if (!dialog) return "NO_DIALOG";
+                const catEntry = Array.from(dialog.querySelectorAll('.form-entry')).find(d =>
                     d.innerText && d.innerText.includes('分类专栏')
                 );
-                if (!catEntry) return JSON.stringify({{action: "NO_CAT_SECTION"}});
+                if (!catEntry) return "NO_CAT_SECTION";
                 const tagBox = catEntry.querySelector('.tag__box');
-                if (!tagBox) return JSON.stringify({{action: "NO_TAG_BOX"}});
+                if (!tagBox) return "NO_TAG_BOX";
                 const catName = {json.dumps(cat_name)};
                 const optionBoxes = Array.from(tagBox.querySelectorAll('.tag__option-box'));
                 for (const box of optionBoxes) {{
@@ -708,13 +687,16 @@ class CsdnPublisher:
                     if (text === catName) {{
                         const cb = box.querySelector('input.tag__option-chk');
                         if (cb && cb.checked) {{
-                            return JSON.stringify({{action: "Already selected: " + catName}});
+                            return "Already selected: " + catName;
                         }}
-                        box.click();
-                        return JSON.stringify({{action: "Selected: " + catName}});
+                        if (cb) {{
+                            cb.click();
+                            return "Selected: " + catName + " checked=" + cb.checked;
+                        }}
+                        return "No checkbox found for: " + catName;
                     }}
                 }}
-                return JSON.stringify({{action: "Not found: " + catName}});
+                return "Not found in list: " + catName;
             }})();
             """
             res_cat = self.chrome.execute_javascript(w_idx, t_idx, js_select_cat, settle_seconds=0.5)
