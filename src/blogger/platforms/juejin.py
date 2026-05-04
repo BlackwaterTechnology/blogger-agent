@@ -42,7 +42,7 @@ class JuejinPublisher:
         content = article_data.get("content", "")
         desc = article_data.get("desc", "")
         cover_path = article_data.get("cover_path")
-        illustration_path = article_data.get("illustration_path")
+        local_images = article_data.get("local_images", [])
 
         # 1. Find Juejin Tab
         try:
@@ -141,67 +141,89 @@ class JuejinPublisher:
             logger.warning(f"Failed to clear editor: {e}")
             
         # 1. Upload the illustration first if provided to get the Juejin CDN URL
-        if illustration_path:
-            logger.info(f"Found illustration image: {illustration_path}. Extracting CDN link...")
-            try:
-                # Copy illustration to clipboard
-                applescript_copy_illus = f'set the clipboard to (read (POSIX file "{illustration_path.absolute()}") as TIFF picture)'
-                subprocess.run(["osascript", "-e", applescript_copy_illus], check=True)
-                
-                # Paste into the empty editor
-                applescript_paste_illus = '''
-                tell application "System Events"
-                    tell process "Google Chrome"
-                        set frontmost to true
-                        delay 0.5
-                        keystroke "v" using {command down}
+        if local_images:
+            logger.info(f"Found {len(local_images)} local images. Extracting CDN links...")
+            for img_path in local_images:
+                try:
+                    # Copy illustration to clipboard
+                    applescript_copy_illus = f'set the clipboard to (read (POSIX file "{img_path.absolute()}") as TIFF picture)'
+                    subprocess.run(["osascript", "-e", applescript_copy_illus], check=True)
+                    
+                    # Paste into the empty editor
+                    applescript_paste_illus = '''
+                    tell application "System Events"
+                        tell process "Google Chrome"
+                            set frontmost to true
+                            delay 0.5
+                            keystroke "v" using {command down}
+                        end tell
                     end tell
-                end tell
-                '''
-                subprocess.run(["osascript", "-e", applescript_paste_illus], check=True)
-                
-                # Poll for the uploaded URL via JS
-                logger.info("Waiting for Juejin to upload the illustration...")
-                js_extract_img = """
-                (function() {
-                    const el = document.querySelector('.bytemd-editor .CodeMirror-code');
-                    if (!el) return "";
-                    const text = el.innerText;
-                    if (text.includes('Uploading')) return "UPLOADING";
-                    const match = text.match(/!\\[.*?\\]\\((https:\\/\\/.*?)\\)/);
-                    if (match) return match[0];
-                    return "";
-                })();
-                """
-                illustration_markdown = ""
-                for _ in range(15):  # Wait up to 15 seconds
-                    res_str = self.chrome.execute_javascript(w_idx, t_idx, js_extract_img, settle_seconds=1.0)
-                    if res_str and res_str != "UPLOADING" and res_str.startswith("!["):
-                        illustration_markdown = res_str
-                        break
-                    time.sleep(1.0)
+                    '''
+                    subprocess.run(["osascript", "-e", applescript_paste_illus], check=True)
                     
-                if illustration_markdown:
-                    logger.info(f"Extracted illustration markdown: {illustration_markdown}")
-                    # Insert before the first heading in the markdown text
-                    lines = content.split('\n')
-                    insert_idx = 0
-                    for i, line in enumerate(lines):
-                        if line.strip().startswith('#'):
-                            insert_idx = i
+                    # Poll for the uploaded URL via JS
+                    logger.info(f"Waiting for Juejin to upload image {img_path.name}...")
+                    js_extract_img = """
+                    (function() {
+                        const el = document.querySelector('.bytemd-editor .CodeMirror-code');
+                        if (!el) return "";
+                        const text = el.innerText;
+                        if (text.includes('Uploading')) return "UPLOADING";
+                        const match = text.match(/!\\[.*?\\]\\((https:\\/\\/.*?)\\)/);
+                        if (match) return match[0];
+                        return "";
+                    })();
+                    """
+                    illustration_markdown = ""
+                    for _ in range(15):  # Wait up to 15 seconds
+                        res_str = self.chrome.execute_javascript(w_idx, t_idx, js_extract_img, settle_seconds=1.0)
+                        if res_str and res_str != "UPLOADING" and res_str.startswith("!["):
+                            illustration_markdown = res_str
                             break
-                    
-                    if insert_idx > 0:
-                        content = "\n".join(lines[:insert_idx]) + f"\n\n{illustration_markdown}\n\n" + "\n".join(lines[insert_idx:])
+                        time.sleep(1.0)
+                        
+                    if illustration_markdown:
+                        logger.info(f"Extracted image markdown: {illustration_markdown}")
+                        import re
+                        local_img_name = img_path.name
+                        pattern = rf'!\[.*?\]\(.*?{re.escape(local_img_name)}\)'
+                        
+                        if re.search(pattern, content):
+                            # It's an inline image, replace it
+                            content = re.sub(pattern, illustration_markdown, content, count=1)
+                        else:
+                            # It's from FrontMatter illustration, insert before first heading
+                            lines = content.split('\n')
+                            insert_idx = 0
+                            for i, line in enumerate(lines):
+                                if line.strip().startswith('#'):
+                                    insert_idx = i
+                                    break
+                            
+                            if insert_idx > 0:
+                                content = "\n".join(lines[:insert_idx]) + f"\n\n{illustration_markdown}\n\n" + "\n".join(lines[insert_idx:])
+                            else:
+                                content = f"{illustration_markdown}\n\n{content}"
+                        
+                        # CLEAR EDITOR for next image
+                        applescript_clear = '''
+                        tell application "System Events"
+                            tell process "Google Chrome"
+                                set frontmost to true
+                                delay 0.5
+                                keystroke "a" using {command down}
+                                delay 0.1
+                                key code 51 -- Delete key
+                                delay 0.5
+                            end tell
+                        end tell
+                        '''
+                        subprocess.run(["osascript", "-e", applescript_clear], check=True)
                     else:
-                        # Fallback: put at the very beginning if no heading is found, 
-                        # or if the first line is already a heading.
-                        content = f"{illustration_markdown}\n\n{content}"
-                else:
-                    logger.warning("Failed to extract uploaded illustration link from editor.")
-                    
-            except Exception as e:
-                logger.warning(f"Failed to process illustration: {e}")
+                        logger.warning(f"Failed to extract uploaded image link for {img_path.name}.")
+                        
+                except Exception as e:
+                    logger.warning(f"Failed to process image {img_path.name}: {e}")
                 
         # 2. Clear editor again before pasting the final content
         logger.info("Clearing editor for final content...")

@@ -44,8 +44,8 @@ class WechatPublisher:
         content = article_data["content"]
         html_content = article_data["html_content"]
         collection = article_data["collection"]
-        illustration_path = article_data["illustration_path"]
         cover_path = article_data["cover_path"]
+        local_images = article_data.get("local_images", [])
 
         try:
             w_idx, t_idx = self.chrome.find_global_tab(["https://mp.weixin.qq.com"])
@@ -280,54 +280,78 @@ class WechatPublisher:
         except Exception as e:
             logger.warning(f"JS injection failed: {e}")
             
-        if illustration_path:
-            logger.info(f"Found illustration image: {illustration_path}. Inserting before first heading...")
-            try:
-                applescript_copy = f'set the clipboard to (read (POSIX file "{illustration_path.absolute()}") as TIFF picture)'
-                self.chrome._run_osascript(applescript_copy)
-                
-                js_move_cursor = """
-                (function() {
-                    try {
-                        let editor = document.querySelector('.ProseMirror');
-                        if (!editor) return "Editor not found";
-                        
-                        editor.focus();
-                        const selection = window.getSelection();
-                        const range = document.createRange();
-                        
-                        const h1 = editor.querySelector('h1, h2, h3');
-                        if (h1) {
-                            range.setStartBefore(h1);
-                            range.collapse(true);
-                        } else {
-                            range.selectNodeContents(editor);
-                            range.collapse(true);
-                        }
-                        
-                        selection.removeAllRanges();
-                        selection.addRange(range);
-                        return "Cursor moved";
-                    } catch(e) {
-                        return e.message;
-                    }
-                })();
-                """
-                self.chrome.execute_javascript(w_idx, t_idx, js_move_cursor, settle_seconds=0.5)
-                
-                applescript_paste = '''
-                tell application "System Events"
-                    tell process "Google Chrome"
-                        set frontmost to true
-                        keystroke "v" using {command down}
+        if local_images:
+            logger.info(f"Found {len(local_images)} local images. Injecting them into the editor...")
+            for img_path in local_images:
+                logger.info(f"Uploading image: {img_path}")
+                try:
+                    applescript_copy = f'set the clipboard to (read (POSIX file "{img_path.absolute()}") as TIFF picture)'
+                    self.chrome._run_osascript(applescript_copy)
+                    
+                    placeholder = f"[UPLOAD_IMAGE: {img_path.absolute()}]"
+                    
+                    js_find_and_select = f"""
+                    (function() {{
+                        try {{
+                            let editor = document.querySelector('.ProseMirror');
+                            if (!editor) return "Editor not found";
+                            
+                            editor.focus();
+                            const selection = window.getSelection();
+                            const range = document.createRange();
+                            
+                            // Find the text node containing the placeholder
+                            const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null, false);
+                            let node;
+                            const placeholder = {{json.dumps(placeholder)}};
+                            
+                            while (node = walker.nextNode()) {{
+                                if (node.nodeValue.includes(placeholder)) {{
+                                    const startOffset = node.nodeValue.indexOf(placeholder);
+                                    range.setStart(node, startOffset);
+                                    range.setEnd(node, startOffset + placeholder.length);
+                                    selection.removeAllRanges();
+                                    selection.addRange(range);
+                                    return "SELECTED";
+                                }}
+                            }}
+                            
+                            // Fallback: If no placeholder found (e.g. legacy front-matter illustration)
+                            const h1 = editor.querySelector('h1, h2, h3');
+                            if (h1) {{
+                                range.setStartBefore(h1);
+                                range.collapse(true);
+                            }} else {{
+                                range.selectNodeContents(editor);
+                                range.collapse(true);
+                            }}
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                            return "FALLBACK_MOVED";
+                        }} catch(e) {{
+                            return e.message;
+                        }}
+                    }})();
+                    """
+                    # Use format() or replace since f-string with nested braces is tricky in raw string
+                    js_find_and_select = js_find_and_select.replace("{{json.dumps(placeholder)}}", json.dumps(placeholder))
+                    
+                    res = self.chrome.execute_javascript(w_idx, t_idx, js_find_and_select, settle_seconds=0.5)
+                    logger.info(f"Select placeholder result: {res}")
+                    
+                    applescript_paste = '''
+                    tell application "System Events"
+                        tell process "Google Chrome"
+                            set frontmost to true
+                            keystroke "v" using {command down}
+                        end tell
                     end tell
-                end tell
-                '''
-                self.chrome._run_osascript(applescript_paste)
-                logger.info("Successfully initiated illustration image paste/upload.")
-                time.sleep(2.0)
-            except Exception as e:
-                logger.warning(f"Failed to insert illustration image: {e}")
+                    '''
+                    self.chrome._run_osascript(applescript_paste)
+                    logger.info("Successfully initiated image paste/upload.")
+                    time.sleep(2.5) # Wait for upload to complete
+                except Exception as e:
+                    logger.warning(f"Failed to insert image {{img_path}}: {e}")
 
         if cover_path:
             logger.info(f"Found cover image: {cover_path}. Inserting at the end of the article...")

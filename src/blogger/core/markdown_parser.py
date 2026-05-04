@@ -2,6 +2,7 @@ from pathlib import Path
 from loguru import logger
 import markdown
 import frontmatter
+import re
 
 def parse_markdown_payload(md_path: Path) -> dict:
     if not md_path.exists():
@@ -25,8 +26,24 @@ def parse_markdown_payload(md_path: Path) -> dict:
         if len(desc) < 60 or len(desc) > 120:
             logger.warning(f"Summary (简介) length is {len(desc)} chars. It should be between 60 and 120 chars!")
             
+    payload_dir = md_path.parent
+
+    local_images = []
+    
+    def wechat_image_replacer(match):
+        img_src = match.group(1)
+        if not img_src.startswith('http://') and not img_src.startswith('https://'):
+            local_img_path = payload_dir / img_src
+            if local_img_path.exists():
+                if local_img_path not in local_images:
+                    local_images.append(local_img_path)
+                return f"[UPLOAD_IMAGE: {local_img_path.absolute()}]"
+        return match.group(0)
+
+    wechat_content = re.sub(r'!\[.*?\]\((.*?)\)', wechat_image_replacer, content)
+
     try:
-        html_content = markdown.markdown(content, extensions=['fenced_code', 'tables', 'sane_lists'])
+        html_content = markdown.markdown(wechat_content, extensions=['fenced_code', 'tables', 'sane_lists'])
         # Inject inline styles for WeChat editor compatibility
         html_content = html_content.replace('<h1>', '<h1 style="font-size: 28px; font-weight: bold; margin-top: 20px; margin-bottom: 15px;">')
         html_content = html_content.replace('<h2>', '<h2 style="font-size: 24px; font-weight: bold; margin-top: 20px; margin-bottom: 15px;">')
@@ -35,7 +52,7 @@ def parse_markdown_payload(md_path: Path) -> dict:
         html_content = html_content.replace('<blockquote>', '<blockquote style="border-left: 4px solid #ccc; padding-left: 10px; color: #666; background-color: #f9f9f9; padding: 10px; margin: 10px 0;">')
     except Exception as e:
         logger.warning(f"Failed to parse markdown, falling back to raw text: {e}")
-        html_content = f"<p>{content.replace(chr(10), '<br>')}</p>"
+        html_content = f"<p>{wechat_content.replace(chr(10), '<br>')}</p>"
         
     logger.info(f"Parsed Title: {title}")
     logger.info(f"Parsed Author: {author}")
@@ -43,10 +60,17 @@ def parse_markdown_payload(md_path: Path) -> dict:
     logger.info(f"Parsed Description: {desc[:20]}... ({len(desc)} chars)")
     logger.info(f"Parsed Content Length: {len(content)}")
     logger.info(f"Generated HTML Length: {len(html_content)}")
+    logger.info(f"Found {len(local_images)} local images inline.")
     
-    payload_dir = md_path.parent
     cover_path = payload_dir / cover_filename if cover_filename and (payload_dir / cover_filename).exists() else None
+    
+    # We still keep the original illustration check for backwards compatibility if no inline images exist
     illustration_path = payload_dir / illustration_filename if illustration_filename and (payload_dir / illustration_filename).exists() else None
+
+    # Merge inline images with front-matter illustration for the publishers to process
+    all_illustrations = list(local_images)
+    if illustration_path and illustration_path not in all_illustrations:
+        all_illustrations.insert(0, illustration_path)
 
     return {
         "title": title,
@@ -56,5 +80,6 @@ def parse_markdown_payload(md_path: Path) -> dict:
         "content": content,
         "html_content": html_content,
         "cover_path": cover_path,
-        "illustration_path": illustration_path
+        "illustration_path": illustration_path,
+        "local_images": all_illustrations
     }
