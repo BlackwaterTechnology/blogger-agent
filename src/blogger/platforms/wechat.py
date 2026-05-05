@@ -303,7 +303,7 @@ class WechatPublisher:
                             // Find the text node containing the placeholder
                             const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null, false);
                             let node;
-                            const placeholder = {{json.dumps(placeholder)}};
+                            const placeholder = "__PLACEHOLDER__";
                             
                             while (node = walker.nextNode()) {{
                                 if (node.nodeValue.includes(placeholder)) {{
@@ -333,8 +333,7 @@ class WechatPublisher:
                         }}
                     }})();
                     """
-                    # Use format() or replace since f-string with nested braces is tricky in raw string
-                    js_find_and_select = js_find_and_select.replace("{{json.dumps(placeholder)}}", json.dumps(placeholder))
+                    js_find_and_select = js_find_and_select.replace('"__PLACEHOLDER__"', json.dumps(placeholder))
                     
                     res = self.chrome.execute_javascript(w_idx, t_idx, js_find_and_select, settle_seconds=0.5)
                     logger.info(f"Select placeholder result: {res}")
