@@ -27,6 +27,13 @@ def main():
     diagram_parser.add_argument("--input", required=True, help="Path to the text file containing diagram code")
     diagram_parser.add_argument("--output", required=True, help="Path to save the generated image (e.g. cover.png)")
 
+    # Video command
+    video_parser = subparsers.add_parser("video", help="Generate a cinematic video and publish to platforms")
+    video_parser.add_argument("--payload", default="articles/test_data", help="Directory containing the article markdown files for metadata")
+    video_parser.add_argument("--prompt", help="Prompt for video generation. If not provided, the article content is used.")
+    video_parser.add_argument("--platform", default="bilibili,wechat_channels", help="Target platform(s) to publish to, comma-separated (e.g. bilibili,wechat_channels)")
+
+
     args = parser.parse_args()
     
     if args.command == "generate-diagram":
@@ -62,6 +69,11 @@ def main():
                 logger.warning(f"Multiple Markdown files found. Using {md_path.name}")
     
     logger.info(f"Parsing payload from: {md_path}")
+    
+    if args.command == "video":
+        handle_video(args, md_path)
+        return
+
     article_data = parse_markdown_payload(md_path)
     
     platforms = [p.strip().lower() for p in args.platform.split(",") if p.strip()]
@@ -82,7 +94,71 @@ def main():
             publisher = CsdnPublisher()
             publisher.publish(article_data)
         else:
-            logger.warning(f"Platform '{platform}' is currently not implemented or unknown.")
+            logger.warning(f"Platform '{platform}' is currently not implemented or unknown for publish command.")
+
+def handle_video(args, md_path):
+    import subprocess
+    import json
+    import tempfile
+    import urllib.request
+
+    logger.info(f"Parsing payload from: {md_path}")
+    article_data = parse_markdown_payload(md_path)
+    
+    prompt = args.prompt if args.prompt else f"Title: {article_data['title']}\nDescription: {article_data['desc']}"
+    
+    logger.info("Generating cinematic video via notebooklm-py...")
+    try:
+        result = subprocess.run(
+            ["uv", "run", "notebooklm", "generate", "cinematic-video", prompt, "--language", "zh_Hans", "--wait", "--json"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        try:
+            data = json.loads(result.stdout)
+            if data.get("error"):
+                logger.error(f"Video generation error: {data.get('message')}")
+                return
+            
+            video_url = data.get("url")
+            video_path = data.get("file_path")
+            
+            if not video_path and video_url:
+                logger.info(f"Downloading generated video from {video_url}...")
+                fd, video_path = tempfile.mkstemp(suffix=".mp4")
+                urllib.request.urlretrieve(video_url, video_path)
+                logger.info(f"Video downloaded to {video_path}")
+            elif not video_path:
+                logger.error(f"No video URL or file_path in response: {data}")
+                return
+            else:
+                logger.info(f"Video generated at {video_path}")
+                
+            article_data["video_path"] = video_path
+            
+            platforms = [p.strip().lower() for p in args.platform.split(",") if p.strip()]
+            for platform in platforms:
+                if platform == "bilibili":
+                    from .platforms.bilibili import BilibiliPublisher
+                    logger.info("Initiating Bilibili publishing flow...")
+                    publisher = BilibiliPublisher()
+                    publisher.publish(article_data)
+                elif platform == "wechat_channels":
+                    from .platforms.wechat_channels import WechatChannelsPublisher
+                    logger.info("Initiating WeChat Channels publishing flow...")
+                    publisher = WechatChannelsPublisher()
+                    publisher.publish(article_data)
+                elif platform == "none":
+                    logger.info("Platform is none, skipping publishing.")
+                else:
+                    logger.warning(f"Platform '{platform}' is currently not implemented or unknown for video command.")
+
+        except json.JSONDecodeError:
+            logger.error(f"Failed to parse notebooklm output: {result.stdout}")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"notebooklm command failed: {e.stderr}")
+
 
 if __name__ == "__main__":
     main()

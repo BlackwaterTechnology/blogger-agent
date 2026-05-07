@@ -2,3 +2,5 @@
 __pycache__
 src/blogger.egg-info
 articles
+docs/personal/visa.md
+.DS_Store

@@ -13,9 +13,13 @@ dependencies = [
     "markdown",
     "rookiepy",
     "mcp",
-    "python-frontmatter"
+    "python-frontmatter",
+    "notebooklm-py",
 ]
 
 [project.scripts]
 blogger = "blogger.cli:main"
 blogger-mcp = "blogger.mcp_server:main"
+
+[tool.uv.sources]
+notebooklm-py = { git = "https://github.com/xilu0/notebooklm-py.git" }
