@@ -906,7 +906,7 @@ class WechatPublisher:
         if collection:
             self.run_ui_state_machine("Collection Setup", w_idx, t_idx, js_collection_setup, max_steps=8)
             
-        logger.info("Setting up Creation Source (AI Generated)...")
+        logger.info("Setting up Creation Source (Personal Opinion)...")
         js_creation_source_setup = """
         (function() {
             try {
@@ -1003,22 +1003,22 @@ class WechatPublisher:
                 state.is_dialog_open = true;
                 
                 const labels = Array.from(sourceDialog.querySelectorAll('label'));
-                const aiLabel = labels.find(l => {
+                const targetLabel = labels.find(l => {
                     const t = l.innerText || '';
-                    return t.includes('内容由AI生成') || t.includes('AI-generated') || t.includes('AI generated');
+                    return t.includes('个人观点，仅供参考') || t.includes('个人观点') || t.includes('Personal opinion');
                 });
                 
-                if (aiLabel) {
-                    const radio = aiLabel.querySelector('input[type="radio"]');
-                    const isChecked = radio ? radio.checked : aiLabel.classList.contains('weui-desktop-form__radio_checked') || (aiLabel.querySelector('.weui-desktop-form__radio_checked') !== null);
+                if (targetLabel) {
+                    const radio = targetLabel.querySelector('input[type="radio"]');
+                    const isChecked = radio ? radio.checked : targetLabel.classList.contains('weui-desktop-form__radio_checked') || (targetLabel.querySelector('.weui-desktop-form__radio_checked') !== null);
                     
                     if (!isChecked) {
                         if (radio) {
                             radio.click();
                         } else {
-                            clickReactElement(aiLabel);
+                            clickReactElement(targetLabel);
                         }
-                        action = 'Selected AI Generated radio button';
+                        action = 'Selected Personal Opinion radio button';
                         return JSON.stringify({state: state, action: action, is_done: false});
                     }
                 }

@@ -52,13 +52,18 @@ cover: "cover.png"
 [掷地有声的总结...]
 ```
 
-## 4. 自动化搬运与发布 (Publish)
+## 4. 资产审查与发布 (Review & Publish)
+在执行发布前，**必须执行一致性审查**：确认生成的图片文件名（带有时间戳后缀）与 `article.md` 中引用的标准文件名（如 `cover.png`）是否一致。
+
 使用 `run_command` 依次执行：
-1. 将 artifact 目录中的图片拷贝至 `articles/<文章标题>/` 目录下。
+1. 将 artifact 目录中的图片拷贝至 `articles/<文章标题>/` 目录下，并**务必重命名**去除时间戳后缀。
 2. 运行发布指令。
 
 ```bash
-cp /Users/linwang/.gemini/antigravity/brain/<conversation-id>/*.png /Users/linwang/src/github/xiluo/skills/blogger/articles/<文章标题>/
+# 拷贝时请务必使用通配符匹配带时间戳的源文件，并将其重命名为 markdown 中引用的标准名称
+cp /Users/linwang/.gemini/antigravity/brain/<conversation-id>/cover_*.png /Users/linwang/src/github/xiluo/skills/blogger/articles/<文章标题>/cover.png
+cp /Users/linwang/.gemini/antigravity/brain/<conversation-id>/illustration_1_*.png /Users/linwang/src/github/xiluo/skills/blogger/articles/<文章标题>/illustration_1.png
+
 cd /Users/linwang/src/github/xiluo/skills/blogger && blogger --payload ./articles/<文章标题>
 ```
 3. 使用 `command_status` 跟踪发布结果并向用户汇报。
