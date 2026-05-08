@@ -117,6 +117,7 @@ description: Use when the user asks to write a technical article, blog post, or 
 - 中文字体：mmdc 走真实 Chromium 渲染，PingFang SC / Heiti SC 等系统字体直接生效，**不需要** 显式声明。
 - 默认背景透明，公众号正文里可能不可读 → 用 `-b white` 显式给白底。
 - 首次启动会下载 Chromium（~200MB），之后冷启动 1-3 秒。批量出图用 `-i input.md` 把多张图打包成一个 Markdown 一次性渲染，省启动开销。
+- **`sequenceDiagram` 默认会在底部把所有 actor 再画一遍**（mirrorActors），actor 多时会让图变得很高、底部一排重复方块还很碍眼。`.mmd` 首行加 `%%{init: {'sequence': {'mirrorActors': false}}}%%` 关掉，只保留顶部 actor。
 
 **PlantUML → SVG → 高分辨率 PNG（推荐路径）**
 ```bash
@@ -367,6 +368,7 @@ uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger
 - **图表细长得像传真纸**：Mermaid 多个 subgraph 默认 TD 堆叠，长宽比直奔 1:3。把 `flowchart TD` 改成 `flowchart LR`、把 subgraph 数量压到 ≤ 4，必要时拆图。
 - **用 Mermaid 画 pie / bar / 数据分布**：Mermaid 的 pie 子语法只能拿到默认配色和小尺寸，无法适配文章风格。饼图 / 条形 / 数据图直接走 Python matplotlib（参考 `articles/Cowork还是ClaudeCode当指挥官/workload-distribution.py`）。
 - **mmdc 把 `.mmd` 渲成 SVG 后用 rsvg-convert 转 PNG，结果中文全没了**：Chromium 渲染 SVG 时把字体当外部资源，rsvg-convert 转 PNG 时找不到。直接 `mmdc -i x.mmd -o x.png -e png -s 2`，PNG 由 Chromium 直接栅格化字体，不要走 SVG 中转。
+- **Mermaid `sequenceDiagram` 底部一排 actor 重复方块**：mirrorActors 默认开。actor ≥4 时尤其碍眼、还把图拉高。`.mmd` 首行加 `%%{init: {'sequence': {'mirrorActors': false}}}%%`，只保留顶部 actor 即可。
 - **PlantUML `package` 标题里中文被横线穿过、字叠字**：是 `packageStyle rectangle` 在 CJK 标题处"挖凹槽"宽度算错，外框横线穿过字符。改 `skinparam packageStyle node`，标题改画在框内顶部，无凹槽。
 - **PlantUML 直接 `-tpng` 出图**：mindmap 子语法不响应 `-Sdpi`，输出停在 ~700px 宽，正文里发糊。改走 `-tsvg` + `rsvg-convert -w 1600`。
 - **PlantUML 没设字体直接画中文**：默认走 SansSerif，渲染像马赛克。`skinparam DefaultFontName "PingFang SC"` 必加。
