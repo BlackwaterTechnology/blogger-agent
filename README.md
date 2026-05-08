@@ -114,15 +114,19 @@ Java is required for PlantUML (`brew install openjdk` if absent). Node ≥ 18.19
 
 **Why local first?** The legacy `blogger generate-diagram` command POSTs source to `kroki.io`, which is occasionally rate-limited or returns 504. Local renderers avoid that, keep diagrams off the public internet, and (for mmdc) use the same Dagre layout as `mermaid.live`.
 
-### WeChat cover spec helper
+### Cover ratio helper (cross-platform)
 
-WeChat Official Account headline covers are validated to be **exactly 2.35:1**. Any other ratio is rejected with *"2.35:1 cover specifications abnormal. Recrop"*. After rendering a `cover.png` from any source, normalize it once:
+Cross-platform blog covers (微信公众号 / 掘金 / CSDN) work best at **16:9** (horizontal flowcharts / comparisons / timelines) or **1:1** (poster / concept / center-radial). Each platform auto-crops to its own thumbnail spec. The legacy 2.35:1 rule applied only to WeChat headline (头条) — current editors accept 16:9. After rendering a `cover.png` from any source, normalize it once:
 
 ```bash
-python3 tools/fit_wechat_cover.py path/to/cover.png --width 2350
+# 16:9 horizontal (default)
+python3 tools/fit_wechat_cover.py path/to/cover.png --width 1920
+
+# 1:1 square (best for WeChat 次条 / poster covers)
+python3 tools/fit_wechat_cover.py path/to/cover.png --ratio 1 --width 1500
 ```
 
-The helper letterboxes (white background, no crop / no stretch) onto a 2350×1000 canvas. Run it as the **last step** of every cover render.
+The helper letterboxes (white background, no crop / no stretch) onto the target canvas. Run it as the **last step** of every cover render.
 
 For the full rendering protocol — aspect ratio rules, color palette, common pitfalls — see `skills/blogger-agent/SKILL.md` 阶段 2.
 

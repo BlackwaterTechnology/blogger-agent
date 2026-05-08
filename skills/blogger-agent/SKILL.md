@@ -81,7 +81,22 @@ description: Use when the user asks to write a technical article, blog post, or 
 
 ### 阶段 2：视觉资产生成
 
-依据阶段 1 的「证据清单」与文章类型，规划配图。
+依据阶段 1 的「证据清单」与文章类型，规划配图。**第一步永远是 §2.0 素材盘点——先看用户给了什么**，再决定要不要新生成。
+
+#### 2.0 素材盘点：先看用户给了什么（在生成任何新图之前）
+
+用户经常会随消息附带图片：UI 截图、产品照、自己画的草图、终端输出。**这些往往是最有力的一手证据——比 AI 生成图更可信、比 Mermaid 重画更贴合现场**。在调用 mmdc / matplotlib / `generate_image` 之前，先做以下四步：
+
+1. **列清单**：把会话里出现过的每张图过一遍，用 `Read` 多模态打开看清楚，记下"画的是什么 + 类型"（UI 截图 / 产品图 / 终端输出 / 手绘 / 表情包 / 照片）。
+2. **逐张定用途**：
+   - **当正文配图**：截图、产品图、终端输出、用户手绘流程图——拷进 Payload 目录，按 §2.1 语义化命名规则重命名（`claude-code-task-list.png`，**不是** `IMG_2024.png` 或 `Screenshot_20260508.png`），在对应小节用 `![图注：...](xxx.png)` 引用。
+   - **当封面**：构图横向、视觉冲击强、扣题——重命名为 `cover.png`，按 §2.3 规范 letterbox 到 **16:9**（横向内容）或 **1:1**（视觉/海报型）。
+   - **跳过**：模糊 / 跑题 / 含敏感信息（token、API key、个人邮箱、同事头像、内部路径）——不要勉强用，照常按 §2.1–§2.3 自己生成。**不切题的图比没图更糟**。
+3. **找缺口**：上两步覆盖完之后，剩下的视觉需求才是新生成的目标。封面没有合适素材就单独生成；正文已经有 2 张用户图就别再凑生成图（总数仍受 §2.4"≤3 张"上限约束）。
+4. **位置原则——贴着论点放**：每张图（用户图 + 生成图）必须紧跟它支撑的那段正文。讲到 X 的那段后面就放 X 的图，配 `![图注：...](xxx.png)` + 正文里一句话呼应（如"如图所示，..."）。**禁止把所有图堆到文末当装饰**。
+
+⚠ **用户图同样需要图注 + 正文呼应**：原样塞进文末、不解释、不引用，约等于没用。等价于 §2.5"渲染后必查"——图注说清画的是什么、正文里有一句话呼应到。
+⚠ **隐私 / 合规预检**：截图里出现 token / API key / 第三方姓名 / 内部路径 / 真人面孔时，先打码或裁切再用，否则发布等于公开了用户的东西。
 
 #### 2.1 数量与命名
 - **必出 1 张封面**：`cover.png`。
@@ -148,20 +163,26 @@ python3 your_chart.py     # 直接出 PNG
 - **副标题**用 `\n` 拼到主标题下面，而不是 `fig.text(0.5, 0.04, ...)`——后者容易和饼图边缘标签撞。
 - 模板可参考 `articles/Cowork还是ClaudeCode当指挥官/workload-distribution.py`。
 
-**封面专用：letterbox 到 2.35:1（微信公众号头图硬规范）**
+**封面专用：letterbox 到 16:9 或 1:1（多平台通用比例）**
 ```bash
-python3 tools/fit_wechat_cover.py path/to/cover.png --width 2350
+# 16:9（横向流程图 / 对比图 / 时间线 —— 默认推荐）
+python3 tools/fit_wechat_cover.py path/to/cover.png --ratio 1.778 --width 1920
+
+# 1:1（视觉冲击型 / 文字海报 / 中心放射构图 —— 兼容微信次条最稳）
+python3 tools/fit_wechat_cover.py path/to/cover.png --ratio 1 --width 1500
 ```
-- **微信公众号头图必须严格 2.35:1**（典型 2350×1000）。比例不符直接被编辑器拒收，提示 "2.35:1 cover specifications abnormal. Recrop"。
-- 任意工具（mmdc / PlantUML / matplotlib / AI 绘图）出来的封面，**最后一步**都跑一次 `tools/fit_wechat_cover.py` 做白底 letterbox。`--width 2350` 强制目标宽度，原图等比缩放后居中贴到画布上，不裁不拉伸。
-- 设计封面时优先选**天然横向**的语义结构：PlantUML `@startwbs`（top-down 工作分解树）、`component diagram`（横向 package 排列）、Mermaid `flowchart LR` 都比较容易接近 2.35:1，letterbox 时白边窄、不显眼。
-- 反例：PlantUML `@startmindmap` 多分支时往往输出近方形（1:1 ~ 1.2:1），letterbox 后两侧大白条难看——这种就先改用 `@startwbs` 重画，再做 letterbox。
+- **不要再强制 2.35:1**。微信公众号一次推送里头条≈16:9、次条 1:1，掘金 / CSDN 也不吃 2.35:1。三家平台都会按各自规范自动截取——封面给 16:9 或 1:1，平台能裁出合适缩略图。详见 memory `封面比例规范`。
+- 选哪一个：横向内容（`flowchart LR`、`component diagram`、`@startwbs`、对比表）→ **16:9**；中心放射 / 海报式（mindmap、概念图、文字主标题）→ **1:1**。
+- 任意工具（mmdc / PlantUML / matplotlib / AI 绘图）出来的封面，**最后一步**都跑一次 `tools/fit_wechat_cover.py` 做白底 letterbox。原图等比缩放后居中贴到画布上，不裁不拉伸。
+- 设计 `.mmd` / `.puml` 时让内容**自然填满目标比例**：4 个横向节点 + 单行文字默认会出 6:1 极扁条，letterbox 到 16:9 后上下白边巨大；改成 3 行多行节点（标题+说明+示例），高度自然增加，白边压到 ≤ 15%。
+- 上一版规则错误："比例不符直接被编辑器拒收"——只对头条生效，且现在编辑器接受 16:9。已废弃。
 
 #### 2.4 构图守则（"看起来不协调"的根因 → 提前规避）
 
 1. **横纵比窗口**：
    - **正文插图**：横向 `1:1 ~ 16:9`，或竖向 `1:1 ~ 3:4`。绝不出现接近 `1:3` 的细长条。
-   - **封面 `cover.png`**：**必须严格 2.35:1**（微信公众号头图硬规范）。最终交付前一律走 `python3 tools/fit_wechat_cover.py cover.png --width 2350` 做白底 letterbox（见 §2.3）。原始 DSL 渲染出近方形也没关系，letterbox 处理；但如果两侧白条占比 >40%（如 mindmap 1:1 → 2.35:1 会留 ~58% 白边），改用更横向的语义结构（如 `@startwbs`）重画。
+   - **封面 `cover.png`**：默认 **16:9**（横向流程 / 对比 / 时间线），或 **1:1**（视觉海报 / 概念图 / 中心放射）。多平台通用，系统会按各自规范自动截取。最终交付前走 `python3 tools/fit_wechat_cover.py cover.png --ratio 1.778 --width 1920`（16:9）或 `--ratio 1 --width 1500`（1:1）。
+   - 白边占比目标 ≤ 15%。原图过扁（如 4 节点 LR ≈ 6:1）→ letterbox 到 16:9 上下白边过大，改 DSL 让节点变高（多行文字、密度更高）。原图过方（mindmap ≈ 1:1）→ 直接选 1:1 比例的 letterbox，或换横向语义结构（如 `@startwbs`）重画再走 16:9。
    - Mermaid / PlantUML 渲染完用 `Read` 看缩略图，不达标就改 DSL 重渲。
 2. **节点数控制**：单图节点（不含 subgraph）≤ 12。超出就拆图，或改用表格 / 雷达图。
 3. **subgraph 的代价**：Mermaid 多个 subgraph 在 `graph TD` 下默认纵向堆叠，**会把图拉成长条**。两条对策：
@@ -183,7 +204,7 @@ python3 tools/fit_wechat_cover.py path/to/cover.png --width 2350
 - ① 文字未溢出节点框、未截断；
 - ② 没有节点 / 边重叠；
 - ③ 每条边的箭头方向、起止位置正确（mmdc 走 Dagre 通常没问题；PlantUML component diagram 偶尔会有反向布局，配合 `direction` 与 `-up->` / `-down->` 修正）；
-- ④ 长宽比落在 2.4 节守则；**`cover.png` 必须严格 2.35:1**（用 `python3 -c "from PIL import Image; im=Image.open('cover.png'); print(im.size, im.size[0]/im.size[1])"` 验，落在 2.349–2.351 之间）；不达标跑 `tools/fit_wechat_cover.py cover.png --width 2350` 修正；
+- ④ 长宽比落在 2.4 节守则；**`cover.png` 走 16:9（≈1.778）或 1:1**（用 `python3 -c "from PIL import Image; im=Image.open('cover.png'); print(im.size, round(im.size[0]/im.size[1], 3))"` 验）；不达标跑 `tools/fit_wechat_cover.py cover.png --ratio 1.778 --width 1920`（或 `--ratio 1 --width 1500`）修正；
 - ⑤ 中文显示清晰：mmdc 用 Chromium 系统字体，正常即可；PlantUML **必须**显式 `skinparam DefaultFontName "PingFang SC"`；
 - ⑥ 缩到 30% 仍可读（封面专用）。
 任一条不达标，**改 DSL / 换工具 / 调参数后重渲**，不要将就。Mermaid 用 mmdc 还是糊？检查 `-s` 是不是太低、`.mmd` 节点是不是过多。
@@ -362,6 +383,9 @@ uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger
 - **图片用 `illustration_1.png` 这类无语义文件名**：会让你忘记图到底在画什么，最后变成孤儿图。
 - **图片写成 `![[图注：…]](xx.png)`（双层方括号）**：是 Markdown 语法异常，部分渲染器渲染不出。标准写法是 `![图注：…](xx.png)`。
 - **图片文件名带时间戳**（AI 绘图工具常见输出）：必须重命名去时间戳，否则正文引用对不上。
+- **忽略用户在对话里附的图片，自己从零生成全套配图**：用户的截图 / 产品图 / 手稿往往是最强一手证据，比 AI 重画更可信。先按 §2.0 盘点，再决定要不要补图——"我画一张更整齐"是高频误判。
+- **把用户图都堆在文末当装饰**：用户给了 3 张图、正文一处没引用、整堆放在结尾——读者读不到上下文，等于没用。每张图必须贴着它支撑的那段正文（§2.0 位置原则），并配图注 + 一句话呼应。
+- **用户图直接用 `IMG_2024.png` / `Screenshot_20260508.png` 之类原始文件名**：和 AI 时间戳文件名同一种坑，正文引用对不上、复盘也不知道哪张画的是什么。一律按 §2.1 语义化重命名（如 `claude-code-task-list.png`）再用。
 - **desc 写成 200+ 字符**：parser 只警告不阻断，但微信编辑器会截断。严格 60–120。
 - **collection 写成 "AI/Agent" 之外**：parser 默认走 "AI"，但发布行为可能和你预期不一致。仅限两个值。
 - **正文小标题原封不动用 `### 1. 核心痛点与背景`**：那是旧模板的化石。按阶段 3 选定的类型走对应骨架。
@@ -372,7 +396,7 @@ uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger
 - **PlantUML `package` 标题里中文被横线穿过、字叠字**：是 `packageStyle rectangle` 在 CJK 标题处"挖凹槽"宽度算错，外框横线穿过字符。改 `skinparam packageStyle node`，标题改画在框内顶部，无凹槽。
 - **PlantUML 直接 `-tpng` 出图**：mindmap 子语法不响应 `-Sdpi`，输出停在 ~700px 宽，正文里发糊。改走 `-tsvg` + `rsvg-convert -w 1600`。
 - **PlantUML 没设字体直接画中文**：默认走 SansSerif，渲染像马赛克。`skinparam DefaultFontName "PingFang SC"` 必加。
-- **`cover.png` 比例不是 2.35:1**：微信公众号头图硬规范，比例不符直接被编辑器拒收（"2.35:1 cover specifications abnormal. Recrop"）。任何工具出来的封面，最后一步都跑 `python3 tools/fit_wechat_cover.py cover.png --width 2350`。原图近方形（如 mindmap 1:1）letterbox 后白边占比过大就改用 `@startwbs` 等横向语义结构重画。
+- **`cover.png` 比例选错或被压扁**：默认 16:9，海报型 1:1。**不要再强制 2.35:1**——那是只针对微信公众号头条的旧规则，次条走 1:1，掘金 / CSDN 都按自己规范裁切。最后一步统一走 `python3 tools/fit_wechat_cover.py cover.png --ratio 1.778 --width 1920`（横向）或 `--ratio 1 --width 1500`（方形）。原图过扁（如 4 节点单行 LR ≈ 6:1）letterbox 后上下白边巨大 → 改 DSL 让节点变高（多行文字 / 增加密度），不要靠 letterbox 蒙混。
 - **不看渲染结果就引用进文章**：阶段 2.5 的"渲染后必查"六项不能跳。
 
 ## 附录：本地渲染工具一次性安装

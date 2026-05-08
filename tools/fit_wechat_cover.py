@@ -1,13 +1,23 @@
-"""Pad / fit an image to WeChat Official Account cover spec (2.35:1).
+"""Pad / fit an image to a multi-platform blog cover ratio (default 16:9).
 
-WeChat 公众号头图（headline cover）要求 2.35:1，否则编辑器会报
-"2.35:1 cover specifications abnormal. Recrop"。本工具用白底 letterbox
-把任意比例的图压成 2.35:1，保留原构图，不做任何裁剪/拉伸。
+跨平台（微信公众号 / 掘金 / CSDN）通用封面比例：
+- **16:9**（≈ 1.778） 横向流程图、对比图、时间线 —— 默认推荐
+- **1:1**            视觉海报、概念图、文字主标题、中心放射构图
+
+各平台都会按自己规范自动截取缩略图，给个常见的横向或方形比例即可。
+旧的 2.35:1 规则（仅针对公众号头条）已废弃。
 
 Usage:
-    python3 tools/fit_wechat_cover.py <path/to/cover.png> [--ratio 2.35] [--width 2350]
+    # 16:9 横向（默认）
+    python3 tools/fit_wechat_cover.py <path/to/cover.png> [--width 1920]
 
-默认 width=2350（高分屏友好，公众号显示约 750–900px 宽，2.5x 缩放仍清晰）。
+    # 1:1 方形
+    python3 tools/fit_wechat_cover.py <path/to/cover.png> --ratio 1 --width 1500
+
+    # 仍需 2.35:1（极少数场景）
+    python3 tools/fit_wechat_cover.py <path/to/cover.png> --ratio 2.35 --width 2350
+
+工具仅做白底 letterbox，保留原构图、不裁切、不拉伸。
 """
 import argparse
 import sys
@@ -16,7 +26,7 @@ from pathlib import Path
 from PIL import Image
 
 
-def fit_cover(src: Path, dst: Path, target_ratio: float = 2.35, target_width: int | None = None,
+def fit_cover(src: Path, dst: Path, target_ratio: float = 16 / 9, target_width: int | None = None,
               bg: tuple[int, int, int] = (255, 255, 255)) -> None:
     img = Image.open(src).convert("RGB")
     w, h = img.size
@@ -51,10 +61,11 @@ def fit_cover(src: Path, dst: Path, target_ratio: float = 2.35, target_width: in
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Fit image to WeChat cover spec (default 2.35:1).")
+    ap = argparse.ArgumentParser(description="Fit image to a blog cover ratio (default 16:9).")
     ap.add_argument("src", type=Path, help="source image path")
     ap.add_argument("--dst", type=Path, default=None, help="output path (default: overwrite src)")
-    ap.add_argument("--ratio", type=float, default=2.35, help="target ratio (default 2.35)")
+    ap.add_argument("--ratio", type=float, default=16 / 9,
+                    help="target ratio (default 1.778 = 16:9). Common: 1.778, 1.0, 2.35")
     ap.add_argument("--width", type=int, default=None,
                     help="target absolute width; if set, image is scaled to fit a (width × width/ratio) canvas")
     args = ap.parse_args()
