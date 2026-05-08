@@ -44,6 +44,21 @@ def parse_markdown_payload(md_path: Path) -> dict:
 
     try:
         html_content = markdown.markdown(wechat_content, extensions=['fenced_code', 'tables', 'sane_lists'])
+
+        # WeChat 编辑器(ProseMirror) 列表 schema 要求 <li> 内容包到 <p> 里。
+        # python-markdown 的 tight list 输出 <li>X</li>,粘贴时编辑器会把内联内容
+        # 拆成多个 <p>(尤其是 <strong>/<em>/<code> 之后断开),导致一个列表项显示成两行。
+        # 在这里主动给只有内联子元素的 <li> 包上 <p>,避免被拆段。
+        def _wrap_li_inline(match):
+            inner = match.group(1).strip()
+            if not inner:
+                return match.group(0)
+            if inner.startswith(('<p', '<ul', '<ol', '<blockquote', '<pre', '<div')):
+                return match.group(0)
+            return f"<li><p>{inner}</p></li>"
+
+        html_content = re.sub(r'<li>(.*?)</li>', _wrap_li_inline, html_content, flags=re.DOTALL)
+
         # Inject inline styles for WeChat editor compatibility
         html_content = html_content.replace('<h1>', '<h1 style="font-size: 28px; font-weight: bold; margin-top: 20px; margin-bottom: 15px;">')
         html_content = html_content.replace('<h2>', '<h2 style="font-size: 24px; font-weight: bold; margin-top: 20px; margin-bottom: 15px;">')
