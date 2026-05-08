@@ -13,21 +13,37 @@ class JxaChromeController:
 function run() {{
     var chrome = Application("{self.app_name}");
     var prefixes = {prefixes_json};
-    
-    for (var w = 0; w < chrome.windows.length; w++) {{
-        var win = chrome.windows[w];
-        for (var t = 0; t < win.tabs.length; t++) {{
-            var tab = win.tabs[t];
+    var winCount = 0;
+    try {{ winCount = chrome.windows.length; }} catch(e) {{ return ""; }}
+
+    for (var w = 0; w < winCount; w++) {{
+        var win;
+        var tabCount;
+        try {{
+            win = chrome.windows[w];
+            tabCount = win.tabs.length;
+        }} catch(e) {{
+            continue;
+        }}
+        for (var t = 0; t < tabCount; t++) {{
+            var tab;
             var url = "";
-            try {{ url = tab.url(); }} catch(e) {{}}
+            try {{
+                tab = win.tabs[t];
+                url = tab.url();
+            }} catch(e) {{ continue; }}
             if (!url) continue;
-            
+
             for (var p = 0; p < prefixes.length; p++) {{
                 if (url.startsWith(prefixes[p])) {{
-                    win.index = 1;
-                    win.activeTabIndex = t + 1; // activeTabIndex is 1-indexed in JXA Chrome dictionary
-                    chrome.activate();
-                    return win.id() + "\\n" + tab.id();
+                    var winId = "", tabId = "";
+                    try {{ winId = win.id(); }} catch(e) {{}}
+                    try {{ tabId = tab.id(); }} catch(e) {{}}
+                    if (!winId || !tabId) continue;
+                    try {{ win.index = 1; }} catch(e) {{}}
+                    try {{ win.activeTabIndex = t + 1; }} catch(e) {{}}
+                    try {{ chrome.activate(); }} catch(e) {{}}
+                    return winId + "\\n" + tabId;
                 }}
             }}
         }}
