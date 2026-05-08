@@ -147,12 +147,21 @@ python3 your_chart.py     # 直接出 PNG
 - **副标题**用 `\n` 拼到主标题下面，而不是 `fig.text(0.5, 0.04, ...)`——后者容易和饼图边缘标签撞。
 - 模板可参考 `articles/Cowork还是ClaudeCode当指挥官/workload-distribution.py`。
 
+**封面专用：letterbox 到 2.35:1（微信公众号头图硬规范）**
+```bash
+python3 tools/fit_wechat_cover.py path/to/cover.png --width 2350
+```
+- **微信公众号头图必须严格 2.35:1**（典型 2350×1000）。比例不符直接被编辑器拒收，提示 "2.35:1 cover specifications abnormal. Recrop"。
+- 任意工具（mmdc / PlantUML / matplotlib / AI 绘图）出来的封面，**最后一步**都跑一次 `tools/fit_wechat_cover.py` 做白底 letterbox。`--width 2350` 强制目标宽度，原图等比缩放后居中贴到画布上，不裁不拉伸。
+- 设计封面时优先选**天然横向**的语义结构：PlantUML `@startwbs`（top-down 工作分解树）、`component diagram`（横向 package 排列）、Mermaid `flowchart LR` 都比较容易接近 2.35:1，letterbox 时白边窄、不显眼。
+- 反例：PlantUML `@startmindmap` 多分支时往往输出近方形（1:1 ~ 1.2:1），letterbox 后两侧大白条难看——这种就先改用 `@startwbs` 重画，再做 letterbox。
+
 #### 2.4 构图守则（"看起来不协调"的根因 → 提前规避）
 
-1. **横纵比窗口**：插图 PNG 的长宽比必须落在
-   - 横向 `1:1 ~ 16:9`，或
-   - 竖向 `1:1 ~ 3:4`。
-   绝不出现接近 `1:3` 的细长条。Mermaid 渲染完用 `Read` 看缩略图，不达标就改 DSL 重渲。
+1. **横纵比窗口**：
+   - **正文插图**：横向 `1:1 ~ 16:9`，或竖向 `1:1 ~ 3:4`。绝不出现接近 `1:3` 的细长条。
+   - **封面 `cover.png`**：**必须严格 2.35:1**（微信公众号头图硬规范）。最终交付前一律走 `python3 tools/fit_wechat_cover.py cover.png --width 2350` 做白底 letterbox（见 §2.3）。原始 DSL 渲染出近方形也没关系，letterbox 处理；但如果两侧白条占比 >40%（如 mindmap 1:1 → 2.35:1 会留 ~58% 白边），改用更横向的语义结构（如 `@startwbs`）重画。
+   - Mermaid / PlantUML 渲染完用 `Read` 看缩略图，不达标就改 DSL 重渲。
 2. **节点数控制**：单图节点（不含 subgraph）≤ 12。超出就拆图，或改用表格 / 雷达图。
 3. **subgraph 的代价**：Mermaid 多个 subgraph 在 `graph TD` 下默认纵向堆叠，**会把图拉成长条**。两条对策：
    - 合并语义相近的 subgraph，控制在 ≤ 4 个。
@@ -173,7 +182,7 @@ python3 your_chart.py     # 直接出 PNG
 - ① 文字未溢出节点框、未截断；
 - ② 没有节点 / 边重叠；
 - ③ 每条边的箭头方向、起止位置正确（mmdc 走 Dagre 通常没问题；PlantUML component diagram 偶尔会有反向布局，配合 `direction` 与 `-up->` / `-down->` 修正）；
-- ④ 长宽比落在 2.4 节守则；
+- ④ 长宽比落在 2.4 节守则；**`cover.png` 必须严格 2.35:1**（用 `python3 -c "from PIL import Image; im=Image.open('cover.png'); print(im.size, im.size[0]/im.size[1])"` 验，落在 2.349–2.351 之间）；不达标跑 `tools/fit_wechat_cover.py cover.png --width 2350` 修正；
 - ⑤ 中文显示清晰：mmdc 用 Chromium 系统字体，正常即可；PlantUML **必须**显式 `skinparam DefaultFontName "PingFang SC"`；
 - ⑥ 缩到 30% 仍可读（封面专用）。
 任一条不达标，**改 DSL / 换工具 / 调参数后重渲**，不要将就。Mermaid 用 mmdc 还是糊？检查 `-s` 是不是太低、`.mmd` 节点是不是过多。
@@ -361,7 +370,8 @@ uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger
 - **PlantUML `package` 标题里中文被横线穿过、字叠字**：是 `packageStyle rectangle` 在 CJK 标题处"挖凹槽"宽度算错，外框横线穿过字符。改 `skinparam packageStyle node`，标题改画在框内顶部，无凹槽。
 - **PlantUML 直接 `-tpng` 出图**：mindmap 子语法不响应 `-Sdpi`，输出停在 ~700px 宽，正文里发糊。改走 `-tsvg` + `rsvg-convert -w 1600`。
 - **PlantUML 没设字体直接画中文**：默认走 SansSerif，渲染像马赛克。`skinparam DefaultFontName "PingFang SC"` 必加。
-- **不看渲染结果就引用进文章**：阶段 2.5 的"渲染后必查"五项不能跳。
+- **`cover.png` 比例不是 2.35:1**：微信公众号头图硬规范，比例不符直接被编辑器拒收（"2.35:1 cover specifications abnormal. Recrop"）。任何工具出来的封面，最后一步都跑 `python3 tools/fit_wechat_cover.py cover.png --width 2350`。原图近方形（如 mindmap 1:1）letterbox 后白边占比过大就改用 `@startwbs` 等横向语义结构重画。
+- **不看渲染结果就引用进文章**：阶段 2.5 的"渲染后必查"六项不能跳。
 
 ## 附录：本地渲染工具一次性安装
 
