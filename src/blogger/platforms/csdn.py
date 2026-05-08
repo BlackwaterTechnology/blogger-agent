@@ -45,13 +45,39 @@ class CsdnPublisher:
         collection = article_data.get("collection", "AI")
         local_images = article_data.get("local_images", [])
 
-        # 1. Find CSDN Tab
+        # 1. Find CSDN Tab — prefer the editor tab; fall back to any logged-in
+        # csdn.net tab (blog/www/i/...) and navigate it to the editor.
+        # Login session is shared across csdn.net subdomains via cookies.
+        editor_prefixes = ["https://editor.csdn.net", "https://mp.csdn.net"]
+        fallback_prefixes = [
+            "https://blog.csdn.net",
+            "https://www.csdn.net",
+            "https://i.csdn.net",
+            "https://bizhi.csdn.net",
+            "https://download.csdn.net",
+            "https://bbs.csdn.net",
+            "https://csdn.net",
+            "http://blog.csdn.net",
+            "http://www.csdn.net",
+            "http://csdn.net",
+        ]
         try:
-            w_idx, t_idx = self.chrome.find_global_tab(["https://editor.csdn.net", "https://mp.csdn.net"])
+            w_idx, t_idx = self.chrome.find_global_tab(editor_prefixes)
+        except Exception:
+            try:
+                w_idx, t_idx = self.chrome.find_global_tab(fallback_prefixes)
+                logger.info("No editor tab open; reusing an existing CSDN tab — will navigate to the editor.")
+            except Exception as e:
+                raise SystemExit(
+                    "CSDN tab not found in Chrome. Open any csdn.net page (blog/www/editor/...) "
+                    f"in a logged-in tab and retry. Detail: {e}"
+                )
+
+        try:
             url = self.chrome.get_tab_url(w_idx, t_idx)
         except Exception as e:
-            raise SystemExit(f"CSDN tab not found in Chrome: {e}")
-            
+            raise SystemExit(f"CSDN tab found but failed to read its URL: {e}")
+
         logger.info(f"Found CSDN tab: {url}")
         
         # 2. Navigate to MD Editor
