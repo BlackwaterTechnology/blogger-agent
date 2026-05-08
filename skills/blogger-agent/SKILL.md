@@ -21,9 +21,13 @@ description: Use when the user asks to write a technical article, blog post, or 
 
 - **bash**：跑 `blogger` CLI 与图片生成子进程。
 - **文件系统**：建 Payload 目录、保存图片与 Markdown。
-- **图片生成**：
-  - **首选**：原生 AI 绘图工具（如 `generate_image`），用于封面与概念配图。
-  - **兜底**：编写 Mermaid 源码 + `blogger generate-diagram --type mermaid --input xx.mmd --output xx.png`。优先 Mermaid 而不是 PlantUML（项目惯例）。
+- **图片生成**（按内容类型分工，参数详见阶段 2）：
+  - **角色 / 场景化封面、概念意象图**：原生 AI 绘图工具（如 `generate_image`）。
+  - **结构化图表（架构 / 流程 / 拓扑 / 思维导图 / UML）**：本地离线渲染优先：
+    - `~/bin/mmdr`（Rust 原生 Mermaid，0.5 秒级，无浏览器依赖）
+    - `~/bin/plantuml.jar`（PlantUML，配合 `!pragma layout smetana` 无需 Graphviz）
+  - **最后兜底**：`blogger generate-diagram --type mermaid|plantuml --input x --output x.png`（kroki.io，受公网限制，仅本地工具不可用时使用）
+  - 工具未安装时按"附录：本地渲染工具一次性安装"自助安装，不要回退到只用 kroki。
 
 ## Workflow
 
@@ -79,12 +83,103 @@ description: Use when the user asks to write a technical article, blog post, or 
 
 依据阶段 1 的「证据清单」与文章类型，规划配图。
 
+#### 2.1 数量与命名
 - **必出 1 张封面**：`cover.png`。
-- **建议 1–2 张正文图**，文件名要**语义化**——能从名字看出画的是什么。
+- **建议 1–2 张正文图**（最多 3），文件名要**语义化**——能从名字看出画的是什么。
   - ✓ `harness-vs-runtime.png`、`agent-loop-anatomy.png`、`bench-radar.png`
   - ✗ `illustration_1.png`、`illustration_2.png`（除非你真的想不到名字了）
-- 图片放进 Payload 目录（如 `articles/<文章标题>/`）。
-- 兜底走 Kroki：`blogger generate-diagram --type mermaid --input <dir>/xx.mmd --output <dir>/xx.png`。
+- 图片放进 Payload 目录（如 `articles/<文章标题>/`）。源码（`.mmd` / `.puml`）也一并保留，便于回溯。
+
+#### 2.2 工具选择
+
+| 配图类型 | 推荐工具 | 理由 |
+|---|---|---|
+| 角色 / 场景 / 概念封面 | `generate_image` 等 AI 绘图 | 视觉冲击、可拟人化 |
+| 单链路流程图 / 状态机视觉版 / 简单架构 | `mmdr` (Mermaid `graph LR/TD`) | Rust 原生，~180ms，边数少时布局干净 |
+| 思维导图 / 分类树 / 多分支层级 / 标题封面 | `plantuml.jar` (`@startmindmap`) | 边路由稳定，**优于 mmdr 处理树形数据** |
+| 时序图 / 状态机 / 类图 | `plantuml.jar` | DSL 完整性最高 |
+| 饼图 / 条形 / 工作量分布 / 数据可视化 | **Python `matplotlib`** | DSL 无主题色 / 尺寸控制；matplotlib 给完整字体、配色、布局控制（参考 `articles/Cowork还是ClaudeCode当指挥官/workload-distribution.py`） |
+| 雷达图 / 对比表 / 复杂数据图 | `generate_image` 或手绘 SVG | DSL 难以表达 |
+
+> ⚠ **mmdr 边路由的硬性边界**：mmdr 0.2.x 用 Rust 重写了 layered layout，作者在 README 注明"edge routing is approximate"。**多分支树（一个父节点 ≥ 4 个子节点，且层级 ≥ 3）会出现肉眼可见的拐角错位、断线、箭头位置错误**。这类数据**不要硬上 mmdr**——直接选 PlantUML mindmap，一次出图。验证经验：把 `* root \n ** A \n *** A1 \n *** A2` 这种四象限层级图喂给 mmdr 必踩坑，喂给 PlantUML mindmap 干净。
+
+> ⚠ **mmdr 对非 `graph` DSL 是退化路径**：mmdr 能解析 `pie` / `sequenceDiagram` 等子语法，但 `--themeVariables` 主题色、`-w/-H` 尺寸参数对它们**全部不响应**——pie 只能拿到默认紫黄配色和 ~700px 输出，无法适配文章风格。Pie / 工作量分布 / 数据图 → 直接 Python matplotlib，不要绕 mmdr 一圈。
+
+#### 2.3 渲染命令（写进脚本的硬性下限）
+
+**Mermaid → mmdr（首选 Mermaid 路径）**
+```bash
+~/bin/mmdr -i x.mmd -o x.png -e png \
+  -w 1600 -H 1000 \
+  --preferredAspectRatio 4:3
+```
+- 输出分辨率 ≥ 1600×1000，缩放后仍清晰。
+- `--preferredAspectRatio` **必加**：
+  - 多 subgraph 的对比图 / 思维导图 → `4:3` 或 `1:1`
+  - 单链路流程图 → `3:2` 或 `16:9`
+  - **禁止** 接近 `1:3` / `3:1` 的极端长条。
+- 节点 ≥ 10 时加 `--nodeSpacing 60 --rankSpacing 80` 拉开间距。
+- 想要更精细的字宽测量（默认即可，速度优先时再开 `--fastText`）。
+
+**PlantUML → SVG → 高分辨率 PNG（推荐路径）**
+```bash
+java -jar ~/bin/plantuml.jar -tsvg x.puml          # 先出 SVG
+rsvg-convert -w 1600 x.svg -o x.png                # 再栅格化到 ≥1600 宽
+```
+- **不要直接 `-tpng`**：mindmap 等子语法不响应 `-Sdpi`，PNG 会停在 ~700px，正文一缩就糊。SVG → rsvg-convert 这条路对所有 PlantUML 子语法都适用，且自由控制目标宽度。
+- 目标宽度：插图 **≥1600**，封面 **≥1800**（公众号正文容器约 700px，2-3x 才能保证清晰）。
+- 缺 `rsvg-convert` 时安装：`brew install librsvg`。
+- `.puml` 顶部三条样板必加，缺一不可：
+  ```
+  !pragma layout smetana
+  skinparam DefaultFontName "PingFang SC"
+  skinparam shadowing false
+  ```
+- 主题二选一开起来：`!theme cerulean-outline`（线框，适合插图）或 `!theme plain`（极简）。
+- mindmap 作封面再附 `<style>` 块定制圆角、配色（参考 `articles/Mermaid与PlantUML本地离线渲染方案/cover.puml`）。
+- **`package` / `frame` 容器在中英混排标题里用 `packageStyle node`，不要用默认 `rectangle`**：rectangle 风格会在标题位置"挖凹槽"，PlantUML 计算凹槽宽度时假定是英文字符宽度，CJK 字符会被外框横线穿过、看起来像字叠字。`packageStyle node` 把标题画在框内顶部、无凹槽，规避这个 bug。
+- **`component diagram` 用作架构 / 流程图**（参考 `articles/Cowork还是ClaudeCode当指挥官/nested-architecture.puml`）：含双向边、多 package 嵌套时，PlantUML 比 mmdr 稳定得多。
+
+**Python matplotlib → 数据图 / 饼图 / 条形（替代 mmdr 退化路径）**
+```bash
+python3 your_chart.py     # 直接出 PNG
+```
+- 字体：`mpl.rcParams["font.sans-serif"] = ["PingFang SC", "Heiti SC", ...]`，否则中文方块。
+- 颜色：用语义化色板（暖=Cowork、冷=Claude Code、灰=其它），不要默认 tab10。
+- 尺寸：`figsize=(12, 8), dpi=150` → 1800px 宽，配 `bbox_inches="tight"` 自动裁白边。
+- **副标题**用 `\n` 拼到主标题下面，而不是 `fig.text(0.5, 0.04, ...)`——后者容易和饼图边缘标签撞。
+- 模板可参考 `articles/Cowork还是ClaudeCode当指挥官/workload-distribution.py`。
+
+#### 2.4 构图守则（"看起来不协调"的根因 → 提前规避）
+
+1. **横纵比窗口**：插图 PNG 的长宽比必须落在
+   - 横向 `1:1 ~ 16:9`，或
+   - 竖向 `1:1 ~ 3:4`。
+   绝不出现接近 `1:3` 的细长条。Mermaid 渲染完用 `Read` 看缩略图，不达标就改 DSL 重渲。
+2. **节点数控制**：单图节点（不含 subgraph）≤ 12。超出就拆图，或改用表格 / 雷达图。
+3. **subgraph 的代价**：Mermaid 多个 subgraph 在 `graph TD` 下默认纵向堆叠，**会把图拉成长条**。两条对策：
+   - 合并语义相近的 subgraph，控制在 ≤ 4 个。
+   - 切换到 `graph LR` + 强制 `--preferredAspectRatio 4:3`。
+4. **配色限定**：单图色相 ≤ 4 类，用 `classDef` 命名后批量应用，禁止逐节点 inline `style`。语义化建议色板：
+   - 在线 / 公网（黄）`#FDE68A` / `#D97706` / `#78350F`
+   - 离线 / 自托管（绿）`#BBF7D0` / `#16A34A` / `#14532D`
+   - 高速 / Rust（红）`#FECACA` / `#DC2626` / `#7F1D1D`
+   - JVM / Java（蓝）`#BFDBFE` / `#2563EB` / `#1E3A8A`
+5. **字号与中文**：
+   - Mermaid 在 1600 宽度下默认字号合适，**不要** 手动调小。
+   - PlantUML 必须显式 `DefaultFontName "PingFang SC"`，否则中文走 SansSerif，发糊。
+6. **封面密度**：作为缩略图被压缩到 200px 仍要可读 → 中心节点字号 ≥ 22pt，叶子节点 ≥ 14pt，全图主体文字总数控制在 ~30 个汉字以内。
+
+#### 2.5 渲染后必查（不要跳过）
+
+用 `Read` 工具打开生成的 PNG（多模态预览），逐项确认：
+- ① 文字未溢出节点框、未截断；
+- ② 没有节点 / 边重叠；
+- ③ **每条边的箭头方向、起止位置正确**——重点查 mmdr 的多分支输出，常见错位：箭头从节点底部钻进、走线穿过其他节点、断线斜杠状的 SVG 路径瑕疵；
+- ④ 长宽比落在 2.4 节守则；
+- ⑤ 中文显示清晰（PlantUML 易出现的字体回退问题）；
+- ⑥ 缩到 30% 仍可读（封面专用）。
+任一条不达标，**改 DSL / 换工具 / 调参数后重渲**，不要将就。mmdr 边路由翻车时，先尝试 PlantUML mindmap，不要硬调 mmdr 参数。
 
 ---
 
@@ -263,3 +358,32 @@ uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger
 - **desc 写成 200+ 字符**：parser 只警告不阻断，但微信编辑器会截断。严格 60–120。
 - **collection 写成 "AI/Agent" 之外**：parser 默认走 "AI"，但发布行为可能和你预期不一致。仅限两个值。
 - **正文小标题原封不动用 `### 1. 核心痛点与背景`**：那是旧模板的化石。按阶段 3 选定的类型走对应骨架。
+- **图表细长得像传真纸**：Mermaid 多个 subgraph 默认 TD 堆叠，长宽比直奔 1:3。必须加 `--preferredAspectRatio 4:3`，并把 subgraph 数量压到 ≤ 4。
+- **mmdr 渲染多分支树出现断线 / 箭头错位**：不是 DSL 错，是 mmdr 0.2.x 边路由的硬性短板（README 写明 "approximate"）。立刻切换到 PlantUML mindmap 重画，**不要** 试图通过调 `--nodeSpacing` / `--rankSpacing` 修正。判断条件：父节点 ≥ 4 子节点 且 层级 ≥ 3。
+- **用 mmdr 渲染 `pie` 拿到默认紫黄配色 / 700px 小图**：mmdr 对非 `graph` 子语法只做最简渲染，主题色 / 尺寸参数全部失效。饼图 / 条形 / 数据图直接走 Python matplotlib，不要先试 mmdr 再换。
+- **PlantUML `package` 标题里中文被横线穿过、字叠字**：是 `packageStyle rectangle` 在 CJK 标题处"挖凹槽"宽度算错，外框横线穿过字符。改 `skinparam packageStyle node`，标题改画在框内顶部，无凹槽。
+- **PlantUML 直接 `-tpng` 出图**：mindmap 子语法不响应 `-Sdpi`，输出停在 ~700px 宽，正文里发糊。改走 `-tsvg` + `rsvg-convert -w 1600`。
+- **PlantUML 没设字体直接画中文**：默认走 SansSerif，渲染像马赛克。`skinparam DefaultFontName "PingFang SC"` 必加。
+- **不看渲染结果就引用进文章**：阶段 2.5 的"渲染后必查"五项不能跳。
+
+## 附录：本地渲染工具一次性安装
+
+只在本地未安装时才需要执行，安装一次终身受益。
+
+```bash
+mkdir -p ~/bin
+
+# 1. mmdr (Mermaid, Rust 原生，无需 Node/Chromium)
+ARCH=$(uname -m); [ "$ARCH" = "arm64" ] && ASSET=mmdr-aarch64-apple-darwin.tar.gz || ASSET=mmdr-x86_64-apple-darwin.tar.gz
+gh release download -R 1jehuang/mermaid-rs-renderer -p "$ASSET" -D /tmp --clobber
+tar -xzf /tmp/$ASSET -C /tmp && mv /tmp/mmdr ~/bin/mmdr && chmod +x ~/bin/mmdr
+
+# 2. plantuml.jar (最新版)
+curl -sSL -o ~/bin/plantuml.jar 'https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar'
+
+# 3. 验证
+~/bin/mmdr --version
+java -jar ~/bin/plantuml.jar -version | head -1
+```
+
+依赖：`java`（macOS 自带或 `brew install openjdk`）、`gh`（`brew install gh`）、`rsvg-convert`（`brew install librsvg`，PlantUML 出图必备）。两个工具合计磁盘占用 < 40MB，无浏览器依赖。
