@@ -99,6 +99,23 @@ If you prefer to run the script manually in your terminal without an AI Agent:
    blogger --payload articles/test_data/ --platform {wechat,juejin,csdn}
    ```
 
+## 🖼 Diagram Rendering Dependencies (Optional but Recommended)
+
+The `blogger-agent` skill prefers **local offline diagram rendering** over the public `kroki.io` fallback (privacy + 504-free). If you plan to write articles with Mermaid / PlantUML / data charts, install these one-time:
+
+| Tool | Purpose | Install |
+|---|---|---|
+| **mmdc** (`@mermaid-js/mermaid-cli`) | Mermaid `.mmd` → PNG/SVG, official Dagre layout | `npm install -g @mermaid-js/mermaid-cli` (downloads Chromium for Puppeteer, ~200MB) |
+| **plantuml.jar** | PlantUML `.puml` → SVG, mindmap / component / sequence diagrams | `curl -sSL -o ~/bin/plantuml.jar https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar` |
+| **librsvg** (`rsvg-convert`) | SVG → high-resolution PNG (universal post-processor) | `brew install librsvg` |
+| **matplotlib** | Pie / bar / data viz with full theme + size control | `pip install matplotlib` (or already present in most Python envs) |
+
+Java is required for PlantUML (`brew install openjdk` if absent). Node ≥ 18.19 is required for mmdc.
+
+**Why local first?** The legacy `blogger generate-diagram` command POSTs source to `kroki.io`, which is occasionally rate-limited or returns 504. Local renderers avoid that, keep diagrams off the public internet, and (for mmdc) use the same Dagre layout as `mermaid.live`.
+
+For the full rendering protocol — aspect ratio rules, color palette, common pitfalls — see `skills/blogger-agent/SKILL.md` 阶段 2.
+
 ## 🤝 Contributing
 
 Contributions are welcome! If you're interested in adding support for a new platform like Juejin or CSDN, or implementing the AI generation layer, feel free to open a PR.

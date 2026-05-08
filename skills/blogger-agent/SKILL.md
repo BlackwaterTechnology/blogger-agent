@@ -24,7 +24,7 @@ description: Use when the user asks to write a technical article, blog post, or 
 - **图片生成**（按内容类型分工，参数详见阶段 2）：
   - **角色 / 场景化封面、概念意象图**：原生 AI 绘图工具（如 `generate_image`）。
   - **结构化图表（架构 / 流程 / 拓扑 / 思维导图 / UML）**：本地离线渲染优先：
-    - `~/bin/mmdr`（Rust 原生 Mermaid，0.5 秒级，无浏览器依赖）
+    - `~/bin/mmdc`（官方 `@mermaid-js/mermaid-cli`，Puppeteer + Dagre 布局，**Mermaid 首选**）
     - `~/bin/plantuml.jar`（PlantUML，配合 `!pragma layout smetana` 无需 Graphviz）
   - **最后兜底**：`blogger generate-diagram --type mermaid|plantuml --input x --output x.png`（kroki.io，受公网限制，仅本地工具不可用时使用）
   - 工具未安装时按"附录：本地渲染工具一次性安装"自助安装，不要回退到只用 kroki。
@@ -95,31 +95,28 @@ description: Use when the user asks to write a technical article, blog post, or 
 | 配图类型 | 推荐工具 | 理由 |
 |---|---|---|
 | 角色 / 场景 / 概念封面 | `generate_image` 等 AI 绘图 | 视觉冲击、可拟人化 |
-| 单链路流程图 / 状态机视觉版 / 简单架构 | `mmdr` (Mermaid `graph LR/TD`) | Rust 原生，~180ms，边数少时布局干净 |
-| 思维导图 / 分类树 / 多分支层级 / 标题封面 | `plantuml.jar` (`@startmindmap`) | 边路由稳定，**优于 mmdr 处理树形数据** |
-| 时序图 / 状态机 / 类图 | `plantuml.jar` | DSL 完整性最高 |
-| 饼图 / 条形 / 工作量分布 / 数据可视化 | **Python `matplotlib`** | DSL 无主题色 / 尺寸控制；matplotlib 给完整字体、配色、布局控制（参考 `articles/Cowork还是ClaudeCode当指挥官/workload-distribution.py`） |
+| 流程图 / 架构图 / 状态机视觉版 / 序列图 | `mmdc` (官方 `@mermaid-js/mermaid-cli`) | Dagre 边路由稳定、中文字体走 Chromium 原生渲染、`subgraph` + `direction TB` 都能正确解释 |
+| 思维导图 / 分类树 / 多分支层级 / 标题封面 | `plantuml.jar` (`@startmindmap`) | 中心放射布局成熟，配 `<style>` 块可做封面 |
+| 时序图 / 状态机 / 类图 / 含双向边和多 package 的架构 | `plantuml.jar` (`component diagram`) | DSL 完整性最高，多 package 嵌套和反向边比 Mermaid 表达更清晰 |
+| 饼图 / 条形 / 工作量分布 / 数据可视化 | **Python `matplotlib`** | 主题色、尺寸、字体全可控（参考 `articles/Cowork还是ClaudeCode当指挥官/workload-distribution.py`） |
 | 雷达图 / 对比表 / 复杂数据图 | `generate_image` 或手绘 SVG | DSL 难以表达 |
 
-> ⚠ **mmdr 边路由的硬性边界**：mmdr 0.2.x 用 Rust 重写了 layered layout，作者在 README 注明"edge routing is approximate"。**多分支树（一个父节点 ≥ 4 个子节点，且层级 ≥ 3）会出现肉眼可见的拐角错位、断线、箭头位置错误**。这类数据**不要硬上 mmdr**——直接选 PlantUML mindmap，一次出图。验证经验：把 `* root \n ** A \n *** A1 \n *** A2` 这种四象限层级图喂给 mmdr 必踩坑，喂给 PlantUML mindmap 干净。
-
-> ⚠ **mmdr 对非 `graph` DSL 是退化路径**：mmdr 能解析 `pie` / `sequenceDiagram` 等子语法，但 `--themeVariables` 主题色、`-w/-H` 尺寸参数对它们**全部不响应**——pie 只能拿到默认紫黄配色和 ~700px 输出，无法适配文章风格。Pie / 工作量分布 / 数据图 → 直接 Python matplotlib，不要绕 mmdr 一圈。
+> ℹ **为什么是官方 mmdc 而不是 Rust 派生的 mmdr**：曾经把 mmdr 0.2.x 列为首选（吹点：纯 Rust、180ms、无浏览器），但实战踩坑多——多分支树边路由出现错位/断线、`subgraph` 内 `direction TB` 不稳、非 `graph` DSL（pie 等）主题色和 `-w/-H` 参数全部失效。mmdc 用 Puppeteer 调真实 Chromium 跑官方 Mermaid，慢点但所有 DSL、所有主题、所有字体都和 `mermaid.live` 一模一样。仍然偏好启动速度的场景才考虑 mmdr，**默认就是 mmdc**。
 
 #### 2.3 渲染命令（写进脚本的硬性下限）
 
-**Mermaid → mmdr（首选 Mermaid 路径）**
+**Mermaid → mmdc（首选 Mermaid 路径）**
 ```bash
-~/bin/mmdr -i x.mmd -o x.png -e png \
-  -w 1600 -H 1000 \
-  --preferredAspectRatio 4:3
+~/bin/mmdc -i x.mmd -o x.png -e png \
+  -w 1800 -H 1200 \
+  -s 2 \
+  -b white
 ```
-- 输出分辨率 ≥ 1600×1000，缩放后仍清晰。
-- `--preferredAspectRatio` **必加**：
-  - 多 subgraph 的对比图 / 思维导图 → `4:3` 或 `1:1`
-  - 单链路流程图 → `3:2` 或 `16:9`
-  - **禁止** 接近 `1:3` / `3:1` 的极端长条。
-- 节点 ≥ 10 时加 `--nodeSpacing 60 --rankSpacing 80` 拉开间距。
-- 想要更精细的字宽测量（默认即可，速度优先时再开 `--fastText`）。
+- `-s/--scale 2`：把 Puppeteer 视口放大 2x，最终 PNG 在 1500–2400px 宽度区间，缩放后清晰。复杂图可以提到 `-s 2.5` 或 `-s 3`。
+- `-w/-H` 是 viewport 提示，不是强制尺寸——mmdc 会根据内容自适应裁切。需要严格控制比例时，改 `.mmd` 内容（增减节点 / 调 `direction TD/LR`）。
+- 中文字体：mmdc 走真实 Chromium 渲染，PingFang SC / Heiti SC 等系统字体直接生效，**不需要** 显式声明。
+- 默认背景透明，公众号正文里可能不可读 → 用 `-b white` 显式给白底。
+- 首次启动会下载 Chromium（~200MB），之后冷启动 1-3 秒。批量出图用 `-i input.md` 把多张图打包成一个 Markdown 一次性渲染，省启动开销。
 
 **PlantUML → SVG → 高分辨率 PNG（推荐路径）**
 ```bash
@@ -138,9 +135,9 @@ rsvg-convert -w 1600 x.svg -o x.png                # 再栅格化到 ≥1600 宽
 - 主题二选一开起来：`!theme cerulean-outline`（线框，适合插图）或 `!theme plain`（极简）。
 - mindmap 作封面再附 `<style>` 块定制圆角、配色（参考 `articles/Mermaid与PlantUML本地离线渲染方案/cover.puml`）。
 - **`package` / `frame` 容器在中英混排标题里用 `packageStyle node`，不要用默认 `rectangle`**：rectangle 风格会在标题位置"挖凹槽"，PlantUML 计算凹槽宽度时假定是英文字符宽度，CJK 字符会被外框横线穿过、看起来像字叠字。`packageStyle node` 把标题画在框内顶部、无凹槽，规避这个 bug。
-- **`component diagram` 用作架构 / 流程图**（参考 `articles/Cowork还是ClaudeCode当指挥官/nested-architecture.puml`）：含双向边、多 package 嵌套时，PlantUML 比 mmdr 稳定得多。
+- **`component diagram` 用作架构 / 流程图**（参考 `articles/Cowork还是ClaudeCode当指挥官/nested-architecture.puml`）：含双向边、多 package 嵌套时，PlantUML component 比 Mermaid `subgraph` 表达更直观、布局更稳定。
 
-**Python matplotlib → 数据图 / 饼图 / 条形（替代 mmdr 退化路径）**
+**Python matplotlib → 数据图 / 饼图 / 条形（替代 Mermaid pie 路径）**
 ```bash
 python3 your_chart.py     # 直接出 PNG
 ```
@@ -175,11 +172,11 @@ python3 your_chart.py     # 直接出 PNG
 用 `Read` 工具打开生成的 PNG（多模态预览），逐项确认：
 - ① 文字未溢出节点框、未截断；
 - ② 没有节点 / 边重叠；
-- ③ **每条边的箭头方向、起止位置正确**——重点查 mmdr 的多分支输出，常见错位：箭头从节点底部钻进、走线穿过其他节点、断线斜杠状的 SVG 路径瑕疵；
+- ③ 每条边的箭头方向、起止位置正确（mmdc 走 Dagre 通常没问题；PlantUML component diagram 偶尔会有反向布局，配合 `direction` 与 `-up->` / `-down->` 修正）；
 - ④ 长宽比落在 2.4 节守则；
-- ⑤ 中文显示清晰（PlantUML 易出现的字体回退问题）；
+- ⑤ 中文显示清晰：mmdc 用 Chromium 系统字体，正常即可；PlantUML **必须**显式 `skinparam DefaultFontName "PingFang SC"`；
 - ⑥ 缩到 30% 仍可读（封面专用）。
-任一条不达标，**改 DSL / 换工具 / 调参数后重渲**，不要将就。mmdr 边路由翻车时，先尝试 PlantUML mindmap，不要硬调 mmdr 参数。
+任一条不达标，**改 DSL / 换工具 / 调参数后重渲**，不要将就。Mermaid 用 mmdc 还是糊？检查 `-s` 是不是太低、`.mmd` 节点是不是过多。
 
 ---
 
@@ -358,9 +355,9 @@ uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger
 - **desc 写成 200+ 字符**：parser 只警告不阻断，但微信编辑器会截断。严格 60–120。
 - **collection 写成 "AI/Agent" 之外**：parser 默认走 "AI"，但发布行为可能和你预期不一致。仅限两个值。
 - **正文小标题原封不动用 `### 1. 核心痛点与背景`**：那是旧模板的化石。按阶段 3 选定的类型走对应骨架。
-- **图表细长得像传真纸**：Mermaid 多个 subgraph 默认 TD 堆叠，长宽比直奔 1:3。必须加 `--preferredAspectRatio 4:3`，并把 subgraph 数量压到 ≤ 4。
-- **mmdr 渲染多分支树出现断线 / 箭头错位**：不是 DSL 错，是 mmdr 0.2.x 边路由的硬性短板（README 写明 "approximate"）。立刻切换到 PlantUML mindmap 重画，**不要** 试图通过调 `--nodeSpacing` / `--rankSpacing` 修正。判断条件：父节点 ≥ 4 子节点 且 层级 ≥ 3。
-- **用 mmdr 渲染 `pie` 拿到默认紫黄配色 / 700px 小图**：mmdr 对非 `graph` 子语法只做最简渲染，主题色 / 尺寸参数全部失效。饼图 / 条形 / 数据图直接走 Python matplotlib，不要先试 mmdr 再换。
+- **图表细长得像传真纸**：Mermaid 多个 subgraph 默认 TD 堆叠，长宽比直奔 1:3。把 `flowchart TD` 改成 `flowchart LR`、把 subgraph 数量压到 ≤ 4，必要时拆图。
+- **用 Mermaid 画 pie / bar / 数据分布**：Mermaid 的 pie 子语法只能拿到默认配色和小尺寸，无法适配文章风格。饼图 / 条形 / 数据图直接走 Python matplotlib（参考 `articles/Cowork还是ClaudeCode当指挥官/workload-distribution.py`）。
+- **mmdc 把 `.mmd` 渲成 SVG 后用 rsvg-convert 转 PNG，结果中文全没了**：Chromium 渲染 SVG 时把字体当外部资源，rsvg-convert 转 PNG 时找不到。直接 `mmdc -i x.mmd -o x.png -e png -s 2`，PNG 由 Chromium 直接栅格化字体，不要走 SVG 中转。
 - **PlantUML `package` 标题里中文被横线穿过、字叠字**：是 `packageStyle rectangle` 在 CJK 标题处"挖凹槽"宽度算错，外框横线穿过字符。改 `skinparam packageStyle node`，标题改画在框内顶部，无凹槽。
 - **PlantUML 直接 `-tpng` 出图**：mindmap 子语法不响应 `-Sdpi`，输出停在 ~700px 宽，正文里发糊。改走 `-tsvg` + `rsvg-convert -w 1600`。
 - **PlantUML 没设字体直接画中文**：默认走 SansSerif，渲染像马赛克。`skinparam DefaultFontName "PingFang SC"` 必加。
@@ -368,22 +365,33 @@ uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger
 
 ## 附录：本地渲染工具一次性安装
 
-只在本地未安装时才需要执行，安装一次终身受益。
+只在本地未安装时才需要执行，安装一次终身受益。仓库根目录 `README.md` 也有同款指引（面向工具使用者）；这里是面向 Agent 的可执行版本。
 
 ```bash
 mkdir -p ~/bin
 
-# 1. mmdr (Mermaid, Rust 原生，无需 Node/Chromium)
-ARCH=$(uname -m); [ "$ARCH" = "arm64" ] && ASSET=mmdr-aarch64-apple-darwin.tar.gz || ASSET=mmdr-x86_64-apple-darwin.tar.gz
-gh release download -R 1jehuang/mermaid-rs-renderer -p "$ASSET" -D /tmp --clobber
-tar -xzf /tmp/$ASSET -C /tmp && mv /tmp/mmdr ~/bin/mmdr && chmod +x ~/bin/mmdr
+# 1. mmdc (Mermaid 官方 CLI，Puppeteer + Chromium，跟 mermaid.live 一致)
+#    若 npm 全局目录是 root 所有，先把 prefix / cache 切到家目录，避开 sudo
+npm config set prefix '~/.npm-global'
+npm config set cache '~/.npm-cache'
+npm install -g @mermaid-js/mermaid-cli           # 自动下载 Chromium ~200MB
+ln -sf ~/.npm-global/bin/mmdc ~/bin/mmdc
 
 # 2. plantuml.jar (最新版)
 curl -sSL -o ~/bin/plantuml.jar 'https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar'
 
-# 3. 验证
-~/bin/mmdr --version
+# 3. librsvg（PlantUML SVG → PNG 必备）
+brew install librsvg
+
+# 4. 验证
+~/bin/mmdc --version          # 期望 11.x
 java -jar ~/bin/plantuml.jar -version | head -1
+rsvg-convert --version
 ```
 
-依赖：`java`（macOS 自带或 `brew install openjdk`）、`gh`（`brew install gh`）、`rsvg-convert`（`brew install librsvg`，PlantUML 出图必备）。两个工具合计磁盘占用 < 40MB，无浏览器依赖。
+依赖：
+- `node` ≥ 18.19（`brew install node`）—— mmdc 必备
+- `java`（macOS 自带或 `brew install openjdk`）—— PlantUML 必备
+- `python3` + `matplotlib`（`pip install matplotlib`）—— 数据图必备
+
+mmdc 的磁盘占用主要是 Chromium（~200MB）。冷启动 1–3 秒，比纯 Rust 实现慢，但布局质量与 `mermaid.live` 完全一致，**复杂图不会再翻车**。
