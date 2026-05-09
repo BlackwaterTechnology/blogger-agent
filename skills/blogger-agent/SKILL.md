@@ -17,17 +17,29 @@ description: Use when the user asks to write a technical article, blog post, or 
 - 用户没有指明"发到/推送到"某平台、也没有说"整理成文章"——可能只是闲聊或问问题。
 - 用户想发到非中文博客平台（Medium、dev.to 等）——本 skill 不支持，告知用户。
 
+## Prerequisites（启动前必查，跳过会在阶段 5 报错）
+
+发布前依赖三件事，任何一项缺失都会导致 `blogger` CLI 中途崩溃且报错信息不够直白。**首次进入阶段 2 之前**先帮用户确认：
+
+1. **Chrome 必须开启「允许 Apple 事件中的 JavaScript」**（默认关闭）——CLI 走 osascript 调 JS 操作微信编辑器，开关没开会抛 `通过 AppleScript 执行 JavaScript 的功能已关闭`。让用户去 **Chrome 菜单栏 → View / 查看 → Developer / 开发者 → Allow JavaScript from Apple Events / 允许 Apple 事件中的 JavaScript**，勾上即可。
+2. **Chrome 当前已登录微信公众号后台**（任意 tab 打开 `mp.weixin.qq.com` 即可）。CLI 会自动复用已有 session，未登录就只能让用户先去登录一次。
+3. **本地渲染工具就位**：`~/bin/mmdc`、`~/bin/plantuml.jar`、`rsvg-convert`、`python3 + Pillow + matplotlib`。缺则按"附录：本地渲染工具一次性安装"补齐。
+
+> ⚠️ 这三条只需问一次。如果用户上次发布过、本次同会话里再发布，可以默认前置都满足。
+
 ## Required Tools
 
 - **bash**：跑 `blogger` CLI 与图片生成子进程。
 - **文件系统**：建 Payload 目录、保存图片与 Markdown。
 - **图片生成**（按内容类型分工，参数详见阶段 2）：
   - **角色 / 场景化封面、概念意象图**：原生 AI 绘图工具（如 `generate_image`）。
+  - **排版式封面（书评 / 杂志风）**：Python `matplotlib`（无 AI 绘图工具时的兜底）。
   - **结构化图表（架构 / 流程 / 拓扑 / 思维导图 / UML）**：本地离线渲染优先：
     - `~/bin/mmdc`（官方 `@mermaid-js/mermaid-cli`，Puppeteer + Dagre 布局，**Mermaid 首选**）
     - `~/bin/plantuml.jar`（PlantUML，配合 `!pragma layout smetana` 无需 Graphviz）
   - **最后兜底**：`blogger generate-diagram --type mermaid|plantuml --input x --output x.png`（kroki.io，受公网限制，仅本地工具不可用时使用）
   - 工具未安装时按"附录：本地渲染工具一次性安装"自助安装，不要回退到只用 kroki。
+- **封面 letterbox 工具**：`~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py`（随 skill 分发）——把任意比例的封面 letterbox 到严格 2.35:1，支持 `--bg white|black|auto|#RRGGBB` 与 `-o/--output` alias。详见 §2.3。
 
 ## Workflow
 
@@ -64,7 +76,9 @@ description: Use when the user asks to write a technical article, blog post, or 
    □ 产品 / 项目对比：场景 → 维度对比 → 推荐
    □ 经验沉淀 / 踩坑：背景 → 操作 → 翻车 → 教训
    □ 观点檄文 / 立场：论点 → 反方 → 论据 → 重申
+   □ 书评 / 读书笔记：钩子 → 这本书在说什么 → 我同意的部分 → 我不同意/补充的部分 → 它适合谁不适合谁
    ⚠ 默认套「痛点→方案→总结」是套路化的根源，不要选这个。
+   ⚠ 书评不要硬塞「观点檄文」——书评的力气应该花在"复述 + 校准"，而不是"开战"。
 ```
 
 #### B. 形式自检
@@ -136,10 +150,11 @@ description: Use when the user asks to write a technical article, blog post, or 
 
 **PlantUML → SVG → 高分辨率 PNG（推荐路径）**
 ```bash
-java -jar ~/bin/plantuml.jar -tsvg x.puml          # 先出 SVG
-rsvg-convert -w 1600 x.svg -o x.png                # 再栅格化到 ≥1600 宽
+java -jar ~/bin/plantuml.jar -tsvg x.puml                                  # 先出 SVG
+rsvg-convert -w 1600 --background-color=white x.svg -o x.png               # 再栅格化到 ≥1600 宽
 ```
 - **不要直接 `-tpng`**：mindmap 等子语法不响应 `-Sdpi`，PNG 会停在 ~700px，正文一缩就糊。SVG → rsvg-convert 这条路对所有 PlantUML 子语法都适用，且自由控制目标宽度。
+- **`--background-color=white` 不能省**：PlantUML SVG 默认透明背景，rsvg-convert 默认 `none` 会渲染成透明 PNG，封面在公众号上变成"黑底"或"花底"。中性背景明确指定为 `white` 最稳。
 - 目标宽度：插图 **≥1600**，封面 **≥1800**（公众号正文容器约 700px，2-3x 才能保证清晰）。
 - 缺 `rsvg-convert` 时安装：`brew install librsvg`。
 - `.puml` 顶部三条样板必加，缺一不可：
@@ -153,35 +168,54 @@ rsvg-convert -w 1600 x.svg -o x.png                # 再栅格化到 ≥1600 宽
 - **`package` / `frame` 容器在中英混排标题里用 `packageStyle node`，不要用默认 `rectangle`**：rectangle 风格会在标题位置"挖凹槽"，PlantUML 计算凹槽宽度时假定是英文字符宽度，CJK 字符会被外框横线穿过、看起来像字叠字。`packageStyle node` 把标题画在框内顶部、无凹槽，规避这个 bug。
 - **`component diagram` 用作架构 / 流程图**（参考 `articles/Cowork还是ClaudeCode当指挥官/nested-architecture.puml`）：含双向边、多 package 嵌套时，PlantUML component 比 Mermaid `subgraph` 表达更直观、布局更稳定。
 
-**Python matplotlib → 数据图 / 饼图 / 条形（替代 Mermaid pie 路径）**
+**Python matplotlib → 数据图 / 饼图 / 条形 / 排版式封面**
 ```bash
 python3 your_chart.py     # 直接出 PNG
 ```
-- 字体：`mpl.rcParams["font.sans-serif"] = ["PingFang SC", "Heiti SC", ...]`，否则中文方块。
+- **字体 fallback 链**（macOS 实测顺序）：
+  ```python
+  mpl.rcParams["font.sans-serif"] = [
+      "Hiragino Sans GB",   # macOS 自带，matplotlib 默认能识别 ★
+      "Heiti TC", "Songti SC",
+      "PingFang SC",        # 不一定在 matplotlib 字体缓存里，作为后备
+      "Arial Unicode MS",
+  ]
+  mpl.rcParams["axes.unicode_minus"] = False
+  ```
+  > 不要把 `PingFang SC` 放在第一位——它在系统字体里，但 matplotlib 的 fontManager 经常**没扫描进缓存**（Python 3.12+/3.14 上常见），第一位就成了缺失警告。把 `Hiragino Sans GB` 顶在前面是因为 macOS 默认装、matplotlib 默认能找到。
+- **中文 weight 最高用 `bold`，不要用 `black`**：Hiragino Sans GB / Heiti TC 没有 black weight，写 `weight="black"` 会渲染成方块字（豆腐）。需要更粗的视觉效果就把 `fontsize` 调大。
+- **特殊字符注意**：`✕`(U+2715) 等"绘图记号"在 Hiragino Sans GB 缺字，会触发 `Glyph missing` 警告并显示豆腐；改用 `×`(U+00D7) 通常都有。
 - 颜色：用语义化色板（暖=Cowork、冷=Claude Code、灰=其它），不要默认 tab10。
-- 尺寸：`figsize=(12, 8), dpi=150` → 1800px 宽，配 `bbox_inches="tight"` 自动裁白边。
+- 尺寸：`figsize=(12, 8), dpi=150` → 1800px 宽，配 `bbox_inches="tight"` 自动裁白边。封面要 4700×2000，用 `figsize=(23.5, 10), dpi=200` + `facecolor` 设置底色。
 - **副标题**用 `\n` 拼到主标题下面，而不是 `fig.text(0.5, 0.04, ...)`——后者容易和饼图边缘标签撞。
+- **没有 `letterspacing` 参数**：matplotlib 的 `text()` 不支持字间距，要"宽松"效果就在源串里手工插空格（如 `"R E A D I N G"`）。
 - 模板可参考 `articles/Cowork还是ClaudeCode当指挥官/workload-distribution.py`。
 
 **封面专用：letterbox 到 16:9 或 1:1（多平台通用比例）**
 ```bash
+# 工具固定路径（随 skill 一起分发）：~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py
+
 # 16:9（横向流程图 / 对比图 / 时间线 —— 默认推荐）
-python3 tools/fit_wechat_cover.py path/to/cover.png --ratio 1.778 --width 1920
+python3 ~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py \
+    path/to/cover-raw.png -o cover.png --ratio 1.778 --width 1920 --bg white
 
 # 1:1（视觉冲击型 / 文字海报 / 中心放射构图 —— 兼容微信次条最稳）
-python3 tools/fit_wechat_cover.py path/to/cover.png --ratio 1 --width 1500
+python3 ~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py \
+    path/to/cover-raw.png -o cover.png --ratio 1 --width 1500 --bg white
 ```
-- **不要再强制 2.35:1**。微信公众号一次推送里头条≈16:9、次条 1:1，掘金 / CSDN 也不吃 2.35:1。三家平台都会按各自规范自动截取——封面给 16:9 或 1:1，平台能裁出合适缩略图。详见 memory `封面比例规范`。
+- **不要再强制 2.35:1**。微信公众号一次推送里头条≈16:9、次条 1:1，掘金 / CSDN 也不吃 2.35:1。三家平台都会按各自规范自动截取——封面给 16:9 或 1:1，平台能裁出合适缩略图。
 - 选哪一个：横向内容（`flowchart LR`、`component diagram`、`@startwbs`、对比表）→ **16:9**；中心放射 / 海报式（mindmap、概念图、文字主标题）→ **1:1**。
-- 任意工具（mmdc / PlantUML / matplotlib / AI 绘图）出来的封面，**最后一步**都跑一次 `tools/fit_wechat_cover.py` 做白底 letterbox。原图等比缩放后居中贴到画布上，不裁不拉伸。
+- `--bg` 选 `white`（默认，最稳，配合公众号正文白底）/ `black`（配合深色封面避免突兀白边）/ `auto`（取源图四角中位色，DSL 渲染图通常和源图主背景一致）/ `#RRGGBB`（精确指定）。
+- `-o/--output` 是 `--dst` 的 alias；不传则覆盖源文件，**强烈建议显式传 `-o cover.png` 留底**，把原图保留为 `cover-raw.png`。
+- 任意工具（mmdc / PlantUML / matplotlib / AI 绘图）出来的封面，**最后一步**都跑一次 letterbox。原图等比缩放后居中贴到画布上，不裁不拉伸。
 - 设计 `.mmd` / `.puml` 时让内容**自然填满目标比例**：4 个横向节点 + 单行文字默认会出 6:1 极扁条，letterbox 到 16:9 后上下白边巨大；改成 3 行多行节点（标题+说明+示例），高度自然增加，白边压到 ≤ 15%。
-- 上一版规则错误："比例不符直接被编辑器拒收"——只对头条生效，且现在编辑器接受 16:9。已废弃。
+- 上一版规则错误："封面必须严格 2.35:1"——那是只针对微信公众号头条的旧规则，已废弃。
 
 #### 2.4 构图守则（"看起来不协调"的根因 → 提前规避）
 
 1. **横纵比窗口**：
    - **正文插图**：横向 `1:1 ~ 16:9`，或竖向 `1:1 ~ 3:4`。绝不出现接近 `1:3` 的细长条。
-   - **封面 `cover.png`**：默认 **16:9**（横向流程 / 对比 / 时间线），或 **1:1**（视觉海报 / 概念图 / 中心放射）。多平台通用，系统会按各自规范自动截取。最终交付前走 `python3 tools/fit_wechat_cover.py cover.png --ratio 1.778 --width 1920`（16:9）或 `--ratio 1 --width 1500`（1:1）。
+   - **封面 `cover.png`**：默认 **16:9**（横向流程 / 对比 / 时间线），或 **1:1**（视觉海报 / 概念图 / 中心放射）。多平台通用，系统会按各自规范自动截取。最终交付前走 `python3 ~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py <src> -o cover.png --ratio 1.778 --width 1920 --bg white`（16:9）或 `--ratio 1 --width 1500`（1:1）。
    - 白边占比目标 ≤ 15%。原图过扁（如 4 节点 LR ≈ 6:1）→ letterbox 到 16:9 上下白边过大，改 DSL 让节点变高（多行文字、密度更高）。原图过方（mindmap ≈ 1:1）→ 直接选 1:1 比例的 letterbox，或换横向语义结构（如 `@startwbs`）重画再走 16:9。
    - Mermaid / PlantUML 渲染完用 `Read` 看缩略图，不达标就改 DSL 重渲。
 2. **节点数控制**：单图节点（不含 subgraph）≤ 12。超出就拆图，或改用表格 / 雷达图。
@@ -204,7 +238,7 @@ python3 tools/fit_wechat_cover.py path/to/cover.png --ratio 1 --width 1500
 - ① 文字未溢出节点框、未截断；
 - ② 没有节点 / 边重叠；
 - ③ 每条边的箭头方向、起止位置正确（mmdc 走 Dagre 通常没问题；PlantUML component diagram 偶尔会有反向布局，配合 `direction` 与 `-up->` / `-down->` 修正）；
-- ④ 长宽比落在 2.4 节守则；**`cover.png` 走 16:9（≈1.778）或 1:1**（用 `python3 -c "from PIL import Image; im=Image.open('cover.png'); print(im.size, round(im.size[0]/im.size[1], 3))"` 验）；不达标跑 `tools/fit_wechat_cover.py cover.png --ratio 1.778 --width 1920`（或 `--ratio 1 --width 1500`）修正；
+- ④ 长宽比落在 2.4 节守则；**`cover.png` 走 16:9（≈1.778）或 1:1**（用 `python3 -c "from PIL import Image; im=Image.open('cover.png'); print(im.size, round(im.size[0]/im.size[1], 3))"` 验）；不达标跑 `python3 ~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py cover.png --ratio 1.778 --width 1920 --bg white`（或 `--ratio 1 --width 1500`）修正；
 - ⑤ 中文显示清晰：mmdc 用 Chromium 系统字体，正常即可；PlantUML **必须**显式 `skinparam DefaultFontName "PingFang SC"`；
 - ⑥ 缩到 30% 仍可读（封面专用）。
 任一条不达标，**改 DSL / 换工具 / 调参数后重渲**，不要将就。Mermaid 用 mmdc 还是糊？检查 `-s` 是不是太低、`.mmd` 节点是不是过多。
@@ -229,9 +263,9 @@ cover: "cover.png" # 必填且固定
 
 > ⚠️ **不要**写 `illustration:` 字段——那是已废弃的旧字段，新文章只用正文 inline `![]()` 引用图片。
 
-#### 正文骨架（按阶段 1 类型四选一 / 五选一）
+#### 正文骨架（按阶段 1 类型六选一）
 
-下面给出 5 种文章类型对应的小标题模板。**只挑一种**，把方括号占位替换为实际内容。
+下面给出 6 种文章类型对应的小标题模板。**只挑一种**，把方括号占位替换为实际内容。
 
 **类型 1：现象解读 / 新闻评论**
 ```markdown
@@ -320,6 +354,26 @@ cover: "cover.png" # 必填且固定
 [再说一次主张，并说明它在哪些情况下不成立。避免说成放之四海而皆准。]
 ```
 
+**类型 6：书评 / 读书笔记**
+```markdown
+[钩子段：用一个具体场景或数据指出"为什么现在重读这本书"，避免"最近读了 XX 这本好书"的开场。]
+
+### 这本书在说什么
+[用 200 字内复述全书最核心的一两个论点。带一两条原文引用（注明章节 / 页码 / 作者推特日期）。
+这一节决定读者要不要继续看下去——复述要忠实，不要夹私货。]
+
+![核心概念示意图：xxx](concept-diagram.png)
+
+### 我同意的部分
+[列 1–3 个让你最受启发的点。每个点：① 作者怎么说 ② 我为什么觉得对 ③ 一个能验证它的具体例子。]
+
+### 我不同意 / 想补充的部分
+[列 1–2 个。这一节是书评是否独立思考的试金石。如果完全没有不同意见，要么再读一遍，要么承认这是「推荐文」而不是书评。]
+
+### 它适合谁，不适合谁
+[谁读完会有收获，谁读完会觉得没意思 / 被冒犯。直接说，不要"见仁见智"。]
+```
+
 ---
 
 ### 阶段 4：发布前自审 (Pre-flight)
@@ -358,7 +412,23 @@ uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger
 
 **监控**：
 - 看输出有无 `WARNING`，特别是 desc 长度。
-- 若提示 `WeChat Official Account tab not found`，提醒用户在 Chrome 里手动登录一次微信公众号后台。
+- **看到 `通过 AppleScript 执行 JavaScript 的功能已关闭`**：说明 Prerequisites #1 没满足。让用户去 Chrome 菜单栏开开关，重跑即可。
+- **看到 `WeChat Official Account tab not found`**：用户没登录公众号后台。让用户在 Chrome 里登录一次。
+- **`Cover Setup` / `Reward Setup` / `Collection Setup` 出现 `Failed to complete within N steps`**：是常态，**正文 + 图片注入通常已经成功**。微信编辑器的弹窗 / 下拉对自动化不够友好，超时不影响主体内容。
+
+**收尾必须给用户一份清单**（即使日志里没有明确的 success summary）：
+
+```
+✓ / ✗ 标题
+✓ / ✗ 正文（看 "Filled via paste event"）
+✓ / ✗ N 张图片（看 "Successfully initiated image paste/upload" 出现次数）
+✓ / ✗ 原创声明（看 "Originality badge found"）
+✗ 封面 → 让用户在编辑器右侧点「从正文选择」
+✗ 合集 → 手动选
+✗ 保存为草稿 → 手动点
+```
+
+把还需手动补的步骤明确告诉用户，比"已发送"更负责。
 
 ## Example Usage
 
@@ -396,8 +466,15 @@ uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger
 - **PlantUML `package` 标题里中文被横线穿过、字叠字**：是 `packageStyle rectangle` 在 CJK 标题处"挖凹槽"宽度算错，外框横线穿过字符。改 `skinparam packageStyle node`，标题改画在框内顶部，无凹槽。
 - **PlantUML 直接 `-tpng` 出图**：mindmap 子语法不响应 `-Sdpi`，输出停在 ~700px 宽，正文里发糊。改走 `-tsvg` + `rsvg-convert -w 1600`。
 - **PlantUML 没设字体直接画中文**：默认走 SansSerif，渲染像马赛克。`skinparam DefaultFontName "PingFang SC"` 必加。
-- **`cover.png` 比例选错或被压扁**：默认 16:9，海报型 1:1。**不要再强制 2.35:1**——那是只针对微信公众号头条的旧规则，次条走 1:1，掘金 / CSDN 都按自己规范裁切。最后一步统一走 `python3 tools/fit_wechat_cover.py cover.png --ratio 1.778 --width 1920`（横向）或 `--ratio 1 --width 1500`（方形）。原图过扁（如 4 节点单行 LR ≈ 6:1）letterbox 后上下白边巨大 → 改 DSL 让节点变高（多行文字 / 增加密度），不要靠 letterbox 蒙混。
+- **`cover.png` 比例选错或被压扁**：默认 16:9，海报型 1:1。**不要再强制 2.35:1**——那是只针对微信公众号头条的旧规则，次条走 1:1，掘金 / CSDN 都按自己规范裁切。最后一步统一走 `python3 ~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py <src> -o cover.png --ratio 1.778 --width 1920 --bg white`（横向）或 `--ratio 1 --width 1500`（方形）。原图过扁（如 4 节点单行 LR ≈ 6:1）letterbox 后上下白边巨大 → 改 DSL 让节点变高（多行文字 / 增加密度），不要靠 letterbox 蒙混。
 - **不看渲染结果就引用进文章**：阶段 2.5 的"渲染后必查"六项不能跳。
+- **Mermaid 写 `-.x.->` / `-.x.->` 想要"被划掉的虚线箭头"**：Mermaid **没有这种语法**，parser 直接抛 InputError，整张图渲染失败。要表达"此路不通"用 `-. 标签 .-> ` 配合中文标签（`-. 此路不通 .->` / `-. 不可行 .->`），或者画两类节点用 `classDef` 区分颜色。
+- **matplotlib 中文字体设成 `["PingFang SC", ...]` 第一位**：在 Python 3.12+/3.14 上 matplotlib 的 fontManager 经常没把 PingFang SC 扫进缓存，第一位就是缺失警告。改用 `["Hiragino Sans GB", "Heiti TC", "Songti SC", "PingFang SC", ...]`，把 macOS 自带且 mpl 默认能识别的 `Hiragino Sans GB` 顶在前面。
+- **matplotlib 用 `weight="black"` 渲染中文**：Hiragino Sans GB / Heiti TC 没有 black 字重，会渲染成方块字（"豆腐"）。中文最高用 `weight="bold"`，要更醒目就调 `fontsize`。
+- **PlantUML SVG → PNG 漏了 `--background-color=white`**：PlantUML SVG 默认透明，rsvg-convert 默认 `none`，PNG 在某些查看器里看着白底其实是透明，公众号背景一变就花掉。`rsvg-convert --background-color=white` 必加。
+- **`fit_wechat_cover.py` 路径写成相对路径 `tools/fit_wechat_cover.py`**：CWD 不对就 ENOENT。固定路径是 `~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py`，永远写绝对路径。
+- **`fit_wechat_cover.py` 不传 `-o`，源文件被覆盖**：默认 `--dst` 等于 `--src`，调用一次原图就被替换掉了。**始终显式传 `-o cover.png` 留底**，把原图保留为 `cover-raw.png`。
+- **微信发布 stage 中途超时就放弃汇报**：UI state machine 三五个 stage 超时是常态（封面 / 合集 / 赞赏 / 草稿按钮），但**正文和图片已经注入**。一定要给用户一份"哪些成功 / 哪些要手动补"的最终清单（见阶段 5），不要扔下一句"发布失败"就跑。
 
 ## 附录：本地渲染工具一次性安装
 
