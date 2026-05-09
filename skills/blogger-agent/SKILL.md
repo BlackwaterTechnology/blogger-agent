@@ -39,7 +39,7 @@ description: Use when the user asks to write a technical article, blog post, or 
     - `~/bin/plantuml.jar`（PlantUML，配合 `!pragma layout smetana` 无需 Graphviz）
   - **最后兜底**：`blogger generate-diagram --type mermaid|plantuml --input x --output x.png`（kroki.io，受公网限制，仅本地工具不可用时使用）
   - 工具未安装时按"附录：本地渲染工具一次性安装"自助安装，不要回退到只用 kroki。
-- **封面 letterbox 工具**：`~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py`（随 skill 分发）——把任意比例的封面 letterbox 到严格 2.35:1，支持 `--bg white|black|auto|#RRGGBB` 与 `-o/--output` alias。详见 §2.3。
+- **封面 letterbox 工具**：`~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py`（随 skill 分发）——把任意比例的封面 letterbox 到目标比例（默认 16:9，可选 1:1 / 2.35:1），支持 `--bg white|black|auto|#RRGGBB` 与 `-o/--output` alias。详见 §2.3。
 
 ## Workflow
 
