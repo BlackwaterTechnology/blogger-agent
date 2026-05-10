@@ -29,18 +29,27 @@ def parse_markdown_payload(md_path: Path) -> dict:
     payload_dir = md_path.parent
 
     local_images = []
-    
-    def wechat_image_replacer(match):
-        img_src = match.group(1)
-        if not img_src.startswith('http://') and not img_src.startswith('https://'):
-            local_img_path = payload_dir / img_src
-            if local_img_path.exists():
-                if local_img_path not in local_images:
-                    local_images.append(local_img_path)
-                return f"[UPLOAD_IMAGE: {local_img_path.absolute()}]"
-        return match.group(0)
+    image_alts: dict[Path, str] = {}
 
-    wechat_content = re.sub(r'!\[.*?\]\((.*?)\)', wechat_image_replacer, content)
+    # 抓 alt 文本:发布器会在 paste 后把 ProseMirror 自动补的 trailing empty <p>
+    # 填成图注(用 alt 文本 + 图注样式)。不在这里把 caption 拼进 HTML——实测
+    # ProseMirror 即使下一个是可写 <p> 也仍然要补 trailing,放在 HTML 里就会和
+    # 那个 trailing 空段叠加,反而出现"图—空段—图注"。
+    def wechat_image_replacer(match):
+        alt_text = (match.group(1) or '').strip()
+        img_src = match.group(2)
+        if img_src.startswith('http://') or img_src.startswith('https://'):
+            return match.group(0)
+        local_img_path = payload_dir / img_src
+        if not local_img_path.exists():
+            return match.group(0)
+        if local_img_path not in local_images:
+            local_images.append(local_img_path)
+        if alt_text and local_img_path not in image_alts:
+            image_alts[local_img_path] = alt_text
+        return f"[UPLOAD_IMAGE: {local_img_path.absolute()}]"
+
+    wechat_content = re.sub(r'!\[(.*?)\]\((.*?)\)', wechat_image_replacer, content)
 
     # python-markdown 的 sane_lists 扩展严格要求列表前有空行;否则
     # `段落：\n- item` 会被并进同一个 <p>,导致微信里出现 "段落：- item" 单行长串。
@@ -160,6 +169,19 @@ def parse_markdown_payload(md_path: Path) -> dict:
     if illustration_path and illustration_path not in all_illustrations:
         all_illustrations.insert(0, illustration_path)
 
+    # 与 all_illustrations 同序的 caption 文本(没有/不达标就空串),供发布器
+    # 在 paste 后把 ProseMirror trailing empty <p> 填成图注。
+    # 过滤"不像图注"的:空值、太短(<5)、或干脆就是文件名(![architecture.png](architecture.png))。
+    def _captionable(alt: str, path: Path) -> str:
+        a = (alt or '').strip()
+        if len(a) < 5:
+            return ''
+        if a.lower() in (path.name.lower(), path.stem.lower()):
+            return ''
+        return a
+
+    image_captions = [_captionable(image_alts.get(p, ''), p) for p in all_illustrations]
+
     return {
         "title": title,
         "author": author,
@@ -169,5 +191,6 @@ def parse_markdown_payload(md_path: Path) -> dict:
         "html_content": html_content,
         "cover_path": cover_path,
         "illustration_path": illustration_path,
-        "local_images": all_illustrations
+        "local_images": all_illustrations,
+        "image_captions": image_captions,
     }

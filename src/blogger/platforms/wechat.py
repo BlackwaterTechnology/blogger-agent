@@ -46,6 +46,7 @@ class WechatPublisher:
         collection = article_data["collection"]
         cover_path = article_data["cover_path"]
         local_images = article_data.get("local_images", [])
+        image_captions = article_data.get("image_captions", [])
 
         try:
             w_idx, t_idx = self.chrome.find_global_tab(["https://mp.weixin.qq.com"])
@@ -308,8 +309,36 @@ class WechatPublisher:
                             while (node = walker.nextNode()) {{
                                 if (node.nodeValue.includes(placeholder)) {{
                                     const startOffset = node.nodeValue.indexOf(placeholder);
-                                    range.setStart(node, startOffset);
-                                    range.setEnd(node, startOffset + placeholder.length);
+                                    // 占位符在 markdown 里独占一行,parser 会把它包在自己的 <p> 里。
+                                    // 如果只选占位符文字,粘贴图片后 ProseMirror 会留下一个空 <p>
+                                    // 在图片下方,造成图文之间多一截空行(2026-05-10 实测)。
+                                    // 当外层块级元素的可见文字只剩这个占位符时,直接选中整段
+                                    // (含 <p>),让 paste 一把替换掉,空段就不会留下了。
+                                    let blockEl = node.parentElement;
+                                    while (blockEl && blockEl !== editor) {{
+                                        const display = window.getComputedStyle(blockEl).display;
+                                        if (display !== 'inline' && display !== 'inline-block') break;
+                                        blockEl = blockEl.parentElement;
+                                    }}
+                                    // 只有当块内除了这条占位符文字以外没有别的可见子节点时,
+                                    // 才扩选到整个块。否则同段里已粘进的图片或邻近文字会被一并替换掉。
+                                    let collapseBlock = false;
+                                    if (blockEl && blockEl !== editor) {{
+                                        const meaningful = Array.from(blockEl.childNodes).filter(n => {{
+                                            if (n.nodeType === 3) return n.nodeValue.trim().length > 0;
+                                            if (n.nodeType === 1) return n.tagName !== 'BR';
+                                            return false;
+                                        }});
+                                        collapseBlock = meaningful.length === 1 &&
+                                            meaningful[0] === node &&
+                                            node.nodeValue.trim() === placeholder;
+                                    }}
+                                    if (collapseBlock) {{
+                                        range.selectNode(blockEl);
+                                    }} else {{
+                                        range.setStart(node, startOffset);
+                                        range.setEnd(node, startOffset + placeholder.length);
+                                    }}
                                     selection.removeAllRanges();
                                     selection.addRange(range);
                                     return "SELECTED";
@@ -351,6 +380,71 @@ class WechatPublisher:
                     time.sleep(2.5) # Wait for upload to complete
                 except Exception as e:
                     logger.warning(f"Failed to insert image {{img_path}}: {e}")
+
+            # 图片块后处理:ProseMirror 在每个 image <section> 后面会强制补一个
+            # 空 <p>(里面是 ProseMirror-trailingBreak),即使下一个已经是可写 <p>
+            # 也照补不误(2026-05-10 实测)。这个空段就成了图文之间多出的一截空白。
+            # 策略:如果该图有 caption(markdown alt),就把这个空段填成图注样式
+            # (居中、灰、小字号);否则把"夹在中间"的空段删掉(末尾空段保留,
+            # ProseMirror 需要可写位置)。
+            js_finalize_images = f"""
+            (function(){{
+                try {{
+                    const editor = document.querySelector('.ProseMirror');
+                    if (!editor) return 'no editor';
+                    const captions = {json.dumps(image_captions)};
+                    const isEmptyP = el => {{
+                        if (!el || el.tagName !== 'P') return false;
+                        if (el.querySelector('img, pre, table, ul, ol, blockquote, hr')) return false;
+                        const txt = (el.innerText || '').replace(/[\\u200B-\\u200D\\uFEFF]/g, '').trim();
+                        return txt.length === 0;
+                    }};
+                    const captionStyle = 'text-align:center; font-size:13px; color:#888888; line-height:1.6; margin:6px 0 14px; padding:0 8px;';
+                    let captioned = 0, removed = 0;
+                    const imgs = Array.from(editor.querySelectorAll('img.wxw-img'));
+                    for (let i = 0; i < imgs.length; i++) {{
+                        let top = imgs[i];
+                        while (top.parentElement && top.parentElement !== editor) top = top.parentElement;
+                        const caption = (captions[i] || '').trim();
+                        let next = top.nextElementSibling;
+                        if (caption && isEmptyP(next)) {{
+                            // 把 trailing 空段就地改造成图注:走 selection + insertText
+                            // 让文字进 ProseMirror 状态,然后直接改 style 属性。
+                            editor.focus();
+                            const sel = window.getSelection();
+                            const range = document.createRange();
+                            range.selectNodeContents(next);
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                            document.execCommand('insertText', false, caption);
+                            next.setAttribute('style', captionStyle);
+                            captioned++;
+                            continue;
+                        }}
+                        // 没 caption:把"夹在中间"的空段删掉
+                        while (next && isEmptyP(next)) {{
+                            const after = next.nextElementSibling;
+                            if (!after) break;
+                            editor.focus();
+                            const sel = window.getSelection();
+                            const range = document.createRange();
+                            range.selectNode(next);
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                            if (!document.execCommand('delete')) break;
+                            removed++;
+                            next = top.nextElementSibling;
+                        }}
+                    }}
+                    return JSON.stringify({{captioned, removed}});
+                }} catch(e) {{ return 'err: ' + e.message; }}
+            }})();
+            """
+            try:
+                fin_res = self.chrome.execute_javascript(w_idx, t_idx, js_finalize_images, settle_seconds=0.3)
+                logger.info(f"Finalize images (caption/strip): {fin_res}")
+            except Exception as e:
+                logger.warning(f"Failed to finalize images: {e}")
 
         if cover_path:
             logger.info(f"Found cover image: {cover_path}. Inserting at the end of the article...")
