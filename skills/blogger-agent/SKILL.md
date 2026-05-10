@@ -468,6 +468,7 @@ uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger
 - **PlantUML 没设字体直接画中文**：默认走 SansSerif，渲染像马赛克。`skinparam DefaultFontName "PingFang SC"` 必加。
 - **`cover.png` 比例选错或被压扁**：默认 16:9，海报型 1:1。**不要再强制 2.35:1**——那是只针对微信公众号头条的旧规则，次条走 1:1，掘金 / CSDN 都按自己规范裁切。最后一步统一走 `python3 ~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py <src> -o cover.png --ratio 1.778 --width 1920 --bg white`（横向）或 `--ratio 1 --width 1500`（方形）。原图过扁（如 4 节点单行 LR ≈ 6:1）letterbox 后上下白边巨大 → 改 DSL 让节点变高（多行文字 / 增加密度），不要靠 letterbox 蒙混。
 - **不看渲染结果就引用进文章**：阶段 2.5 的"渲染后必查"六项不能跳。
+- **段落紧贴 `- ` 列表写、没空行**：python-markdown 的 `sane_lists` 扩展严格按 CommonMark——列表前没空行就被并进上一段 `<p>`，发到微信变成 "段落：- item1 - item2" 单行长串，无序列表彻底失效。parser 已加 `_ensure_blank_before_lists` 自动补空行，但写作时仍坚持"段落 → 空行 → 列表"的习惯，避免在不经过本 parser 的工具链（README 预览等）出错。同样适用于 `* ` / `+ ` / `1. ` 数字列表。
 - **Mermaid 写 `-.x.->` / `-.x.->` 想要"被划掉的虚线箭头"**：Mermaid **没有这种语法**，parser 直接抛 InputError，整张图渲染失败。要表达"此路不通"用 `-. 标签 .-> ` 配合中文标签（`-. 此路不通 .->` / `-. 不可行 .->`），或者画两类节点用 `classDef` 区分颜色。
 - **matplotlib 中文字体设成 `["PingFang SC", ...]` 第一位**：在 Python 3.12+/3.14 上 matplotlib 的 fontManager 经常没把 PingFang SC 扫进缓存，第一位就是缺失警告。改用 `["Hiragino Sans GB", "Heiti TC", "Songti SC", "PingFang SC", ...]`，把 macOS 自带且 mpl 默认能识别的 `Hiragino Sans GB` 顶在前面。
 - **matplotlib 用 `weight="black"` 渲染中文**：Hiragino Sans GB / Heiti TC 没有 black 字重，会渲染成方块字（"豆腐"）。中文最高用 `weight="bold"`，要更醒目就调 `fontsize`。

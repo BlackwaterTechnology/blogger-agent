@@ -42,6 +42,29 @@ def parse_markdown_payload(md_path: Path) -> dict:
 
     wechat_content = re.sub(r'!\[.*?\]\((.*?)\)', wechat_image_replacer, content)
 
+    # python-markdown 的 sane_lists 扩展严格要求列表前有空行;否则
+    # `段落：\n- item` 会被并进同一个 <p>,导致微信里出现 "段落：- item" 单行长串。
+    # 在这里把"非空行 + 列表项"之间自动塞一个空行,作者忘了写也能渲染对。
+    # 注意:不能跨进围栏代码块,所以分块处理。
+    def _ensure_blank_before_lists(md: str) -> str:
+        out_lines: list[str] = []
+        in_fence = False
+        list_re = re.compile(r'^(\s{0,3})([-*+]|\d+\.)\s+\S')
+        for line in md.splitlines():
+            if line.lstrip().startswith('```') or line.lstrip().startswith('~~~'):
+                in_fence = not in_fence
+                out_lines.append(line)
+                continue
+            if not in_fence and list_re.match(line) and out_lines:
+                prev = out_lines[-1]
+                # 上一行非空、且本身不是列表项时,补一个空行
+                if prev.strip() and not list_re.match(prev):
+                    out_lines.append('')
+            out_lines.append(line)
+        return '\n'.join(out_lines)
+
+    wechat_content = _ensure_blank_before_lists(wechat_content)
+
     try:
         html_content = markdown.markdown(wechat_content, extensions=['fenced_code', 'tables', 'sane_lists'])
 
