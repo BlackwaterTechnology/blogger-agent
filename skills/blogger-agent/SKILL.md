@@ -238,7 +238,7 @@ python3 ~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py \
 - ① 文字未溢出节点框、未截断；
 - ② 没有节点 / 边重叠；
 - ③ 每条边的箭头方向、起止位置正确（mmdc 走 Dagre 通常没问题；PlantUML component diagram 偶尔会有反向布局，配合 `direction` 与 `-up->` / `-down->` 修正）；
-- ④ 长宽比落在 2.4 节守则；**`cover.png` 走 16:9（≈1.778）或 1:1**（用 `python3 -c "from PIL import Image; im=Image.open('cover.png'); print(im.size, round(im.size[0]/im.size[1], 3))"` 验）；不达标跑 `python3 ~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py cover.png --ratio 1.778 --width 1920 --bg white`（或 `--ratio 1 --width 1500`）修正；
+- ④ 长宽比落在 2.4 节守则；**`cover.png` 走 16:9（≈1.778）或 1:1**（用 `python3 -c "from PIL import Image; im=Image.open('cover.png'); print(im.size, round(im.size[0]/im.size[1], 3))"` 验）；不达标先 `mv cover.png cover-raw.png` 备份，再跑 `python3 ~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py cover-raw.png -o cover.png --ratio 1.778 --width 1920 --bg white`（或 `--ratio 1 --width 1500`）修正；
 - ⑤ 中文显示清晰：mmdc 用 Chromium 系统字体，正常即可；PlantUML **必须**显式 `skinparam DefaultFontName "PingFang SC"`；
 - ⑥ 缩到 30% 仍可读（封面专用）。
 任一条不达标，**改 DSL / 换工具 / 调参数后重渲**，不要将就。Mermaid 用 mmdc 还是糊？检查 `-s` 是不是太低、`.mmd` 节点是不是过多。
