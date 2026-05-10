@@ -82,6 +82,48 @@ def parse_markdown_payload(md_path: Path) -> dict:
 
         html_content = re.sub(r'<li>(.*?)</li>', _wrap_li_inline, html_content, flags=re.DOTALL)
 
+        # 微信编辑器(ProseMirror) paste schema 对围栏代码块不可靠:
+        # <pre> 内部的 \n 经常被吞掉,<pre> 还可能被降级成普通 <p>,只剩
+        # <code> 的等宽字体没有底色和换行(2026-05-10 HyperFrames 那篇实测)。
+        # 双保险:1) <pre>/<code> 都内联样式,不依赖编辑器主题
+        #        2) 内部 \n 全换成 <br>,即使 <pre> 被剥成 <p>,换行也保住。
+        _PRE_STYLE = (
+            'background-color:#f6f8fa; border-radius:6px; padding:12px 14px; '
+            'overflow-x:auto; white-space:pre-wrap; word-break:break-all; '
+            'font-family:Menlo,Monaco,Consolas,monospace; '
+            'font-size:13px; line-height:1.5; color:#24292e; '
+            'margin:14px 0; border:1px solid #e1e4e8;'
+        )
+        _CODE_BLOCK_STYLE = (
+            'font-family:Menlo,Monaco,Consolas,monospace; '
+            'background:transparent; padding:0; color:#24292e; '
+            'font-size:inherit;'
+        )
+
+        def _style_code_blocks(match):
+            attrs = match.group(1) or ''
+            body = match.group(2).rstrip('\n').replace('\n', '<br>')
+            return (
+                f'<pre style="{_PRE_STYLE}">'
+                f'<code{attrs} style="{_CODE_BLOCK_STYLE}">{body}</code>'
+                '</pre>'
+            )
+
+        html_content = re.sub(
+            r'<pre[^>]*><code([^>]*)>([\s\S]*?)</code></pre>',
+            _style_code_blocks,
+            html_content,
+        )
+
+        # 行内 <code> 也补一层等宽 + 浅底色,避免被微信 ProseMirror 当成裸文本。
+        # 注意:上面 _style_code_blocks 已经给块级 <code> 加了 style,这里的
+        # 替换只命中没有 style 属性的 <code>(即正文里的 inline code)。
+        html_content = html_content.replace(
+            '<code>',
+            '<code style="background-color:#f3f4f6; color:#d63384; padding:1px 5px; '
+            'border-radius:3px; font-family:Menlo,Monaco,Consolas,monospace; font-size:0.92em;">',
+        )
+
         # Inject inline styles for WeChat editor compatibility
         html_content = html_content.replace('<h1>', '<h1 style="font-size: 28px; font-weight: bold; margin-top: 20px; margin-bottom: 15px;">')
         html_content = html_content.replace('<h2>', '<h2 style="font-size: 24px; font-weight: bold; margin-top: 20px; margin-bottom: 15px;">')
