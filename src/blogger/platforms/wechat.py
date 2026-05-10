@@ -533,45 +533,51 @@ class WechatPublisher:
             js_delete_cover = """
             (function() {
                 try {
-                    let editor = document.querySelector('.ProseMirror');
+                    const editor = document.querySelector('.ProseMirror');
                     if (!editor) return "Editor not found";
-                    
-                    const imgs = Array.from(editor.querySelectorAll('img'));
-                    if (imgs.length > 0) {
-                        const lastImg = imgs[imgs.length - 1];
-                        
-                        editor.focus();
-                        const selection = window.getSelection();
-                        const range = document.createRange();
-                        
-                        range.selectNode(lastImg);
-                        selection.removeAllRanges();
-                        selection.addRange(range);
-                        
-                        return "READY_TO_CUT";
+
+                    // Filter out ProseMirror-separator (zero-size internal placeholder).
+                    // Real WeChat content images carry the wxw-img class.
+                    const realImgs = Array.from(editor.querySelectorAll('img.wxw-img'));
+                    if (realImgs.length === 0) return "No real images found to delete";
+
+                    const lastImg = realImgs[realImgs.length - 1];
+
+                    // Walk up to the top-level child of the editor — typically a <section>
+                    // wrapping just this image. Deleting the wrapper avoids leaving an empty section.
+                    let topSection = lastImg;
+                    while (topSection.parentElement && topSection.parentElement !== editor) {
+                        topSection = topSection.parentElement;
                     }
-                    return "No images found to delete";
+                    if (topSection.parentElement !== editor) {
+                        return "Cover image is not inside an editor child";
+                    }
+
+                    // If the wrapper holds more than just this image (e.g. surrounding text),
+                    // narrow the deletion target to the image itself to avoid clobbering content.
+                    const sectionText = (topSection.innerText || '').trim();
+                    const otherImgs = topSection.querySelectorAll('img.wxw-img').length;
+                    const target = (sectionText.length === 0 && otherImgs === 1) ? topSection : lastImg;
+
+                    editor.focus();
+                    const selection = window.getSelection();
+                    const range = document.createRange();
+                    range.selectNode(target);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+
+                    // execCommand('delete') routes through the contenteditable beforeinput
+                    // pipeline, which ProseMirror handles via its own transaction — no
+                    // AppleScript keystroke needed (which would lose focus).
+                    const ok = document.execCommand('delete');
+                    return ok ? "DELETED" : "execCommand('delete') returned false";
                 } catch(e) {
-                    return e.message;
+                    return "Error: " + e.message;
                 }
             })();
             """
             del_res = self.chrome.execute_javascript(w_idx, t_idx, js_delete_cover, settle_seconds=0.5)
-            if del_res == "READY_TO_CUT":
-                applescript_cut = '''
-                tell application "System Events"
-                    tell process "Google Chrome"
-                        set frontmost to true
-                        delay 0.5
-                        keystroke "x" using {command down}
-                    end tell
-                end tell
-                '''
-                self.chrome._run_osascript(applescript_cut)
-                time.sleep(0.5)
-                logger.info("Delete cover image result: Cut the selected image")
-            else:
-                logger.info(f"Delete cover image result: {del_res}")
+            logger.info(f"Delete cover image result: {del_res}")
 
         logger.info("Setting up Originality (Original)...")
         js_original_setup = """
