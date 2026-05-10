@@ -88,6 +88,14 @@ def parse_markdown_payload(md_path: Path) -> dict:
         html_content = html_content.replace('<h3>', '<h3 style="font-size: 20px; font-weight: bold; margin-top: 20px; margin-bottom: 15px;">')
         html_content = html_content.replace('<h4>', '<h4 style="font-size: 18px; font-weight: bold; margin-top: 20px; margin-bottom: 15px;">')
         html_content = html_content.replace('<blockquote>', '<blockquote style="border-left: 4px solid #ccc; padding-left: 10px; color: #666; background-color: #f9f9f9; padding: 10px; margin: 10px 0;">')
+
+        # 微信阅读器对正文 <p> 默认 `text-align: justify; text-justify: auto; word-break: break-word`,
+        # 浏览器(尤其 iOS WebKit)把 auto 解释为 CJK inter-character 分布,导致
+        # "打开"、"标语" 这种相邻汉字也被 justify 拉宽。试过 `text-justify: inter-word`
+        # 在 Safari/iOS 微信里被忽略仍然糊掉(2026-05-10 实测),只能直接关掉两端对齐。
+        # inline style 优先级高于阅读器类样式,跨浏览器都生效。视觉上右边沿会从齐变锯齿,
+        # 但比字间距撑开可读性更好。
+        html_content = html_content.replace('<p>', '<p style="text-align: left;">')
     except Exception as e:
         logger.warning(f"Failed to parse markdown, falling back to raw text: {e}")
         html_content = f"<p>{wechat_content.replace(chr(10), '<br>')}</p>"
