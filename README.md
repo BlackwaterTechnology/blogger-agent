@@ -1,6 +1,18 @@
 # Blogger Agent 🤖✍️
 
+> **🌐 Languages**: **English** · [简体中文](README_zh.md)
+
 Blogger Agent is an intelligent automation project designed to seamlessly generate and publish articles to mainstream Chinese blog platforms. Provide a single topic or viewpoint, and the AI Agent takes care of writing the article and publishing it to platforms such as WeChat Official Accounts (微信公众号), Juejin (稀土掘金), and CSDN.
+
+## 🌟 See It in Action
+
+Curious what this tool actually publishes? Every article on the WeChat Official Account **「运维开发与AI实战」** is generated and posted end-to-end by this very project — that's the live demo of what Blogger Agent produces.
+
+<p align="center">
+  <img src="static/wechat-official-account.png" alt="WeChat Official Account QR — 运维开发与AI实战" width="240" />
+  <br />
+  <em>Scan to follow «运维开发与AI实战» on WeChat</em>
+</p>
 
 ## 🎯 Vision
 
@@ -13,8 +25,8 @@ The ultimate goal of this project is to create a fully autonomous content creati
 
 - [x] **WeChat Official Account (微信公众号)**: Automated publishing using AppleScript and Chrome browser automation.
 - [x] **Juejin (稀土掘金)**: Automated publishing (Planned).
-- [ ] **CSDN**: Automated publishing (Planned).
-- [ ] **AI Article Generation**: Integration with LLMs (e.g., Claude, GPT-4, Gemini) to autonomously write content based on a prompt (Planned).
+- [x] **CSDN**: Automated publishing (Planned).
+- [x] **AI Article Generation**: Integration with LLMs (e.g., Claude, GPT-4, Gemini) to autonomously write content based on a prompt (Planned).
 - [ ] **Multi-platform Orchestration**: Distribute a single article across multiple platforms with platform-specific formatting adjustments.
 
 ## 🛠 Architecture
@@ -129,6 +141,24 @@ python3 tools/fit_wechat_cover.py path/to/cover.png --ratio 1 --width 1500
 The helper letterboxes (white background, no crop / no stretch) onto the target canvas. Run it as the **last step** of every cover render.
 
 For the full rendering protocol — aspect ratio rules, color palette, common pitfalls — see `skills/blogger-agent/SKILL.md` 阶段 2.
+
+## 👤 Stay in Touch
+
+I write about DevOps × AI agents, harness engineering, and platform automation. If this project resonates with you, here's where to find more — and where to discuss it:
+
+| Channel | Where to find me |
+| :--- | :--- |
+| 📣 WeChat Official Account | **运维开发与AI实战** ([scan above](#-see-it-in-action)) — the actual publishing target of this tool |
+| 📝 CSDN Blog | <https://yijie.blog.csdn.net> |
+| 📝 Juejin (稀土掘金) | <https://juejin.cn/user/4151367379457848> |
+
+Want to chat directly or join the reader / contributor discussion group? Add me on WeChat:
+
+<p align="center">
+  <img src="static/wechat-personal.png" alt="Personal WeChat QR" width="240" />
+  <br />
+  <em>Scan to add me on WeChat · DM «进群» to join the discussion group</em>
+</p>
 
 ## 🤝 Contributing
 
