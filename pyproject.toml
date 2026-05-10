@@ -8,6 +8,10 @@ version = "0.1.0"
 description = "AI Agent automation project for multi-platform article publishing."
 readme = "README.md"
 requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "王义杰" },
+]
 dependencies = [
     "loguru",
     "markdown",
