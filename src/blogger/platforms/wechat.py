@@ -764,28 +764,53 @@ class WechatPublisher:
                     return JSON.stringify({state: state, action: action, is_done: false});
                 }
                 
-                const nicknames = Array.from(rewardDialog.querySelectorAll('div.nickname, .weui-desktop-account__nickname'));
-                if (nicknames.length > 0) {
-                    const selected = rewardDialog.querySelector('.weui-desktop-account_selected, input[type="radio"]:checked');
-                    if (!selected) {
-                        nicknames[0].click();
-                        action = 'Clicked account';
-                        return JSON.stringify({state: state, action: action, is_done: false});
-                    }
-                } else {
-                    const searchInput = rewardDialog.querySelector('input.weui-desktop-form__input');
-                    if (searchInput) {
-                        const activeDropdownItems = Array.from(document.querySelectorAll('.weui-desktop-dropdown__list li, .weui-desktop-picker__list li'));
-                        const visibleItems = activeDropdownItems.filter(el => el.getBoundingClientRect().height > 0);
-                        if (visibleItems.length > 0) {
-                            visibleItems[0].click();
+                const searchInput = rewardDialog.querySelector('input.weui-desktop-form__input');
+                const accountEmpty = !!searchInput && !searchInput.value.trim();
+                const isVisible = el => !!el && el.getBoundingClientRect().height > 0;
+
+                if (searchInput) {
+                    // Search-input variant: the search input is the source of truth.
+                    if (accountEmpty) {
+                        // Preferred path: a "Recent" suggestion block is rendered next to the
+                        // search input as `<div class="recent-select"><label>Recent</label><div>NAME</div></div>`.
+                        // Without clicking it the Confirm button stays disabled and the dialog never closes.
+                        const recentSelect = rewardDialog.querySelector('.recent-select');
+                        if (isVisible(recentSelect)) {
+                            const recentItem = Array.from(recentSelect.querySelectorAll('div'))
+                                .find(d => (d.innerText || '').trim().length > 0);
+                            if (recentItem) {
+                                recentItem.click();
+                                action = 'Clicked Recent account suggestion';
+                                return JSON.stringify({state: state, action: action, is_done: false});
+                            }
+                        }
+                        const dropdownItems = Array.from(document.querySelectorAll('.weui-desktop-dropdown__list li, .weui-desktop-picker__list li, .search-result__item'))
+                            .filter(isVisible);
+                        if (dropdownItems.length > 0) {
+                            dropdownItems[0].click();
                             action = 'Selected account from dropdown';
                             return JSON.stringify({state: state, action: action, is_done: false});
-                        } else {
-                            const mousedown = new MouseEvent('mousedown', {bubbles: true, cancelable: true, view: window});
-                            searchInput.dispatchEvent(mousedown);
-                            searchInput.click();
-                            action = 'Clicked search input to open dropdown';
+                        }
+                        const mousedown = new MouseEvent('mousedown', {bubbles: true, cancelable: true, view: window});
+                        searchInput.dispatchEvent(mousedown);
+                        searchInput.click();
+                        action = 'Clicked search input to open dropdown';
+                        return JSON.stringify({state: state, action: action, is_done: false});
+                    }
+                    // Otherwise the input already holds an account name — fall through to Confirm.
+                } else {
+                    // List variant: the dialog renders nicknames inline. Restrict to visible
+                    // elements (`.search-result__wrp` is hidden until typing).
+                    const nicknames = Array.from(rewardDialog.querySelectorAll('div.nickname, .weui-desktop-account__nickname'))
+                        .filter(isVisible);
+                    if (nicknames.length > 0) {
+                        // Restrict the "already selected" probe to the account-list area, not
+                        // unrelated radios (e.g. the Reward Type radio group).
+                        const accountArea = rewardDialog.querySelector('.reward-account-setting') || rewardDialog;
+                        const selected = accountArea.querySelector('.weui-desktop-account_selected, .selected');
+                        if (!selected) {
+                            nicknames[0].click();
+                            action = 'Clicked account';
                             return JSON.stringify({state: state, action: action, is_done: false});
                         }
                     }
