@@ -2,11 +2,11 @@ import time
 import json
 import subprocess
 from loguru import logger
-from ..core.chrome import ChromeDomController
+from ..core.cdp_chrome import CdpChromeController
 
 class WechatPublisher:
     def __init__(self):
-        self.chrome = ChromeDomController()
+        self.chrome = CdpChromeController()
 
     def run_ui_state_machine(self, name, w_idx, t_idx, js_code, max_steps=10, delay=1.5):
         logger.info(f"Starting UI State Machine: {name}")
@@ -286,8 +286,10 @@ class WechatPublisher:
             for img_path in local_images:
                 logger.info(f"Uploading image: {img_path}")
                 try:
+                    # Set TIFF image to clipboard — global clipboard, no
+                    # process targeting needed, can use plain osascript.
                     applescript_copy = f'set the clipboard to (read (POSIX file "{img_path.absolute()}") as TIFF picture)'
-                    self.chrome._run_osascript(applescript_copy)
+                    subprocess.run(["osascript", "-e", applescript_copy], check=True)
                     
                     placeholder = f"[UPLOAD_IMAGE: {img_path.absolute()}]"
                     
@@ -367,15 +369,13 @@ class WechatPublisher:
                     res = self.chrome.execute_javascript(w_idx, t_idx, js_find_and_select, settle_seconds=0.5)
                     logger.info(f"Select placeholder result: {res}")
                     
-                    applescript_paste = '''
-                    tell application "System Events"
-                        tell process "Google Chrome"
-                            set frontmost to true
+                    # Cmd+V keystroke must hit the CDP Chrome (pid-anchored)
+                    # rather than the user's day-to-day Chrome which may also
+                    # be running. ProseMirror's paste handler reads the TIFF
+                    # off the OS clipboard and uploads to WeChat's CDN.
+                    self.chrome.run_in_chrome_process('''
                             keystroke "v" using {command down}
-                        end tell
-                    end tell
-                    '''
-                    self.chrome._run_osascript(applescript_paste)
+                    ''')
                     logger.info("Successfully initiated image paste/upload.")
                     time.sleep(2.5) # Wait for upload to complete
                 except Exception as e:
@@ -450,7 +450,7 @@ class WechatPublisher:
             logger.info(f"Found cover image: {cover_path}. Inserting at the end of the article...")
             try:
                 applescript_copy = f'set the clipboard to (read (POSIX file "{cover_path.absolute()}") as TIFF picture)'
-                self.chrome._run_osascript(applescript_copy)
+                subprocess.run(["osascript", "-e", applescript_copy], check=True)
                 
                 js_move_cursor_end = """
                 (function() {
@@ -475,15 +475,10 @@ class WechatPublisher:
                 """
                 self.chrome.execute_javascript(w_idx, t_idx, js_move_cursor_end, settle_seconds=0.5)
                 
-                applescript_paste = '''
-                tell application "System Events"
-                    tell process "Google Chrome"
-                        set frontmost to true
-                        keystroke "v" using {command down}
-                    end tell
-                end tell
-                '''
-                self.chrome._run_osascript(applescript_paste)
+                # Cmd+V paste — pid-anchored to CDP Chrome.
+                self.chrome.run_in_chrome_process('''
+                            keystroke "v" using {command down}
+                ''')
                 logger.info("Successfully initiated cover image paste/upload.")
                 time.sleep(2.0)
             except Exception as e:
