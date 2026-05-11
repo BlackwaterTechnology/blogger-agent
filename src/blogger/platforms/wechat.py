@@ -2,11 +2,18 @@ import time
 import json
 import subprocess
 from loguru import logger
-from ..core.cdp_chrome import CdpChromeController
+from ..core.chrome import ChromeDomController
 
 class WechatPublisher:
     def __init__(self):
-        self.chrome = CdpChromeController()
+        # WeChat 用 AppleScript / ChromeDomController 走默认 user-data-dir 的
+        # 日常 Chrome —— CDP Chrome 跑 mp.weixin 会被反爬检测弹"插件存在安全
+        # 隐患"告警（微信开发者社区里官方建议无痕模式即可绕，但无痕模式不持久
+        # cookies，不实用）。详见 commit 历史和 docs。
+        #
+        # 前置：你日常 Chrome 必须勾选 View → Developer →
+        # Allow JavaScript from Apple Events，否则 execute javascript 失败。
+        self.chrome = ChromeDomController()
 
     def run_ui_state_machine(self, name, w_idx, t_idx, js_code, max_steps=10, delay=1.5):
         logger.info(f"Starting UI State Machine: {name}")
@@ -228,7 +235,11 @@ class WechatPublisher:
                 
                 const html = {json.dumps(html_content)};
                 
-                if (typeof UE !== 'undefined' && UE.instants) {{
+                // UE.instants is a plain object that's truthy even when empty.
+                // We must verify it has at least one editor instance before
+                // claiming success — otherwise we'd "succeed" without writing
+                // a single character and the ProseMirror fallback never runs.
+                if (typeof UE !== 'undefined' && UE.instants && Object.keys(UE.instants).length > 0) {{
                     for (let key in UE.instants) {{
                         UE.instants[key].setContent(html);
                     }}
@@ -369,13 +380,23 @@ class WechatPublisher:
                     res = self.chrome.execute_javascript(w_idx, t_idx, js_find_and_select, settle_seconds=0.5)
                     logger.info(f"Select placeholder result: {res}")
                     
-                    # Cmd+V keystroke must hit the CDP Chrome (pid-anchored)
-                    # rather than the user's day-to-day Chrome which may also
-                    # be running. ProseMirror's paste handler reads the TIFF
-                    # off the OS clipboard and uploads to WeChat's CDN.
-                    self.chrome.run_in_chrome_process('''
+                    # ProseMirror's paste handler reads the TIFF off the OS
+                    # clipboard and uploads to WeChat's CDN. The osascript
+                    # block targets process "Google Chrome" by name — if both
+                    # the regular and the CDP Chrome are running concurrently,
+                    # `tell application "Google Chrome"` resolves to whichever
+                    # System Events selects first (usually the older / front
+                    # one). Bring your regular Chrome to the front before
+                    # running publisher to disambiguate.
+                    applescript_paste = '''
+                    tell application "System Events"
+                        tell process "Google Chrome"
+                            set frontmost to true
                             keystroke "v" using {command down}
-                    ''')
+                        end tell
+                    end tell
+                    '''
+                    self.chrome._run_osascript(applescript_paste)
                     logger.info("Successfully initiated image paste/upload.")
                     time.sleep(2.5) # Wait for upload to complete
                 except Exception as e:
@@ -475,10 +496,15 @@ class WechatPublisher:
                 """
                 self.chrome.execute_javascript(w_idx, t_idx, js_move_cursor_end, settle_seconds=0.5)
                 
-                # Cmd+V paste — pid-anchored to CDP Chrome.
-                self.chrome.run_in_chrome_process('''
-                            keystroke "v" using {command down}
-                ''')
+                applescript_paste = '''
+                tell application "System Events"
+                    tell process "Google Chrome"
+                        set frontmost to true
+                        keystroke "v" using {command down}
+                    end tell
+                end tell
+                '''
+                self.chrome._run_osascript(applescript_paste)
                 logger.info("Successfully initiated cover image paste/upload.")
                 time.sleep(2.0)
             except Exception as e:
@@ -1072,30 +1098,50 @@ class WechatPublisher:
                     
                     if (sourceLabel) {
                         let container = sourceLabel.parentElement;
-                        let isUnset = false;
+                        let alreadyTarget = false;
+                        let foundContainer = null;
                         let searchDepth = 0;
-                        
+
+                        // Walk up looking for the row that wraps the source
+                        // field. Decide:
+                        //   - already at "个人观点" → skip (don't re-open dialog)
+                        //   - anything else (未声明 / 原创 / 转载 / etc.) → click
+                        //     to open dialog and let downstream iteration pick
+                        //     the correct radio.
                         while(container && container.tagName.toLowerCase() !== 'body' && searchDepth < 5) {
                             const t = container.innerText || '';
-                            if (t.includes('未声明') || t.includes('Not added') || t.includes('未设置') || t.includes('未添加')) {
-                                isUnset = true;
+                            if (t.includes('个人观点') || t.includes('Personal opinion')) {
+                                alreadyTarget = true;
+                                foundContainer = container;
                                 break;
+                            }
+                            // Heuristic: any container whose innerText mentions
+                            // the Creation Source label is a good click target.
+                            if (t.includes('创作声明') || t.includes('Creation Source')) {
+                                foundContainer = container;
                             }
                             container = container.parentElement;
                             searchDepth++;
                         }
-                        
-                        if (isUnset && container && container.tagName.toLowerCase() !== 'body') {
-                            const clickables = Array.from(container.querySelectorAll('a, i, svg, span')).filter(el => el.clientHeight > 0);
+
+                        if (alreadyTarget) {
+                            state.is_done = true;
+                            action = 'Creation Source already set to 个人观点, skipping';
+                            return JSON.stringify({state: state, action: action, is_done: true});
+                        }
+
+                        if (foundContainer) {
+                            const clickables = Array.from(foundContainer.querySelectorAll('a, i, svg, span')).filter(el => el.clientHeight > 0);
                             const unstatedEl = clickables.find(el => {
                                 const t = el.innerText || '';
-                                return t.includes('未声明') || t.includes('未设置') || t.includes('未添加') || t.includes('Not added');
+                                return t.includes('未声明') || t.includes('未设置') || t.includes('未添加') || t.includes('Not added')
+                                    || t.includes('原创') || t.includes('转载');
                             });
-                            
+
                             const iconEl = clickables.find(el => el.tagName.toLowerCase() === 'svg' || el.tagName.toLowerCase() === 'i' || el.classList.contains('weui-icon'));
-                            
-                            const targets = [iconEl, unstatedEl, container].filter(Boolean);
-                            
+
+                            const targets = [iconEl, unstatedEl, foundContainer].filter(Boolean);
+
                             for (let target of targets) {
                                 clickReactElement(target);
                                 try {
@@ -1103,20 +1149,20 @@ class WechatPublisher:
                                     target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
                                     target.click();
                                 } catch (e) {}
-                                
+
                                 if (target.parentElement) {
                                     clickReactElement(target.parentElement);
                                     target.parentElement.click();
                                 }
                             }
-                            
+
                             action = 'Clicked Creation Source row to open dialog';
                             return JSON.stringify({state: state, action: action, is_done: false});
                         }
                     }
-                    
+
                     state.is_done = true;
-                    action = 'Creation Source seems already set or not found, skipping';
+                    action = 'Creation Source label not found, skipping';
                     return JSON.stringify({state: state, action: action, is_done: true});
                 }
                 
