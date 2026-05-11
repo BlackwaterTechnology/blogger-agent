@@ -63,6 +63,14 @@ class CdpChromeController:
 
     port: int = field(default_factory=_default_port)
     timeout: float = 5.0
+    # Cache of long-lived per-target WebSocket sessions. We need these for
+    # Page.addScriptToEvaluateOnNewDocument: that command's effect lives
+    # only as long as the session does, so if every CDP call opens and
+    # closes its own WebSocket the stealth script never survives to the
+    # next page navigation. Keyed by target_id; values are open WebSocket
+    # connections, each preconfigured with stealth.
+    _sessions: dict = field(default_factory=dict)
+    _msg_id: int = 0
 
     # ---- HTTP /json -----------------------------------------------------
 
@@ -80,8 +88,15 @@ class CdpChromeController:
 
     # ---- WebSocket calls ------------------------------------------------
 
-    def _call_on(self, target_id: str, method: str, params: dict | None = None) -> dict:
-        """Open a per-target WebSocket, send one command, close."""
+    def _get_session(self, target_id: str):
+        """Return a persistent WebSocket session for this target, opening
+        one on first request and installing the stealth on-new-document
+        script before any other call. Subsequent calls reuse the session
+        so the stealth install survives across page navigations."""
+        ws = self._sessions.get(target_id)
+        if ws is not None:
+            return ws
+
         targets = self._list_targets()
         tgt = next((t for t in targets if t.get("id") == target_id), None)
         if not tgt:
@@ -90,21 +105,112 @@ class CdpChromeController:
         if not ws_url:
             raise RuntimeError(f"CDP target {target_id!r} has no webSocketDebuggerUrl")
         ws = websocket.create_connection(ws_url, timeout=self.timeout)
+        self._sessions[target_id] = ws
+
+        # Install stealth right now, in this session, so any future
+        # navigation in this tab gets the script before page JS runs.
         try:
-            ws.send(json.dumps({"id": 1, "method": method, "params": params or {}}))
-            while True:
-                raw = ws.recv()
-                msg = json.loads(raw)
-                if msg.get("id") != 1:
-                    continue  # Drain async event before our reply.
-                if "error" in msg:
-                    raise RuntimeError(f"CDP {method} failed: {msg['error']}")
-                return msg.get("result", {})
-        finally:
+            self._raw_call(ws, "Page.enable")
+            self._raw_call(ws, "Page.addScriptToEvaluateOnNewDocument",
+                           {"source": self._STEALTH_SCRIPT})
+        except Exception:
+            # best-effort; controller still works without stealth
+            pass
+        return ws
+
+    def _raw_call(self, ws, method: str, params: dict | None = None) -> dict:
+        """Send one command on the given WebSocket and wait for its reply.
+        Drains unrelated async events while waiting."""
+        self._msg_id += 1
+        my_id = self._msg_id
+        ws.send(json.dumps({"id": my_id, "method": method, "params": params or {}}))
+        while True:
+            raw = ws.recv()
+            msg = json.loads(raw)
+            if msg.get("id") != my_id:
+                continue
+            if "error" in msg:
+                raise RuntimeError(f"CDP {method} failed: {msg['error']}")
+            return msg.get("result", {})
+
+    def _call_on(self, target_id: str, method: str, params: dict | None = None) -> dict:
+        """Public-ish entry point: get (or open) the persistent session for
+        target_id and run a single command on it."""
+        ws = self._get_session(target_id)
+        try:
+            return self._raw_call(ws, method, params)
+        except (websocket.WebSocketConnectionClosedException, ConnectionError, OSError):
+            # Session died — drop from cache and retry once with a fresh one.
             try:
                 ws.close()
             except Exception:
                 pass
+            self._sessions.pop(target_id, None)
+            ws = self._get_session(target_id)
+            return self._raw_call(ws, method, params)
+
+    # ---- Stealth: hide CDP fingerprint from anti-bot scripts ---------
+    #
+    # Chrome's `--remote-debugging-port` flag triggers the AutomationControlled
+    # feature, which removes `window.chrome.runtime` and (in some versions)
+    # sets `navigator.webdriver = true`. Some sites — mp.weixin.qq.com is one
+    # — detect these and show a "browser plugin has security issues" dialog
+    # that blocks the editor.
+    #
+    # The launch script already passes --disable-blink-features=AutomationControlled
+    # and --exclude-switches=enable-automation; on top of that we install
+    # Page.addScriptToEvaluateOnNewDocument so that every future navigation
+    # in this tab gets a chrome.runtime stub and `navigator.webdriver=undefined`
+    # injected before any page script runs.
+
+    _STEALTH_SCRIPT = r"""
+    (function(){
+      try { window.__blogger_stealth_loaded = Date.now(); } catch(e) {}
+      try {
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      } catch(e) {}
+      try {
+        if (typeof window.chrome === 'object' && !window.chrome.runtime) {
+          window.chrome.runtime = {
+            id: undefined,
+            OnInstalledReason: { CHROME_UPDATE: 'chrome_update', INSTALL: 'install', SHARED_MODULE_UPDATE: 'shared_module_update', UPDATE: 'update' },
+            OnRestartRequiredReason: { APP_UPDATE: 'app_update', OS_UPDATE: 'os_update', PERIODIC: 'periodic' },
+            PlatformArch: { ARM: 'arm', ARM64: 'arm64', MIPS: 'mips', MIPS64: 'mips64', X86_32: 'x86-32', X86_64: 'x86-64' },
+            PlatformOs: { ANDROID: 'android', CROS: 'cros', LINUX: 'linux', MAC: 'mac', OPENBSD: 'openbsd', WIN: 'win' },
+            RequestUpdateCheckStatus: { NO_UPDATE: 'no_update', THROTTLED: 'throttled', UPDATE_AVAILABLE: 'update_available' },
+            connect: function(){ return { onMessage: { addListener: function(){}, removeListener: function(){} }, onDisconnect: { addListener: function(){}, removeListener: function(){} }, postMessage: function(){}, disconnect: function(){} }; },
+            sendMessage: function(){},
+            getURL: function(p){ return p; },
+            getManifest: function(){ return {}; },
+          };
+        }
+      } catch(e) {}
+      try {
+        const desired = ['zh-CN', 'zh', 'en-US', 'en'];
+        if (!navigator.languages || navigator.languages[0] !== 'zh-CN') {
+          Object.defineProperty(navigator, 'languages', { get: () => desired });
+          Object.defineProperty(navigator, 'language', { get: () => 'zh-CN' });
+        }
+      } catch(e) {}
+    })();
+    """
+
+    def _install_stealth(self, target_id: str) -> None:
+        """Install the stealth script on a page target so that every future
+        navigation has chrome.runtime / navigator.webdriver back in place.
+
+        Has no effect on already-loaded pages — for those, reload the tab
+        after the controller has run once.
+        """
+        try:
+            self._call_on(
+                target_id,
+                "Page.addScriptToEvaluateOnNewDocument",
+                {"source": self._STEALTH_SCRIPT},
+            )
+        except Exception:
+            # Best-effort; do not block the publisher if the install fails.
+            pass
 
     # ---- Public API: matches JxaChromeController.find_global_tab ----
 
@@ -120,6 +226,7 @@ class CdpChromeController:
             url = t.get("url", "")
             for prefix in url_prefixes:
                 if url.startswith(prefix):
+                    self._install_stealth(t["id"])
                     return (0, t["id"])
         raise RuntimeError(
             f"No CDP page-tab matched prefixes {url_prefixes!r}. "

@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Blogger CDP Stealth",
+  "version": "1.0",
+  "description": "Restores chrome.runtime / hides navigator.webdriver so anti-bot pages don't flag the CDP Chrome instance. Loaded only by tools/launch-chrome-cdp.sh.",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["inject.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ]
+}

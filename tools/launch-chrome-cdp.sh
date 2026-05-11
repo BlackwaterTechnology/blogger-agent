@@ -50,12 +50,33 @@ mkdir -p "$USER_DATA_DIR"
 
 # Background, detached, stderr-to-log so we can diagnose future startup failures.
 LOG_FILE="$USER_DATA_DIR/launch.log"
+# Stealth extension lives next to this script. Chrome loads it into MAIN
+# world at document_start so anti-bot pages (e.g. mp.weixin.qq.com) see a
+# clean chrome.runtime / navigator.webdriver / navigator.languages.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STEALTH_EXT="$SCRIPT_DIR/stealth-extension"
+
+# Note: we DON'T pass --disable-blink-features=AutomationControlled. Chrome
+# flags it as an "unsupported command-line flag" and shows a yellow infobar
+# every launch. The stealth extension's inject.js overrides
+# navigator.webdriver and chrome.runtime in MAIN world at document_start,
+# which achieves the same thing without the warning bar.
+# Chrome 137+ silently ignores --load-extension unless either:
+#   (a) the user has toggled "Developer mode" ON in chrome://extensions/
+#       (persists to Preferences, requires a GUI gesture), or
+#   (b) we disable the gating feature on the command line.
+# We take path (b): DisableLoadExtensionCommandLineSwitch is the internal
+# Chromium feature that enforces the gate; disabling it re-enables flag-
+# based extension loading.
 "$CHROME_BIN" \
     --remote-debugging-port="$PORT" \
     --remote-allow-origins='*' \
     --user-data-dir="$USER_DATA_DIR" \
     --no-first-run \
     --no-default-browser-check \
+    --disable-features=DisableLoadExtensionCommandLineSwitch \
+    --load-extension="$STEALTH_EXT" \
+    --disable-extensions-except="$STEALTH_EXT" \
     "$@" >"$LOG_FILE" 2>&1 &
 chrome_pid=$!
 disown
