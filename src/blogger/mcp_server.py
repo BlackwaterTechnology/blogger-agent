@@ -30,18 +30,19 @@ def generate_diagram(diagram_type: str, code: str, output_path: str) -> str:
 
 @mcp.tool()
 def publish_article(
-    title: str, 
-    content: str, 
-    platform: str = "wechat", 
-    summary: str = "", 
-    collection: str = "AI", 
+    title: str,
+    content: str,
+    platform: str = "wechat",
+    summary: str = "",
+    collection: str = "AI",
     author: str = "Agent",
     cover_path: str = "",
-    illustration_path: str = ""
+    illustration_path: str = "",
+    no_publish: bool = False,
 ) -> str:
     """
     Publish a tech article directly via local Chrome automation.
-    
+
     Args:
         title: The title of the article.
         content: The main content of the article in Markdown format.
@@ -51,6 +52,8 @@ def publish_article(
         author: The author's name.
         cover_path: Optional absolute path to a cover image.
         illustration_path: Optional absolute path to an illustration image.
+        no_publish: If True, fill the publish dialog but stop before clicking the final submit button.
+                    Honored by juejin and csdn; wechat is always manual.
     """
     if platform.lower() not in ["wechat", "juejin", "csdn"]:
         return f"Error: Platform '{platform}' is not supported yet. Only 'wechat', 'juejin' and 'csdn' are available."
@@ -109,14 +112,15 @@ def publish_article(
         logger.info(f"Initiating publish for platform: {platform}")
         if platform.lower() == "wechat":
             publisher = WechatPublisher()
+            publisher.publish(article_data)
         elif platform.lower() == "juejin":
             from .platforms.juejin import JuejinPublisher
             publisher = JuejinPublisher()
+            publisher.publish(article_data, dry_run=no_publish)
         elif platform.lower() == "csdn":
             from .platforms.csdn import CsdnPublisher
             publisher = CsdnPublisher()
-        
-        publisher.publish(article_data)
+            publisher.publish(article_data, dry_run=no_publish)
 
         return f"Successfully processed and initiated publish for '{title}' to {platform}. Payload kept at {payload_dir}."
 

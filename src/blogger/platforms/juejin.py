@@ -2,11 +2,11 @@ import time
 import json
 import subprocess
 from loguru import logger
-from ..core.jxa_chrome import JxaChromeController
+from ..core.cdp_chrome import CdpChromeController, CdpChromeUnavailable
 
 class JuejinPublisher:
     def __init__(self):
-        self.chrome = JxaChromeController()
+        self.chrome = CdpChromeController()
 
     def run_ui_state_machine(self, name, w_idx, t_idx, js_code, max_steps=10, delay=1.5):
         logger.info(f"Starting UI State Machine: {name}")
@@ -37,7 +37,10 @@ class JuejinPublisher:
         logger.warning(f"[{name}] Failed to complete within {max_steps} steps.")
         return False
 
-    def publish(self, article_data: dict) -> None:
+    def publish(self, article_data: dict, *, dry_run: bool = False) -> None:
+        """Publish the article. Set dry_run=True to fill the publish dialog but
+        skip the final submit click — useful for previewing or for testing the
+        flow without spamming the platform."""
         title = article_data.get("title", "")
         content = article_data.get("content", "")
         desc = article_data.get("desc", "")
@@ -124,22 +127,15 @@ class JuejinPublisher:
         # Clear existing content
         logger.info("Clearing existing content in editor...")
         try:
-            applescript_clear = '''
-            tell application "System Events"
-                tell process "Google Chrome"
-                    set frontmost to true
-                    delay 0.5
+            self.chrome.run_in_chrome_process('''
                     keystroke "a" using {command down}
                     delay 0.1
                     key code 51 -- Delete key
                     delay 0.5
-                end tell
-            end tell
-            '''
-            subprocess.run(["osascript", "-e", applescript_clear], check=True)
+            ''')
         except Exception as e:
             logger.warning(f"Failed to clear editor: {e}")
-            
+
         # 1. Upload the illustration first if provided to get the Juejin CDN URL
         if local_images:
             logger.info(f"Found {len(local_images)} local images. Extracting CDN links...")
@@ -148,18 +144,11 @@ class JuejinPublisher:
                     # Copy illustration to clipboard
                     applescript_copy_illus = f'set the clipboard to (read (POSIX file "{img_path.absolute()}") as TIFF picture)'
                     subprocess.run(["osascript", "-e", applescript_copy_illus], check=True)
-                    
-                    # Paste into the empty editor
-                    applescript_paste_illus = '''
-                    tell application "System Events"
-                        tell process "Google Chrome"
-                            set frontmost to true
-                            delay 0.5
+
+                    # Paste into the empty editor — targeting CDP Chrome by pid.
+                    self.chrome.run_in_chrome_process('''
                             keystroke "v" using {command down}
-                        end tell
-                    end tell
-                    '''
-                    subprocess.run(["osascript", "-e", applescript_paste_illus], check=True)
+                    ''')
                     
                     # Poll for the uploaded URL via JS
                     logger.info(f"Waiting for Juejin to upload image {img_path.name}...")
@@ -205,20 +194,13 @@ class JuejinPublisher:
                             else:
                                 content = f"{illustration_markdown}\n\n{content}"
                         
-                        # CLEAR EDITOR for next image
-                        applescript_clear = '''
-                        tell application "System Events"
-                            tell process "Google Chrome"
-                                set frontmost to true
-                                delay 0.5
+                        # CLEAR EDITOR for next image — targeting CDP Chrome by pid.
+                        self.chrome.run_in_chrome_process('''
                                 keystroke "a" using {command down}
                                 delay 0.1
                                 key code 51 -- Delete key
                                 delay 0.5
-                            end tell
-                        end tell
-                        '''
-                        subprocess.run(["osascript", "-e", applescript_clear], check=True)
+                        ''')
                     else:
                         logger.warning(f"Failed to extract uploaded image link for {img_path.name}.")
                         
@@ -228,19 +210,12 @@ class JuejinPublisher:
         # 2. Clear editor again before pasting the final content
         logger.info("Clearing editor for final content...")
         try:
-            applescript_clear = '''
-            tell application "System Events"
-                tell process "Google Chrome"
-                    set frontmost to true
-                    delay 0.5
+            self.chrome.run_in_chrome_process('''
                     keystroke "a" using {command down}
                     delay 0.1
                     key code 51 -- Delete key
                     delay 0.5
-                end tell
-            end tell
-            '''
-            subprocess.run(["osascript", "-e", applescript_clear], check=True)
+            ''')
         except Exception as e:
             logger.warning(f"Failed to clear editor: {e}")
 
@@ -249,17 +224,10 @@ class JuejinPublisher:
         try:
             p_pbcopy = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
             p_pbcopy.communicate(content.encode('utf-8'))
-            
-            applescript_paste = '''
-            tell application "System Events"
-                tell process "Google Chrome"
-                    set frontmost to true
-                    delay 0.5
+
+            self.chrome.run_in_chrome_process('''
                     keystroke "v" using {command down}
-                end tell
-            end tell
-            '''
-            subprocess.run(["osascript", "-e", applescript_paste], check=True)
+            ''')
             time.sleep(2.0)
         except Exception as e:
             logger.warning(f"Failed to paste content: {e}")
@@ -302,58 +270,38 @@ class JuejinPublisher:
         logger.info("Clicking Publish to open dialog...")
         self.run_ui_state_machine("Open Publish Dialog", w_idx, t_idx, js_open_publish, max_steps=5)
         
-        # 5. Handle Cover Image Upload using macOS File Dialog
+        # 5. Handle Cover Image Upload via CDP DOM.setFileInputFiles.
+        #
+        # All the fragile machinery this used to require — a11y permission,
+        # physical clicks, Cmd-Shift-G keystroke timing, panel-visibility
+        # detection, button-hit verification — is gone. CDP injects the file
+        # directly into the <input type="file">; Juejin's Vue handler fires
+        # the same way it would for a real user click.
         if cover_path:
-            logger.info(f"Found cover image: {cover_path}. Attempting to upload...")
+            logger.info(f"Found cover image: {cover_path}. Uploading via CDP...")
             try:
-                js_click_cover = """
-                (function() {
-                    try {
-                        const fileInput = document.querySelector('.byte-upload input[type="file"]') || document.querySelector('input[type="file"]');
-                        if (fileInput) {
-                            fileInput.click();
-                            return "Clicked file input directly";
-                        }
-                        return "Cover upload area not found";
-                    } catch (err) {
-                        return err.message;
-                    }
-                })();
-                """
-                
-                # Poll until the file input is found and clicked (max 5 tries)
-                clicked = False
-                for _ in range(5):
-                    res = self.chrome.execute_javascript(w_idx, t_idx, js_click_cover, settle_seconds=1.0)
-                    if "Clicked" in res:
-                        clicked = True
-                        break
-                    time.sleep(1)
-                
-                if clicked:
-                    applescript_file_dialog = f'''
-                    set the clipboard to "{cover_path.absolute()}"
-                    tell application "System Events"
-                        tell process "Google Chrome"
-                            set frontmost to true
-                            delay 2.0
-                            keystroke "G" using {{command down, shift down}}
-                            delay 2.0
-                            keystroke "v" using {{command down}}
-                            delay 1.5
-                            key code 36 -- Return key
-                            delay 1.5
-                            key code 36 -- Return key
-                        end tell
-                    end tell
-                    '''
-                    subprocess.run(["osascript", "-e", applescript_file_dialog], check=True)
-                    logger.info("Successfully initiated cover image upload via file dialog.")
-                    time.sleep(4.0)
-                else:
-                    logger.warning(f"Skipping cover upload, area not clicked: {res}")
-            except Exception as e:
-                logger.warning(f"Failed to upload cover image: {e}")
+                # If a cover was already set (e.g. previous publish on this
+                # draft), Juejin replaces .select-btn with .preview-box +
+                # .delete-btn. JS-click delete first so the new file takes
+                # the place. delete-btn does NOT trigger a native dialog,
+                # so a programmatic click is enough.
+                self.chrome.execute_javascript(
+                    w_idx, t_idx,
+                    "(function(){const d=document.querySelector('.coverselector_container .delete-btn');if(d){d.click();return 'cleared';}return 'no-existing';})();",
+                    settle_seconds=0.3,
+                )
+                time.sleep(0.4)
+                self.chrome.set_file_input(
+                    t_idx,
+                    '.coverselector_container input[type="file"]',
+                    cover_path,
+                )
+                logger.info("Cover uploaded via CDP DOM.setFileInputFiles.")
+                # Give Juejin time to push the image to its CDN before
+                # downstream steps read the cover state.
+                time.sleep(4.0)
+            except Exception as exc:
+                logger.warning(f"Cover upload failed: {exc}")
 
         # 6. Fill Publish Dialog Data (Summary, Category)
         logger.info("Setting up Publish Dialog (Summary & Category)...")
@@ -588,9 +536,14 @@ class JuejinPublisher:
         res3 = self.chrome.execute_javascript(w_idx, t_idx, js_publish_dialog_part3, settle_seconds=1.0)
         logger.info(f"Publish Dialog Part 3: {res3}")
 
-        logger.info("Juejin article configuration complete. Submitting article...")
-        
+        logger.info("Juejin article configuration complete.")
+
+        if dry_run:
+            logger.info("Dry-run mode: skipping final submit click. The publish dialog is left open for manual review.")
+            return
+
         # 11. Final Submit
+        logger.info("Submitting article...")
         js_submit = """
         (function() {{
             const buttons = Array.from(document.querySelectorAll('button, .byte-btn'));

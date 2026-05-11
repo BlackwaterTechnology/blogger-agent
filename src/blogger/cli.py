@@ -20,6 +20,13 @@ def main():
     publish_parser = subparsers.add_parser("publish", help="Publish an article payload")
     publish_parser.add_argument("--payload", default="articles/test_data", help="Directory containing the article markdown files")
     publish_parser.add_argument("--platform", default="wechat", help="Target platform(s) to publish to, comma-separated (e.g. wechat,juejin,csdn)")
+    publish_parser.add_argument(
+        "--no-publish",
+        action="store_true",
+        help="Fill the publish dialog but stop before clicking the final submit button. "
+             "Useful for previewing or testing without spamming the platform. "
+             "Currently honored by juejin and csdn; wechat is always manual.",
+    )
 
     # Diagram command
     diagram_parser = subparsers.add_parser("generate-diagram", help="Generate an image from diagram text")
@@ -78,6 +85,10 @@ def main():
     
     platforms = [p.strip().lower() for p in args.platform.split(",") if p.strip()]
     
+    dry_run = bool(getattr(args, "no_publish", False))
+    if dry_run:
+        logger.info("--no-publish set: will skip the final submit click on platforms that auto-submit (juejin, csdn).")
+
     for platform in platforms:
         if platform == "wechat":
             logger.info("Initiating WeChat publishing flow...")
@@ -87,12 +98,12 @@ def main():
             from .platforms.juejin import JuejinPublisher
             logger.info("Initiating Juejin publishing flow...")
             publisher = JuejinPublisher()
-            publisher.publish(article_data)
+            publisher.publish(article_data, dry_run=dry_run)
         elif platform == "csdn":
             from .platforms.csdn import CsdnPublisher
             logger.info("Initiating CSDN publishing flow...")
             publisher = CsdnPublisher()
-            publisher.publish(article_data)
+            publisher.publish(article_data, dry_run=dry_run)
         else:
             logger.warning(f"Platform '{platform}' is currently not implemented or unknown for publish command.")
 

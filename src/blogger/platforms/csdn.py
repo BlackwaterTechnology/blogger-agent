@@ -2,11 +2,11 @@ import time
 import json
 import subprocess
 from loguru import logger
-from ..core.jxa_chrome import JxaChromeController
+from ..core.cdp_chrome import CdpChromeController, CdpChromeUnavailable
 
 class CsdnPublisher:
     def __init__(self):
-        self.chrome = JxaChromeController()
+        self.chrome = CdpChromeController()
 
     def run_ui_state_machine(self, name, w_idx, t_idx, js_code, max_steps=10, delay=1.5):
         logger.info(f"Starting UI State Machine: {name}")
@@ -37,7 +37,10 @@ class CsdnPublisher:
         logger.warning(f"[{name}] Failed to complete within {max_steps} steps.")
         return False
 
-    def publish(self, article_data: dict) -> None:
+    def publish(self, article_data: dict, *, dry_run: bool = False) -> None:
+        """Publish the article. Set dry_run=True to fill the publish dialog but
+        skip the final submit click — useful for previewing or for testing the
+        flow without spamming the platform."""
         title = article_data.get("title", "")
         content = article_data.get("content", "")
         desc = article_data.get("desc", "")
@@ -147,19 +150,12 @@ class CsdnPublisher:
         # Clear existing content
         logger.info("Clearing existing content in editor...")
         try:
-            applescript_clear = '''
-            tell application "System Events"
-                tell process "Google Chrome"
-                    set frontmost to true
-                    delay 0.5
+            self.chrome.run_in_chrome_process('''
                     keystroke "a" using {command down}
                     delay 0.1
                     key code 51 -- Delete key
                     delay 0.5
-                end tell
-            end tell
-            '''
-            subprocess.run(["osascript", "-e", applescript_clear], check=True)
+            ''')
         except Exception as e:
             logger.warning(f"Failed to clear editor: {e}")
 
@@ -171,18 +167,11 @@ class CsdnPublisher:
                     # Copy illustration to clipboard
                     applescript_copy_illus = f'set the clipboard to (read (POSIX file "{img_path.absolute()}") as TIFF picture)'
                     subprocess.run(["osascript", "-e", applescript_copy_illus], check=True)
-                    
-                    # Paste into the empty editor
-                    applescript_paste_illus = '''
-                    tell application "System Events"
-                        tell process "Google Chrome"
-                            set frontmost to true
-                            delay 0.5
+
+                    # Paste into the empty editor — targeting CDP Chrome by pid.
+                    self.chrome.run_in_chrome_process('''
                             keystroke "v" using {command down}
-                        end tell
-                    end tell
-                    '''
-                    subprocess.run(["osascript", "-e", applescript_paste_illus], check=True)
+                    ''')
                     
                     # Poll for the uploaded URL via JS
                     logger.info(f"Waiting for CSDN to upload image {img_path.name}...")
@@ -228,20 +217,13 @@ class CsdnPublisher:
                             else:
                                 content = f"{illustration_markdown}\n\n{content}"
                         
-                        # CLEAR EDITOR for next image
-                        applescript_clear = '''
-                        tell application "System Events"
-                            tell process "Google Chrome"
-                                set frontmost to true
-                                delay 0.5
+                        # CLEAR EDITOR for next image — targeting CDP Chrome by pid.
+                        self.chrome.run_in_chrome_process('''
                                 keystroke "a" using {command down}
                                 delay 0.1
                                 key code 51 -- Delete key
                                 delay 0.5
-                            end tell
-                        end tell
-                        '''
-                        subprocess.run(["osascript", "-e", applescript_clear], check=True)
+                        ''')
                     else:
                         logger.warning(f"Failed to extract uploaded image link for {img_path.name}.")
                         
@@ -262,20 +244,13 @@ class CsdnPublisher:
             })();
             """
             self.chrome.execute_javascript(w_idx, t_idx, js_focus_for_clear, settle_seconds=0.5)
-            
-            applescript_clear = '''
-            tell application "System Events"
-                tell process "Google Chrome"
-                    set frontmost to true
-                    delay 0.5
+
+            self.chrome.run_in_chrome_process('''
                     keystroke "a" using {command down}
                     delay 0.1
                     key code 51 -- Delete key
                     delay 0.5
-                end tell
-            end tell
-            '''
-            subprocess.run(["osascript", "-e", applescript_clear], check=True)
+            ''')
         except Exception as e:
             logger.warning(f"Failed to clear editor: {e}")
 
@@ -284,17 +259,10 @@ class CsdnPublisher:
         try:
             p_pbcopy = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
             p_pbcopy.communicate(content.encode('utf-8'))
-            
-            applescript_paste = '''
-            tell application "System Events"
-                tell process "Google Chrome"
-                    set frontmost to true
-                    delay 0.5
+
+            self.chrome.run_in_chrome_process('''
                     keystroke "v" using {command down}
-                end tell
-            end tell
-            '''
-            subprocess.run(["osascript", "-e", applescript_paste], check=True)
+            ''')
             time.sleep(2.0)
         except Exception as e:
             logger.warning(f"Failed to paste final content: {e}")
@@ -321,118 +289,60 @@ class CsdnPublisher:
         # Add slight delay for dialog to appear
         time.sleep(2.0)
         
-        # 5. Handle Cover Image
+        # 5. Handle Cover Image via CDP DOM.setFileInputFiles.
+        # CSDN's <input type="file"> sits inside an Element-UI .el-upload
+        # wrapper. setFileInputFiles fires the same change event a real
+        # user click would, which puts CSDN straight into its cropper
+        # dialog — we still need to click "确认上传" afterwards.
         if cover_path:
-            logger.info(f"Found cover image: {cover_path}. Attempting to upload...")
+            logger.info(f"Found cover image: {cover_path}. Uploading via CDP...")
             try:
-                js_click_cover = """
+                self.chrome.set_file_input(
+                    t_idx,
+                    '.el-upload input[type="file"]',
+                    cover_path,
+                )
+                logger.info("Cover file injected via CDP DOM.setFileInputFiles; waiting for cropper...")
+                time.sleep(4.0)
+
+                # Cropper-confirm: poll for "确认上传" and click it.
+                js_confirm_cover = """
                 (function() {
                     try {
-                        // Find the "从本地上传" element
-                        const uploadAreas = Array.from(document.querySelectorAll('.el-upload, div, button, span')).filter(el => el.innerText && el.innerText.includes('从本地上传') && el.clientHeight > 0);
-                        if (uploadAreas.length > 0) {
-                            const target = uploadAreas[uploadAreas.length - 1];
-                            
-                            // Find the closest el-upload or focusable element, or make it focusable
-                            let focusable = target.closest('.el-upload') || target.closest('button') || target;
-                            focusable.setAttribute('tabindex', '0');
-                            focusable.focus();
-                            
-                            return "READY_FOR_ENTER";
+                        const btns = Array.from(document.querySelectorAll('button, div, span')).filter(b => b.innerText && b.innerText.includes('确认上传'));
+                        const confirmBtn = btns.find(b => b.tagName === 'BUTTON' && b.clientHeight > 0) || btns[btns.length - 1];
+                        if (confirmBtn) {
+                            if (confirmBtn.disabled || confirmBtn.classList.contains('is-disabled') || confirmBtn.classList.contains('disabled')) {
+                                return "Button is disabled, waiting...";
+                            }
+                            confirmBtn.click();
+                            const evt = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+                            confirmBtn.dispatchEvent(evt);
+                            const span = confirmBtn.querySelector ? confirmBtn.querySelector('span') : null;
+                            if (span) {
+                                span.click();
+                                span.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                            }
+                            return "Clicked confirm upload";
                         }
-                        
-                        return "Cover upload area not found";
-                    } catch (err) {
-                        return err.message;
-                    }
+                        return "Confirm upload button not found";
+                    } catch(e) { return e.message; }
                 })();
                 """
-                
-                res = self.chrome.execute_javascript(w_idx, t_idx, js_click_cover, settle_seconds=1.0)
-                logger.info(f"Cover focus result: {res}")
-                
-                if "READY_FOR_ENTER" in res:
-                    applescript_file_dialog = f'''
-                    set the clipboard to "{cover_path.absolute()}"
-                    tell application "System Events"
-                        tell process "Google Chrome"
-                            set frontmost to true
-                            delay 0.5
-                            -- Press Enter to trigger the focused upload button with a trusted event
-                            key code 36
-                            delay 2.0
-                            
-                            -- Now the system file dialog should be open
-                            -- Press Cmd+Shift+G to go to folder
-                            keystroke "G" using {{command down, shift down}}
-                            delay 2.0
-                            
-                            -- Paste the file path
-                            keystroke "v" using {{command down}}
-                            delay 1.5
-                            
-                            -- Press Enter to confirm path
-                            key code 36
-                            delay 1.5
-                            
-                            -- Press Enter to select the file
-                            key code 36
-                        end tell
-                    end tell
-                    '''
-                    subprocess.run(["osascript", "-e", applescript_file_dialog], check=True)
-                    logger.info("Successfully initiated cover image upload via trusted Enter and file dialog.")
-                    time.sleep(4.0)
-                    
-                    # CSDN pops up an image cropper dialog after file selection, we need to click "确认上传"
-                    js_confirm_cover = """
-                    (function() {
-                        try {
-                            const btns = Array.from(document.querySelectorAll('button, div, span')).filter(b => b.innerText && b.innerText.includes('确认上传'));
-                            const confirmBtn = btns.find(b => b.tagName === 'BUTTON' && b.clientHeight > 0) || btns[btns.length - 1];
-                            
-                            if (confirmBtn) {
-                                if (confirmBtn.disabled || confirmBtn.classList.contains('is-disabled') || confirmBtn.classList.contains('disabled')) {
-                                    return "Button is disabled, waiting...";
-                                }
-                                
-                                // Native click
-                                confirmBtn.click();
-                                
-                                // Dispatch MouseEvent
-                                const evt = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
-                                confirmBtn.dispatchEvent(evt);
-                                
-                                // Click inner span if it exists (Element UI pattern)
-                                const span = confirmBtn.querySelector ? confirmBtn.querySelector('span') : null;
-                                if (span) {
-                                    span.click();
-                                    span.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-                                }
-                                
-                                return "Clicked confirm upload";
-                            }
-                            return "Confirm upload button not found";
-                        } catch(e) { return e.message; }
-                    })();
-                    """
-                    confirm_success = False
-                    for i in range(8):
-                        res_confirm = self.chrome.execute_javascript(w_idx, t_idx, js_confirm_cover, settle_seconds=1.0)
-                        logger.info(f"Confirm upload poll {i+1}: {res_confirm}")
-                        if res_confirm and "Clicked" in str(res_confirm):
-                            logger.info("Clicked cover image confirm upload button.")
-                            confirm_success = True
-                            time.sleep(2.0)
-                            break
-                        time.sleep(1.5)
-                        
-                    if not confirm_success:
-                        logger.warning("Failed to click '确认上传' button, cover may not be saved.")
-                else:
-                    logger.warning(f"Skipping cover upload, area not found or focused: {res}")
-            except Exception as e:
-                logger.warning(f"Failed to upload cover image: {e}")
+                confirm_clicked = False
+                for i in range(8):
+                    res_confirm = self.chrome.execute_javascript(w_idx, t_idx, js_confirm_cover, settle_seconds=1.0)
+                    logger.info(f"Confirm upload poll {i+1}: {res_confirm}")
+                    if res_confirm and "Clicked" in str(res_confirm):
+                        logger.info("Clicked CSDN cover crop confirm.")
+                        time.sleep(2.0)
+                        confirm_clicked = True
+                        break
+                    time.sleep(1.5)
+                if not confirm_clicked:
+                    logger.warning("Failed to click '确认上传' button after CDP file injection.")
+            except Exception as exc:
+                logger.warning(f"Cover upload failed: {exc}")
 
         # 6. Fill Publish Dialog Fields
         logger.info("Setting up Publish Dialog data (Summary, Type, Declaration, Category)...")
@@ -629,23 +539,16 @@ class CsdnPublisher:
                 # Copy tag name to system clipboard
                 subprocess.run(["pbcopy"], input=tag_name.encode(), check=True)
 
-                # Paste + Enter in one AppleScript call
-                applescript_paste_and_enter = '''
-                tell application "System Events"
-                    tell process "Google Chrome"
-                        set frontmost to true
-                        delay 0.3
+                # Paste + Enter — targeting CDP Chrome by pid.
+                try:
+                    self.chrome.run_in_chrome_process('''
                         keystroke "a" using {command down}
                         delay 0.1
                         keystroke "v" using {command down}
                         delay 0.05
                         key code 36
                         delay 1.0
-                    end tell
-                end tell
-                '''
-                try:
-                    subprocess.run(["osascript", "-e", applescript_paste_and_enter], check=True)
+                    ''')
                     logger.info(f"  [tag={tag_name}] Pasted + Enter via clipboard")
                 except Exception as e:
                     logger.warning(f"  [tag={tag_name}] AppleScript failed: {e}")
@@ -748,7 +651,11 @@ class CsdnPublisher:
             time.sleep(0.3)
 
         # 7. Final Submit
-        logger.info("CSDN article configuration complete. Submitting article...")
+        logger.info("CSDN article configuration complete.")
+        if dry_run:
+            logger.info("Dry-run mode: skipping final submit click. The publish dialog is left open for manual review.")
+            return
+        logger.info("Submitting article...")
         js_submit = """
         (function() {
             try {
