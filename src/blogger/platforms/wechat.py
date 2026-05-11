@@ -1102,23 +1102,41 @@ class WechatPublisher:
                         let foundContainer = null;
                         let searchDepth = 0;
 
-                        // Walk up looking for the row that wraps the source
-                        // field. Decide:
-                        //   - already at "个人观点" → skip (don't re-open dialog)
-                        //   - anything else (未声明 / 原创 / 转载 / etc.) → click
-                        //     to open dialog and let downstream iteration pick
-                        //     the correct radio.
+                        // Walk up looking for the SMALLEST ancestor whose innerText
+                        // contains a status indicator. That ancestor IS the row
+                        // container (it wraps both the "创作声明" label and the
+                        // current value). Walking past it pulls in sibling form
+                        // rows and the click-target search latches onto the wrong
+                        // row (e.g. 原创声明 row's "未声明" or some unrelated icon),
+                        // so 8 iterations all click nothing useful.
+                        //
+                        // STATUS_OPENABLE = states from which we should re-open the
+                        // dialog to switch to 个人观点. Note: 原创/转载 are NOT
+                        // valid Creation Source values — they belong to a
+                        // different field (原创声明) and including them here
+                        // caused false matches against that sibling row.
+                        const STATUS_OPENABLE = ['未声明', '未设置', '未添加', 'Not added', '内容由人工智能'];
+                        const STATUS_TARGET = ['个人观点', 'Personal opinion'];
+
                         while(container && container.tagName.toLowerCase() !== 'body' && searchDepth < 5) {
                             const t = container.innerText || '';
-                            if (t.includes('个人观点') || t.includes('Personal opinion')) {
-                                alreadyTarget = true;
+                            const hasOpenable = STATUS_OPENABLE.some(k => t.includes(k));
+                            const hasTarget = STATUS_TARGET.some(k => t.includes(k));
+
+                            if (hasOpenable) {
+                                // Current state is some non-target value (most
+                                // commonly 未声明 on a fresh draft). Open the
+                                // dialog. If hasTarget is also true it's text
+                                // leaked from a tooltip / radio option — trust
+                                // the openable indicator as the real state.
                                 foundContainer = container;
+                                alreadyTarget = false;
                                 break;
                             }
-                            // Heuristic: any container whose innerText mentions
-                            // the Creation Source label is a good click target.
-                            if (t.includes('创作声明') || t.includes('Creation Source')) {
+                            if (hasTarget) {
                                 foundContainer = container;
+                                alreadyTarget = true;
+                                break;
                             }
                             container = container.parentElement;
                             searchDepth++;
@@ -1135,7 +1153,7 @@ class WechatPublisher:
                             const unstatedEl = clickables.find(el => {
                                 const t = el.innerText || '';
                                 return t.includes('未声明') || t.includes('未设置') || t.includes('未添加') || t.includes('Not added')
-                                    || t.includes('原创') || t.includes('转载');
+                                    || t.includes('内容由人工智能');
                             });
 
                             const iconEl = clickables.find(el => el.tagName.toLowerCase() === 'svg' || el.tagName.toLowerCase() === 'i' || el.classList.contains('weui-icon'));
