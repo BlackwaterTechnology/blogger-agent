@@ -6,60 +6,66 @@ from dataclasses import dataclass
 class JxaChromeController:
     app_name: str = "Google Chrome"
     script_timeout_seconds: float = 10.0
+    target_pid: int = None
 
     def find_global_tab(self, url_prefixes: list[str]) -> tuple[int, int]:
         prefixes_json = json.dumps(url_prefixes)
-        script = f"""
+        script = f'''
 function run() {{
-    var chrome = Application("{self.app_name}");
+    var appName = "{self.app_name}";
+    var se = Application("System Events");
+    var procs = se.processes.whose({{name: appName}});
+    var pids = [];
+    for (var i=0; i<procs.length; i++) {{
+        pids.push(procs[i].unixId());
+    }}
+    
     var prefixes = {prefixes_json};
-    var winCount = 0;
-    try {{ winCount = chrome.windows.length; }} catch(e) {{ return ""; }}
-
-    for (var w = 0; w < winCount; w++) {{
-        var win;
-        var tabCount;
+    
+    for (var i=0; i<pids.length; i++) {{
+        var pid = pids[i];
         try {{
-            win = chrome.windows[w];
-            tabCount = win.tabs.length;
-        }} catch(e) {{
-            continue;
-        }}
-        for (var t = 0; t < tabCount; t++) {{
-            var tab;
-            var url = "";
-            try {{
-                tab = win.tabs[t];
-                url = tab.url();
-            }} catch(e) {{ continue; }}
-            if (!url) continue;
+            var chrome = Application(pid);
+            var winCount = chrome.windows.length;
+            for (var w = 0; w < winCount; w++) {{
+                var win = chrome.windows[w];
+                var tabCount = win.tabs.length;
+                for (var t = 0; t < tabCount; t++) {{
+                    var tab = win.tabs[t];
+                    var url = tab.url();
+                    if (!url) continue;
 
-            for (var p = 0; p < prefixes.length; p++) {{
-                if (url.startsWith(prefixes[p])) {{
-                    var winId = "", tabId = "";
-                    try {{ winId = win.id(); }} catch(e) {{}}
-                    try {{ tabId = tab.id(); }} catch(e) {{}}
-                    if (!winId || !tabId) continue;
-                    try {{ win.index = 1; }} catch(e) {{}}
-                    try {{ win.activeTabIndex = t + 1; }} catch(e) {{}}
-                    try {{ chrome.activate(); }} catch(e) {{}}
-                    return winId + "\\n" + tabId;
+                    for (var p = 0; p < prefixes.length; p++) {{
+                        if (url.startsWith(prefixes[p])) {{
+                            var winId = win.id();
+                            var tabId = tab.id();
+                            win.index = 1;
+                            win.activeTabIndex = t + 1;
+                            chrome.activate();
+                            return pid + "\\n" + winId + "\\n" + tabId;
+                        }}
+                    }}
                 }}
             }}
-        }}
+        }} catch(e) {{ continue; }}
     }}
     return "";
 }}
-"""
+'''
         raw = self._run_jxa(script).strip()
         if not raw:
             raise RuntimeError(f"chrome global tab not found for prefixes: {url_prefixes!r}")
         
-        w_text, _, t_text = raw.partition("\n")
-        try:
-            return int(w_text.strip()), int(t_text.strip())
-        except ValueError as exc:
-            raise RuntimeError(f"unexpected global tab return: {raw!r}") from exc
+        parts = raw.split("\n")
+        if len(parts) == 3:
+            self.target_pid = int(parts[0].strip())
+            return int(parts[1].strip()), int(parts[2].strip())
+        raise RuntimeError(f"unexpected global tab return: {raw!r}")
+
+    def _get_app_ref(self) -> str:
+        if self.target_pid:
+            return f'Application({self.target_pid})'
+        return f'Application("{self.app_name}")'
 
     def execute_javascript(
         self,
@@ -70,9 +76,9 @@ function run() {{
         settle_seconds: float = 0.5,
     ) -> str:
         escaped_js = json.dumps(javascript)
-        script = f"""
+        script = f'''
 function run() {{
-    var chrome = Application("{self.app_name}");
+    var chrome = {self._get_app_ref()};
     var win = chrome.windows.byId({window_id});
     var tab = win.tabs.byId({tab_id});
     
@@ -86,7 +92,7 @@ function run() {{
     delay({settle_seconds});
     return tab.execute({{javascript: {escaped_js}}});
 }}
-"""
+'''
         try:
             return self._run_jxa(script)
         except RuntimeError as exc:
@@ -107,9 +113,9 @@ function run() {{
         settle_seconds: float = 1.0,
     ) -> str:
         escaped_url = json.dumps(url)
-        script = f"""
+        script = f'''
 function run() {{
-    var chrome = Application("{self.app_name}");
+    var chrome = {self._get_app_ref()};
     var win = chrome.windows.byId({window_id});
     var tab = win.tabs.byId({tab_id});
     
@@ -124,17 +130,44 @@ function run() {{
     delay({settle_seconds});
     return tab.url();
 }}
-"""
+'''
         return self._run_jxa(script).strip()
 
     def get_tab_url(self, window_id: int, tab_id: int) -> str:
-        script = f"""
+        script = f'''
 function run() {{
-    var chrome = Application("{self.app_name}");
+    var chrome = {self._get_app_ref()};
     return chrome.windows.byId({window_id}).tabs.byId({tab_id}).url();
 }}
-"""
+'''
         return self._run_jxa(script).strip()
+
+    def run_in_chrome_process(self, inner_body: str, *, check: bool = True) -> subprocess.CompletedProcess:
+        if self.target_pid is not None:
+            script = (
+                'tell application "System Events"\n'
+                f'    set theProcess to (first process whose unix id is {self.target_pid})\n'
+                '    tell theProcess\n'
+                '        set frontmost to true\n'
+                '        delay 0.2\n'
+                f'{inner_body}\n'
+                '    end tell\n'
+                'end tell\n'
+            )
+        else:
+            script = (
+                'tell application "System Events"\n'
+                f'    tell process "{self.app_name}"\n'
+                '        set frontmost to true\n'
+                '        delay 0.2\n'
+                f'{inner_body}\n'
+                '    end tell\n'
+                'end tell\n'
+            )
+        return subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True, text=True, check=check,
+        )
 
     def _run_jxa(self, script: str) -> str:
         try:
@@ -147,7 +180,7 @@ function run() {{
             )
         except subprocess.CalledProcessError as exc:
             stderr = exc.stderr.strip() if exc.stderr else str(exc)
-            raise RuntimeError(f"failed to run jxa script: {stderr}\\nOutput: {exc.stdout}") from exc
+            raise RuntimeError(f"failed to run jxa script: {stderr}\nOutput: {exc.stdout}") from exc
         except subprocess.TimeoutExpired as exc:
             raise RuntimeError("jxa script timed out") from exc
         return result.stdout

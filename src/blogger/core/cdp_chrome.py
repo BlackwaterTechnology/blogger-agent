@@ -227,6 +227,10 @@ class CdpChromeController:
             for prefix in url_prefixes:
                 if url.startswith(prefix):
                     self._install_stealth(t["id"])
+                    try:
+                        self._call_on(t["id"], "Page.bringToFront")
+                    except Exception:
+                        pass
                     return (0, t["id"])
         raise RuntimeError(
             f"No CDP page-tab matched prefixes {url_prefixes!r}. "
@@ -247,6 +251,10 @@ class CdpChromeController:
         *,
         settle_seconds: float = 1.0,
     ) -> str:
+        try:
+            self._call_on(tab_id, "Page.bringToFront")
+        except Exception:
+            pass
         self._call_on(tab_id, "Page.navigate", {"url": url})
         if settle_seconds > 0:
             time.sleep(settle_seconds)
@@ -266,6 +274,10 @@ class CdpChromeController:
         publisher code stores the return value and JSON.parses it, so we
         coerce here the same way: primitives → str, objects → JSON.
         """
+        try:
+            self._call_on(tab_id, "Page.bringToFront")
+        except Exception:
+            pass
         res = self._call_on(
             tab_id,
             "Runtime.evaluate",

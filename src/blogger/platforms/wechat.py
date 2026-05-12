@@ -2,18 +2,18 @@ import time
 import json
 import subprocess
 from loguru import logger
-from ..core.chrome import ChromeDomController
+from ..core.jxa_chrome import JxaChromeController
 
 class WechatPublisher:
     def __init__(self):
-        # WeChat 用 AppleScript / ChromeDomController 走默认 user-data-dir 的
+        # WeChat 用 JxaChromeController (AppleScript/JXA) 走默认 user-data-dir 的
         # 日常 Chrome —— CDP Chrome 跑 mp.weixin 会被反爬检测弹"插件存在安全
         # 隐患"告警（微信开发者社区里官方建议无痕模式即可绕，但无痕模式不持久
         # cookies，不实用）。详见 commit 历史和 docs。
         #
         # 前置：你日常 Chrome 必须勾选 View → Developer →
         # Allow JavaScript from Apple Events，否则 execute javascript 失败。
-        self.chrome = ChromeDomController()
+        self.chrome = JxaChromeController()
 
     def run_ui_state_machine(self, name, w_idx, t_idx, js_code, max_steps=10, delay=1.5):
         logger.info(f"Starting UI State Machine: {name}")
@@ -305,20 +305,9 @@ class WechatPublisher:
                 try:
                     subprocess.run(["osascript", "-e", applescript_set_clipboard], check=True)
                     
-                    applescript_paste = f'''
-                    tell application "{self.chrome.app_name}"
-                        set index of window {w_idx} to 1
-                        activate
-                    end tell
-                    delay 0.5
-                    tell application "System Events"
-                        tell process "{self.chrome.app_name}"
-                            set frontmost to true
-                            keystroke "v" using {{command down}}
-                        end tell
-                    end tell
-                    '''
-                    self.chrome._run_osascript(applescript_paste)
+                    self.chrome.run_in_chrome_process('''
+                        keystroke "v" using {command down}
+                    ''')
                     logger.info("Successfully pasted HTML content via OS clipboard.")
                     time.sleep(2.0)
                 except Exception as e:
@@ -427,20 +416,9 @@ class WechatPublisher:
                     # System Events selects first (usually the older / front
                     # one). Bring your regular Chrome to the front before
                     # running publisher to disambiguate.
-                    applescript_paste = f'''
-                    tell application "{self.chrome.app_name}"
-                        set index of window {w_idx} to 1
-                        activate
-                    end tell
-                    delay 0.2
-                    tell application "System Events"
-                        tell process "{self.chrome.app_name}"
-                            set frontmost to true
-                            keystroke "v" using {{command down}}
-                        end tell
-                    end tell
-                    '''
-                    self.chrome._run_osascript(applescript_paste)
+                    self.chrome.run_in_chrome_process('''
+                        keystroke "v" using {command down}
+                    ''')
                     logger.info("Successfully initiated image paste/upload.")
                     time.sleep(2.5) # Wait for upload to complete
                 except Exception as e:
@@ -540,15 +518,9 @@ class WechatPublisher:
                 """
                 self.chrome.execute_javascript(w_idx, t_idx, js_move_cursor_end, settle_seconds=0.5)
                 
-                applescript_paste = '''
-                tell application "System Events"
-                    tell process "Google Chrome"
-                        set frontmost to true
-                        keystroke "v" using {command down}
-                    end tell
-                end tell
-                '''
-                self.chrome._run_osascript(applescript_paste)
+                self.chrome.run_in_chrome_process('''
+                    keystroke "v" using {command down}
+                ''')
                 logger.info("Successfully initiated cover image paste/upload.")
                 time.sleep(2.0)
             except Exception as e:
