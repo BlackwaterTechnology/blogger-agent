@@ -19,6 +19,7 @@ dependencies = [
     "mcp",
     "python-frontmatter",
     "notebooklm-py",
+    "websocket-client",
 ]
 
 [project.scripts]

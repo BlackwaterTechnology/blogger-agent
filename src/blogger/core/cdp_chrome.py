@@ -367,15 +367,19 @@ class CdpChromeController:
                 capture_output=True, text=True, check=False,
             )
             return
-        script = (
-            'tell application "System Events"\n'
-            f'    set procs to (every process whose unix id is {pid})\n'
-            "    if (count of procs) > 0 then\n"
-            "        set frontmost of (item 1 of procs) to true\n"
-            "    end if\n"
-            "end tell"
-        )
-        subprocess.run(["osascript", "-e", script], capture_output=True, text=True, check=False)
+
+        # Use native macOS AppKit API via JXA to explicitly activate the specific PID.
+        # This completely bypasses the LaunchServices/WindowServer bug where AppleScript
+        # "System Events" misroutes activation to the default Chrome instance.
+        jxa_script = f"""
+        ObjC.import('AppKit');
+        var app = $.NSRunningApplication.runningApplicationWithProcessIdentifier({pid});
+        if (app) {{
+            app.activateWithOptions($.NSApplicationActivateIgnoringOtherApps);
+        }}
+        """
+        subprocess.run(["osascript", "-l", "JavaScript", "-e", jxa_script], check=False)
+        time.sleep(0.2)
 
     def run_in_chrome_process(self, inner_body: str, *, check: bool = True) -> subprocess.CompletedProcess:
         """Wrap `inner_body` in a `tell` block targeting the *CDP* Chrome
@@ -398,11 +402,10 @@ class CdpChromeController:
         which is no worse than the legacy behavior."""
         pid = self._chrome_pid()
         if pid is not None:
+            self.activate()
             script = (
                 'tell application "System Events"\n'
                 f'    set theProcess to (first process whose unix id is {pid})\n'
-                '    set frontmost of theProcess to true\n'
-                '    delay 0.2\n'
                 '    tell theProcess\n'
                 f'{inner_body}\n'
                 '    end tell\n'
