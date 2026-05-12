@@ -198,89 +198,94 @@ class WechatPublisher:
                 const author = {json.dumps(author)};
                 const desc = {json.dumps(desc)};
                 const content = {json.dumps(content)};
+                const html = {json.dumps(html_content)};
                 
-                const setReactValue = (element, value) => {{
+                const setEditorValue = (element, value) => {{
+                    if (!element) return;
                     element.focus();
-                    document.execCommand('selectAll', false, null);
-                    document.execCommand('insertText', false, value);
-                    element.blur();
                     
-                    let proto = window.HTMLInputElement.prototype;
-                    if (element.tagName.toUpperCase() === 'TEXTAREA') {{
-                        proto = window.HTMLTextAreaElement.prototype;
-                    }}
-                    const setter = Object.getOwnPropertyDescriptor(proto, "value");
-                    if (setter && setter.set) {{
-                        setter.set.call(element, value);
-                        element.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {{
+                        element.select();
+                        document.execCommand('insertText', false, value);
+                        let proto = window.HTMLInputElement.prototype;
+                        if (element.tagName === 'TEXTAREA') proto = window.HTMLTextAreaElement.prototype;
+                        const setter = Object.getOwnPropertyDescriptor(proto, "value");
+                        if (setter && setter.set) {{
+                            setter.set.call(element, value);
+                            element.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                        }}
+                    }} else {{
+                        const selection = window.getSelection();
+                        const range = document.createRange();
+                        range.selectNodeContents(element);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                        
+                        const dt = new DataTransfer();
+                        dt.setData('text/plain', value);
+                        const pasteEvent = new ClipboardEvent('paste', {{ bubbles: true, cancelable: true, clipboardData: dt }});
+                        const handled = !element.dispatchEvent(pasteEvent);
+                        
+                        if (!handled) {{
+                            document.execCommand('insertText', false, value);
+                            element.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                        }}
                     }}
                 }};
                 
-                const inputs = Array.from(document.querySelectorAll('input, textarea'));
-                const tInput = inputs.find(i => i.placeholder && (i.placeholder.includes('标题') || i.placeholder.includes('title'))) || document.getElementById('title');
-                if (tInput) {{
-                    setReactValue(tInput, title);
+                // ONLY look at VISIBLE elements to avoid hidden proxy inputs that misdirect commands
+                const allEditors = Array.from(document.querySelectorAll('.ProseMirror, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), textarea')).filter(e => e.clientHeight > 0);
+                const pmEditors = allEditors.filter(e => e.classList && e.classList.contains('ProseMirror'));
+                
+                // Helper to get placeholder safely (works for divs and inputs)
+                const getPh = (e) => (e.getAttribute('placeholder') || e.placeholder || e.getAttribute('data-placeholder') || '').toLowerCase();
+                
+                // 1. Identify Title Editor
+                let tInput = allEditors.find(e => e.id === 'title' || getPh(e).includes('标题') || getPh(e).includes('title'));
+                if (!tInput && pmEditors.length > 0) {{
+                    tInput = pmEditors[0]; // fallback to first ProseMirror
                 }}
-                const aInput = inputs.find(i => i.placeholder && (i.placeholder.includes('作者') || i.placeholder.includes('author'))) || document.getElementById('author');
-                if (aInput) {{
-                    setReactValue(aInput, author);
+                
+                // 2. Identify Author Editor
+                let aInput = allEditors.find(e => e !== tInput && (e.id === 'author' || getPh(e).includes('作者') || getPh(e).includes('author')));
+                if (!aInput && pmEditors.length > 1) {{
+                    aInput = pmEditors[1];
                 }}
+                
+                // 3. Identify Main Content Editor
+                let mainEditor = allEditors.find(e => e.id === 'js_editor');
+                if (!mainEditor) {{
+                    // The main content editor is usually the last ProseMirror that isn't title/author
+                    const unassigned = pmEditors.filter(e => e !== tInput && e !== aInput);
+                    if (unassigned.length > 0) {{
+                        mainEditor = unassigned[unassigned.length - 1];
+                    }}
+                }}
+                
+                // Inject values
+                if (tInput) setEditorValue(tInput, title);
+                if (aInput) setEditorValue(aInput, author);
                 
                 if (desc) {{
-                    const descInput = document.getElementById('js_description') || inputs.find(i => i.placeholder && (i.placeholder.includes('摘要') || i.placeholder.includes('summary') || i.placeholder.includes('Optional')));
+                    let descInput = allEditors.find(e => e !== mainEditor && (e.id === 'js_description' || getPh(e).includes('摘要') || getPh(e).includes('summary')));
                     if (descInput) {{
-                        setReactValue(descInput, desc);
+                        setEditorValue(descInput, desc);
                     }}
                 }}
                 
-                const html = {json.dumps(html_content)};
-                
-                // UE.instants is a plain object that's truthy even when empty.
-                // We must verify it has at least one editor instance before
-                // claiming success — otherwise we'd "succeed" without writing
-                // a single character and the ProseMirror fallback never runs.
-                if (typeof UE !== 'undefined' && UE.instants && Object.keys(UE.instants).length > 0) {{
-                    for (let key in UE.instants) {{
-                        UE.instants[key].setContent(html);
-                    }}
-                    return "Filled via UE";
-                }}
-                
-                let editor = document.querySelector('.ProseMirror');
-                if (!editor) {{
-                    const editors = Array.from(document.querySelectorAll('[contenteditable="true"]'));
-                    // Try to find the actual main editor by checking if it's large, or just grab the last one.
-                    editor = editors.find(e => e.clientHeight > 100) || editors[editors.length - 1];
-                }}
-                
-                if (editor) {{
-                    editor.focus();
-                    
-                    // Explicitly set the DOM selection to select ALL content, so it overwrites existing text
+                if (mainEditor) {{
+                    mainEditor.focus();
                     const selection = window.getSelection();
                     const range = document.createRange();
-                    range.selectNodeContents(editor);
+                    range.selectNodeContents(mainEditor);
                     selection.removeAllRanges();
                     selection.addRange(range);
-                    
-                    // document.execCommand('insertHTML') strips format in newer WeChat editor versions.
-                    // Simulate a paste event with clipboardData instead.
-                    const dt = new DataTransfer();
-                    dt.setData('text/html', html);
-                    dt.setData('text/plain', content);
-                    const pasteEvent = new ClipboardEvent('paste', {{
-                        bubbles: true,
-                        cancelable: true,
-                        clipboardData: dt
-                    }});
-                    editor.dispatchEvent(pasteEvent);
-                    
-                    return "Filled via paste event";
+                    return "READY_FOR_PASTE";
                 }}
                 
-                return "Filled basic inputs, but could not find rich text editor.";
+                return "Could not find main editor.";
             }} catch (err) {{
-                return "Error in JS: " + err.message;
+                return "Error in JS: " + err.message + "\\n" + err.stack;
             }}
         }})();
         """
@@ -289,9 +294,37 @@ class WechatPublisher:
         try:
             inject_res = self.chrome.execute_javascript(w_idx, t_idx, js_inject, settle_seconds=1.0)
             logger.info(f"Injection result: {inject_res}")
+            if inject_res and inject_res.strip() == "READY_FOR_PASTE":
+                logger.info("Main editor focused and ready. Copying HTML to clipboard and pasting via Cmd+V...")
+                import binascii
+                html_hex = binascii.hexlify(html_content.encode('utf-8')).decode('utf-8')
+                plain_hex = binascii.hexlify(content.encode('utf-8')).decode('utf-8')
+                
+                # Use AppleScript to set both HTML and UTF8 plain text to the OS clipboard
+                applescript_set_clipboard = f'set the clipboard to {{«class utf8»:«data utf8{plain_hex}», «class HTML»:«data HTML{html_hex}»}}'
+                try:
+                    subprocess.run(["osascript", "-e", applescript_set_clipboard], check=True)
+                    
+                    applescript_paste = f'''
+                    tell application "{self.chrome.app_name}"
+                        set index of window {w_idx} to 1
+                        activate
+                    end tell
+                    delay 0.5
+                    tell application "System Events"
+                        tell process "{self.chrome.app_name}"
+                            set frontmost to true
+                            keystroke "v" using {{command down}}
+                        end tell
+                    end tell
+                    '''
+                    self.chrome._run_osascript(applescript_paste)
+                    logger.info("Successfully pasted HTML content via OS clipboard.")
+                    time.sleep(2.0)
+                except Exception as e:
+                    logger.warning(f"Failed to paste HTML via OS clipboard: {e}")
         except Exception as e:
             logger.warning(f"JS injection failed: {e}")
-            
         if local_images:
             logger.info(f"Found {len(local_images)} local images. Injecting them into the editor...")
             for img_path in local_images:
@@ -307,69 +340,75 @@ class WechatPublisher:
                     js_find_and_select = f"""
                     (function() {{
                         try {{
-                            let editor = document.querySelector('.ProseMirror');
+                            const placeholder = "__PLACEHOLDER__";
+                            
+                            // Re-identify main editor like in js_inject
+                            const allEditors = Array.from(document.querySelectorAll('.ProseMirror, input:not([type="hidden"]), textarea')).filter(e => e.clientHeight > 0);
+                            const pmEditors = allEditors.filter(e => e.classList && e.classList.contains('ProseMirror'));
+                            const getPh = (e) => (e.getAttribute('placeholder') || e.placeholder || e.getAttribute('data-placeholder') || '').toLowerCase();
+                            
+                            let tInput = allEditors.find(e => e.id === 'title' || getPh(e).includes('标题') || getPh(e).includes('title'));
+                            if (!tInput && pmEditors.length > 0) tInput = pmEditors[0];
+                            let aInput = allEditors.find(e => e !== tInput && (e.id === 'author' || getPh(e).includes('作者') || getPh(e).includes('author')));
+                            if (!aInput && pmEditors.length > 1) aInput = pmEditors[1];
+                            let mainEditor = allEditors.find(e => e.id === 'js_editor');
+                            if (!mainEditor) {{
+                                const unassigned = pmEditors.filter(e => e !== tInput && e !== aInput);
+                                if (unassigned.length > 0) mainEditor = unassigned[unassigned.length - 1];
+                            }}
+                            
+                            // Find the deepest element containing the placeholder text
+                            const elements = Array.from(document.body.querySelectorAll('*'));
+                            let targetEl = elements.find(el => 
+                                el.textContent && el.textContent.includes(placeholder) && 
+                                Array.from(el.children).every(c => !c.textContent || !c.textContent.includes(placeholder))
+                            );
+                            
+                            let editor = targetEl ? (targetEl.closest('.ProseMirror') || targetEl.closest('[contenteditable="true"]')) : mainEditor;
                             if (!editor) return "Editor not found";
                             
                             editor.focus();
                             const selection = window.getSelection();
                             const range = document.createRange();
                             
-                            // Find the text node containing the placeholder
-                            const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null, false);
-                            let node;
-                            const placeholder = "__PLACEHOLDER__";
-                            
-                            while (node = walker.nextNode()) {{
-                                if (node.nodeValue.includes(placeholder)) {{
-                                    const startOffset = node.nodeValue.indexOf(placeholder);
-                                    // 占位符在 markdown 里独占一行,parser 会把它包在自己的 <p> 里。
-                                    // 如果只选占位符文字,粘贴图片后 ProseMirror 会留下一个空 <p>
-                                    // 在图片下方,造成图文之间多一截空行(2026-05-10 实测)。
-                                    // 当外层块级元素的可见文字只剩这个占位符时,直接选中整段
-                                    // (含 <p>),让 paste 一把替换掉,空段就不会留下了。
-                                    let blockEl = node.parentElement;
-                                    while (blockEl && blockEl !== editor) {{
-                                        const display = window.getComputedStyle(blockEl).display;
-                                        if (display !== 'inline' && display !== 'inline-block') break;
-                                        blockEl = blockEl.parentElement;
-                                    }}
-                                    // 只有当块内除了这条占位符文字以外没有别的可见子节点时,
-                                    // 才扩选到整个块。否则同段里已粘进的图片或邻近文字会被一并替换掉。
-                                    let collapseBlock = false;
-                                    if (blockEl && blockEl !== editor) {{
-                                        const meaningful = Array.from(blockEl.childNodes).filter(n => {{
-                                            if (n.nodeType === 3) return n.nodeValue.trim().length > 0;
-                                            if (n.nodeType === 1) return n.tagName !== 'BR';
-                                            return false;
-                                        }});
-                                        collapseBlock = meaningful.length === 1 &&
-                                            meaningful[0] === node &&
-                                            node.nodeValue.trim() === placeholder;
-                                    }}
-                                    if (collapseBlock) {{
-                                        range.selectNode(blockEl);
+                            if (targetEl) {{
+                                const meaningful = Array.from(targetEl.childNodes).filter(n => {{
+                                    if (n.nodeType === 3) return n.nodeValue.trim().length > 0;
+                                    if (n.nodeType === 1) return n.tagName !== 'BR';
+                                    return false;
+                                }});
+                                
+                                const collapseBlock = meaningful.length > 0 && targetEl.textContent.trim() === placeholder;
+                                
+                                if (collapseBlock) {{
+                                    range.selectNode(targetEl);
+                                }} else {{
+                                    const textNode = Array.from(targetEl.childNodes).find(n => n.nodeType === 3 && n.nodeValue.includes(placeholder));
+                                    if (textNode) {{
+                                        const startOffset = textNode.nodeValue.indexOf(placeholder);
+                                        range.setStart(textNode, startOffset);
+                                        range.setEnd(textNode, startOffset + placeholder.length);
                                     }} else {{
-                                        range.setStart(node, startOffset);
-                                        range.setEnd(node, startOffset + placeholder.length);
+                                        range.selectNode(targetEl);
                                     }}
-                                    selection.removeAllRanges();
-                                    selection.addRange(range);
-                                    return "SELECTED";
                                 }}
-                            }}
-                            
-                            // Fallback: If no placeholder found (e.g. legacy front-matter illustration)
-                            const h1 = editor.querySelector('h1, h2, h3');
-                            if (h1) {{
-                                range.setStartBefore(h1);
-                                range.collapse(true);
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                                return "SELECTED";
                             }} else {{
-                                range.selectNodeContents(editor);
-                                range.collapse(true);
+                                // Fallback: If no placeholder found (e.g. legacy front-matter illustration)
+                                const h1 = editor.querySelector('h1, h2, h3');
+                                if (h1) {{
+                                    range.setStartBefore(h1);
+                                    range.collapse(true);
+                                }} else {{
+                                    range.selectNodeContents(editor);
+                                    range.collapse(true);
+                                }}
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                                return "FALLBACK_MOVED";
                             }}
-                            selection.removeAllRanges();
-                            selection.addRange(range);
-                            return "FALLBACK_MOVED";
                         }} catch(e) {{
                             return e.message;
                         }}
@@ -388,11 +427,16 @@ class WechatPublisher:
                     # System Events selects first (usually the older / front
                     # one). Bring your regular Chrome to the front before
                     # running publisher to disambiguate.
-                    applescript_paste = '''
+                    applescript_paste = f'''
+                    tell application "{self.chrome.app_name}"
+                        set index of window {w_idx} to 1
+                        activate
+                    end tell
+                    delay 0.2
                     tell application "System Events"
-                        tell process "Google Chrome"
+                        tell process "{self.chrome.app_name}"
                             set frontmost to true
-                            keystroke "v" using {command down}
+                            keystroke "v" using {{command down}}
                         end tell
                     end tell
                     '''

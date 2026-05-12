@@ -5,3 +5,5 @@ articles
 docs/personal/visa.md
 .DS_Store
 mannul.md
+.claude/rules/gcc-s1.md
+build/
