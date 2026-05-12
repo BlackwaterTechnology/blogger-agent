@@ -433,50 +433,132 @@ class WechatPublisher:
             js_finalize_images = f"""
             (function(){{
                 try {{
-                    const editor = document.querySelector('.ProseMirror');
-                    if (!editor) return 'no editor';
+                    const editors = document.querySelectorAll('.ProseMirror');
+                    let editor = null;
+                    for (let e of editors) {{
+                        if (e.querySelector('img.wxw-img')) {{
+                            editor = e; break;
+                        }}
+                    }}
+                    if (!editor) return 'no editor with images';
+                    
                     const captions = {json.dumps(image_captions)};
-                    const isEmptyP = el => {{
-                        if (!el || el.tagName !== 'P') return false;
-                        if (el.querySelector('img, pre, table, ul, ol, blockquote, hr')) return false;
-                        const txt = (el.innerText || '').replace(/[\\u200B-\\u200D\\uFEFF]/g, '').trim();
+                    const isEmptyBlock = el => {{
+                        if (!el) return false;
+                        if (el.tagName !== 'P' && el.tagName !== 'SECTION' && el.tagName !== 'DIV') return false;
+                        if (el.querySelector('img, pre, table, ul, ol, blockquote, hr, iframe, video')) return false;
+                        const txt = (el.innerText || '').replace(/[\\u200B-\\u200D\\uFEFF\\n\\r\\t ]/g, '').trim();
                         return txt.length === 0;
                     }};
-                    const captionStyle = 'text-align:center; font-size:13px; color:#888888; line-height:1.6; margin:6px 0 14px; padding:0 8px;';
+                    const captionStyle = 'text-align:center; font-size:13px; color:#888888; line-height:1.6; margin:4px 0 4px; padding:0 8px;';
                     let captioned = 0, removed = 0;
-                    const imgs = Array.from(editor.querySelectorAll('img.wxw-img'));
-                    for (let i = 0; i < imgs.length; i++) {{
-                        let top = imgs[i];
+                    
+                    const getImgs = () => Array.from(editor.querySelectorAll('img.wxw-img'));
+                    const initialImgsCount = getImgs().length;
+                    
+                    for (let i = 0; i < initialImgsCount; i++) {{
+                        let currentImgs = getImgs();
+                        if (i >= currentImgs.length) break;
+                        
+                        let top = currentImgs[i];
                         while (top.parentElement && top.parentElement !== editor) top = top.parentElement;
+                        
+                        // Fix the native 24px margin gap that looks like an empty line
+                        top.style.marginBottom = '2px';
+                        
                         const caption = (captions[i] || '').trim();
-                        let next = top.nextElementSibling;
-                        if (caption && isEmptyP(next)) {{
-                            // 把 trailing 空段就地改造成图注:走 selection + insertText
-                            // 让文字进 ProseMirror 状态,然后直接改 style 属性。
-                            editor.focus();
-                            const sel = window.getSelection();
-                            const range = document.createRange();
-                            range.selectNodeContents(next);
-                            sel.removeAllRanges();
-                            sel.addRange(range);
-                            document.execCommand('insertText', false, caption);
-                            next.setAttribute('style', captionStyle);
-                            captioned++;
-                            continue;
+                        
+                        let emptyCount = 0;
+                        let curr = top.nextElementSibling;
+                        while (curr && isEmptyBlock(curr)) {{
+                            emptyCount++;
+                            curr = curr.nextElementSibling;
                         }}
-                        // 没 caption:把"夹在中间"的空段删掉
-                        while (next && isEmptyP(next)) {{
-                            const after = next.nextElementSibling;
-                            if (!after) break;
+                        
+                        let isLast = false;
+                        if (emptyCount > 0) {{
+                            let lastEmpty = top;
+                            for(let j=0; j<emptyCount; j++) lastEmpty = lastEmpty.nextElementSibling;
+                            if (!lastEmpty || !lastEmpty.nextElementSibling) isLast = true;
+                        }}
+                        
+                        if (emptyCount > 0) {{
+                            let keepCount = caption ? 1 : 0;
+                            if (isLast && emptyCount > keepCount) {{
+                                keepCount++; 
+                            }}
+                            
+                            let deleteCount = emptyCount - keepCount;
+                            
+                            // Delete extra empty blocks by simulating Backspace
+                            for (let d = 0; d < deleteCount; d++) {{
+                                currentImgs = getImgs();
+                                if (i < currentImgs.length) {{
+                                    top = currentImgs[i];
+                                    while (top.parentElement && top.parentElement !== editor) top = top.parentElement;
+                                }}
+                                
+                                let toDelete = top;
+                                for (let j = 0; j <= keepCount; j++) {{
+                                    if (toDelete) toDelete = toDelete.nextElementSibling;
+                                }}
+                                if (toDelete) {{
+                                    editor.focus();
+                                    const sel = window.getSelection();
+                                    const range = document.createRange();
+                                    range.setStart(toDelete, 0);
+                                    range.collapse(true);
+                                    sel.removeAllRanges();
+                                    sel.addRange(range);
+                                    if (document.execCommand('delete')) {{
+                                        removed++;
+                                    }}
+                                }}
+                            }}
+                            
+                            // Apply caption to the kept empty block
+                            if (caption) {{
+                                currentImgs = getImgs();
+                                if (i < currentImgs.length) {{
+                                    top = currentImgs[i];
+                                    while (top.parentElement && top.parentElement !== editor) top = top.parentElement;
+                                }}
+                                let target = top.nextElementSibling;
+                                if (target && isEmptyBlock(target)) {{
+                                    editor.focus();
+                                    const sel = window.getSelection();
+                                    const range = document.createRange();
+                                    range.selectNodeContents(target);
+                                    sel.removeAllRanges();
+                                    sel.addRange(range);
+                                    document.execCommand('insertText', false, caption);
+                                    target.setAttribute('style', captionStyle);
+                                    captioned++;
+                                }}
+                            }}
+                        }} else if (caption) {{
+                            // ProseMirror didn't leave an empty block, but we need a caption!
+                            // We create an empty block by simulating Enter at the end of the image section
                             editor.focus();
                             const sel = window.getSelection();
                             const range = document.createRange();
-                            range.selectNode(next);
+                            range.selectNode(top);
+                            range.collapse(false); // End of image section
                             sel.removeAllRanges();
                             sel.addRange(range);
-                            if (!document.execCommand('delete')) break;
-                            removed++;
-                            next = top.nextElementSibling;
+                            
+                            document.execCommand('insertParagraph');
+                            
+                            // The newly inserted paragraph is now top.nextElementSibling
+                            let newTarget = top.nextElementSibling;
+                            if (newTarget) {{
+                                range.selectNodeContents(newTarget);
+                                sel.removeAllRanges();
+                                sel.addRange(range);
+                                document.execCommand('insertText', false, caption);
+                                newTarget.setAttribute('style', captionStyle);
+                                captioned++;
+                            }}
                         }}
                     }}
                     return JSON.stringify({{captioned, removed}});
