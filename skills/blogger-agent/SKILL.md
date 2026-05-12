@@ -43,7 +43,7 @@ description: Use when the user asks to write a technical article, blog post, or 
     - `~/bin/plantuml.jar`（PlantUML，配合 `!pragma layout smetana` 无需 Graphviz）
   - **最后兜底**：`blogger generate-diagram --type mermaid|plantuml --input x --output x.png`（kroki.io，受公网限制，仅本地工具不可用时使用）
   - 工具未安装时按"附录：本地渲染工具一次性安装"自助安装，不要回退到只用 kroki。
-- **封面 letterbox 工具**：`~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py`（随 skill 分发）——把任意比例的封面 letterbox 到目标比例（默认 16:9，可选 1:1 / 2.35:1），支持 `--bg white|black|auto|#RRGGBB` 与 `-o/--output` alias。详见 §2.3。
+- **封面 letterbox 工具**：`~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py`（随 skill 分发）——把任意比例的封面 letterbox 到目标比例（默认 16:9，可选 1:1），支持 `--bg white|black|auto|#RRGGBB` 与 `-o/--output` alias。详见 §2.3。
 
 ## Workflow
 
@@ -123,7 +123,7 @@ description: Use when the user asks to write a technical article, blog post, or 
 1. **列清单**：把会话里出现过的每张图过一遍，用 `Read` 多模态打开看清楚，记下"画的是什么 + 类型"（UI 截图 / 产品图 / 终端输出 / 手绘 / 表情包 / 照片）。
 2. **逐张定用途**：
    - **当正文配图**：截图、产品图、终端输出、用户手绘流程图——拷进 Payload 目录，按 §2.1 语义化命名规则重命名（`claude-code-task-list.png`，**不是** `IMG_2024.png` 或 `Screenshot_20260508.png`），在对应小节用 `![图注：...](xxx.png)` 引用。
-   - **当封面**：构图横向、视觉冲击强、扣题——重命名为 `cover.png`，按 §2.3 规范 letterbox 到 **16:9**（横向内容）或 **1:1**（视觉/海报型）。
+   - **当封面**：**严禁使用横向流程图/架构图当封面！**（因为太宽，裁剪后分辨率极低）。必须是构图紧凑、视觉冲击强、扣题的图（如 1:1 或 16:9 高分辨率概念图）——重命名为 `cover.png`，按 §2.3 规范 letterbox 到 **16:9** 或 **1:1**。
    - **跳过**：模糊 / 跑题 / 含敏感信息（token、API key、个人邮箱、同事头像、内部路径）——不要勉强用，照常按 §2.1–§2.3 自己生成。**不切题的图比没图更糟**。
 3. **找缺口**：上两步覆盖完之后，剩下的视觉需求才是新生成的目标。封面没有合适素材就单独生成；正文已经有 2 张用户图就别再凑生成图（总数仍受 §2.4"≤3 张"上限约束）。
 4. **位置原则——贴着论点放**：每张图（用户图 + 生成图）必须紧跟它支撑的那段正文。讲到 X 的那段后面就放 X 的图，配 `![图注：...](xxx.png)` + 正文里一句话呼应（如"如图所示，..."）。**禁止把所有图堆到文末当装饰**。
@@ -132,7 +132,7 @@ description: Use when the user asks to write a technical article, blog post, or 
 ⚠ **隐私 / 合规预检**：截图里出现 token / API key / 第三方姓名 / 内部路径 / 真人面孔时，先打码或裁切再用，否则发布等于公开了用户的东西。
 
 #### 2.1 数量与命名
-- **必出 1 张封面**：`cover.png`。
+- **必出 1 张封面**：`cover.png`。**绝对禁止用常规横向流程图、架构图当封面**（作为封面分辨率不合格）。封面必须是使用 `generate_image` 产出的高分辨率概念意象图，或 1:1 的思维导图。
 - **正文图 2–4 张起步，没有硬上限**——把阶段 1A Q4 视觉建模清单里勾的每一项都落地成一张图。文件名要**语义化**——能从名字看出画的是什么。
   - ✓ `harness-vs-runtime.png`、`agent-loop-anatomy.png`、`bench-radar.png`、`state-transitions.png`
   - ✗ `illustration_1.png`、`illustration_2.png`（除非你真的想不到名字了）
@@ -225,20 +225,18 @@ python3 ~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py \
 python3 ~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py \
     path/to/cover-raw.png -o cover.png --ratio 1 --width 1500 --bg white
 ```
-- **不要再强制 2.35:1**。微信公众号一次推送里头条≈16:9、次条 1:1，掘金 / CSDN 也不吃 2.35:1。三家平台都会按各自规范自动截取——封面给 16:9 或 1:1，平台能裁出合适缩略图。
 - 选哪一个：横向内容（`flowchart LR`、`component diagram`、`@startwbs`、对比表）→ **16:9**；中心放射 / 海报式（mindmap、概念图、文字主标题）→ **1:1**。
 - `--bg` 选 `white`（默认，最稳，配合公众号正文白底）/ `black`（配合深色封面避免突兀白边）/ `auto`（取源图四角中位色，DSL 渲染图通常和源图主背景一致）/ `#RRGGBB`（精确指定）。
 - `-o/--output` 是 `--dst` 的 alias；不传则覆盖源文件，**强烈建议显式传 `-o cover.png` 留底**，把原图保留为 `cover-raw.png`。
 - 任意工具（mmdc / PlantUML / matplotlib / AI 绘图）出来的封面，**最后一步**都跑一次 letterbox。原图等比缩放后居中贴到画布上，不裁不拉伸。
 - 设计 `.mmd` / `.puml` 时让内容**自然填满目标比例**：4 个横向节点 + 单行文字默认会出 6:1 极扁条，letterbox 到 16:9 后上下白边巨大；改成 3 行多行节点（标题+说明+示例），高度自然增加，白边压到 ≤ 15%。
-- 上一版规则错误："封面必须严格 2.35:1"——那是只针对微信公众号头条的旧规则，已废弃。
 
 #### 2.4 构图守则（"看起来不协调"的根因 → 提前规避）
 
 1. **横纵比窗口**：
    - **正文插图**：横向 `1:1 ~ 16:9`，或竖向 `1:1 ~ 3:4`。绝不出现接近 `1:3` 的细长条。
-   - **封面 `cover.png`**：默认 **16:9**（横向流程 / 对比 / 时间线），或 **1:1**（视觉海报 / 概念图 / 中心放射）。多平台通用，系统会按各自规范自动截取。最终交付前走 `python3 ~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py <src> -o cover.png --ratio 1.778 --width 1920 --bg white`（16:9）或 `--ratio 1 --width 1500`（1:1）。
-   - 白边占比目标 ≤ 15%。原图过扁（如 4 节点 LR ≈ 6:1）→ letterbox 到 16:9 上下白边过大，改 DSL 让节点变高（多行文字、密度更高）。原图过方（mindmap ≈ 1:1）→ 直接选 1:1 比例的 letterbox，或换横向语义结构（如 `@startwbs`）重画再走 16:9。
+   - **封面 `cover.png`**：**严禁使用常规横向流程图（flowchart LR）、架构图当封面**！这会导致严重的分辨率过低和过宽问题，做插图可以，做封面不合格。默认封面采用 **16:9** 的高分辨率 AI 概念图，或 **1:1**（视觉海报 / 中心放射）。最终交付前走 `python3 ~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py <src> -o cover.png --ratio 1.778 --width 1920 --bg white`（16:9）或 `--ratio 1 --width 1500`（1:1）。
+   - 白边占比目标 ≤ 15%。原图过扁（如 4 节点 LR ≈ 6:1）如果强行 letterbox 会导致上下白边巨大，绝对不可用于封面。原图过方（mindmap ≈ 1:1）→ 直接选 1:1 比例的 letterbox。
    - Mermaid / PlantUML 渲染完用 `Read` 看缩略图，不达标就改 DSL 重渲。
 2. **节点数控制**：单图节点（不含 subgraph）≤ 12。超出就拆图，或改用表格 / 雷达图。
 3. **subgraph 的代价**：Mermaid 多个 subgraph 在 `graph TD` 下默认纵向堆叠，**会把图拉成长条**。两条对策：
@@ -494,7 +492,8 @@ uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger
 - **PlantUML `package` 标题里中文被横线穿过、字叠字**：是 `packageStyle rectangle` 在 CJK 标题处"挖凹槽"宽度算错，外框横线穿过字符。改 `skinparam packageStyle node`，标题改画在框内顶部，无凹槽。
 - **PlantUML 直接 `-tpng` 出图**：mindmap 子语法不响应 `-Sdpi`，输出停在 ~700px 宽，正文里发糊。改走 `-tsvg` + `rsvg-convert -w 1600`。
 - **PlantUML 没设字体直接画中文**：默认走 SansSerif，渲染像马赛克。`skinparam DefaultFontName "PingFang SC"` 必加。
-- **`cover.png` 比例选错或被压扁**：默认 16:9，海报型 1:1。**不要再强制 2.35:1**——那是只针对微信公众号头条的旧规则，次条走 1:1，掘金 / CSDN 都按自己规范裁切。最后一步统一走 `python3 ~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py <src> -o cover.png --ratio 1.778 --width 1920 --bg white`（横向）或 `--ratio 1 --width 1500`（方形）。原图过扁（如 4 节点单行 LR ≈ 6:1）letterbox 后上下白边巨大 → 改 DSL 让节点变高（多行文字 / 增加密度），不要靠 letterbox 蒙混。
+- **用宽幅流程图 / 架构图直接当封面**：这是绝对的禁忌！流程图太宽，做封面会被微信压得很小，分辨率过低，这种图做插图可以，做封面不合格。封面必须用 `generate_image` 画高分辨率概念图，或者画 1:1 的思维导图。
+- **`cover.png` 比例选错或被压扁**：默认 16:9，海报型 1:1。最后一步统一走 `fit_wechat_cover.py`。原图过扁（如单行 LR ≈ 6:1）严禁当封面。
 - **不看渲染结果就引用进文章**：阶段 2.5 的"渲染后必查"六项不能跳。
 - **段落紧贴 `- ` 列表写、没空行**：python-markdown 的 `sane_lists` 扩展严格按 CommonMark——列表前没空行就被并进上一段 `<p>`，发到微信变成 "段落：- item1 - item2" 单行长串，无序列表彻底失效。parser 已加 `_ensure_blank_before_lists` 自动补空行，但写作时仍坚持"段落 → 空行 → 列表"的习惯，避免在不经过本 parser 的工具链（README 预览等）出错。同样适用于 `* ` / `+ ` / `1. ` 数字列表。
 - **Mermaid 写 `-.x.->` / `-.x.->` 想要"被划掉的虚线箭头"**：Mermaid **没有这种语法**，parser 直接抛 InputError，整张图渲染失败。要表达"此路不通"用 `-. 标签 .-> ` 配合中文标签（`-. 此路不通 .->` / `-. 不可行 .->`），或者画两类节点用 `classDef` 区分颜色。

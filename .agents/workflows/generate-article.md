@@ -17,8 +17,8 @@ description: This workflow automates the process of generating high-quality arti
 
 ## 2. 视觉资产生成 (Generate Visual Assets)
 根据主题，使用 `generate_image` 工具生成：
-1. `cover.png`：高质量的概念封面图。
-2. `illustration_x.png`：用于解释核心原理或痛点的正文配图。
+1. `cover.png`：高质量的概念封面图。**严禁使用流程图、架构图等宽幅技术图表作为封面**（因为裁剪后分辨率过低、太宽）。必须使用 `generate_image` 生成，并在提示词中要求：“aspect ratio 16:9, high resolution, centered composition, no text, avoid ultra-wide panoramic formats”。
+2. `illustration_x.png`：用于解释核心原理或痛点的正文配图。可以使用宽幅技术图表。
 
 *注意：生成的图片会暂时保存在 artifact 目录中，在最后一步需要拷贝到 Payload 目录。*
 
