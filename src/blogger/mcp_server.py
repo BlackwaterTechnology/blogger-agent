@@ -124,7 +124,7 @@ def publish_article(
         elif platform.lower() == "bilibili":
             from .platforms.bilibili import BilibiliPublisher
             publisher = BilibiliPublisher()
-            publisher.publish(article_data)
+            publisher.publish(article_data, dry_run=no_publish)
 
         return f"Successfully processed and initiated publish for '{title}' to {platform}. Payload kept at {payload_dir}."
 

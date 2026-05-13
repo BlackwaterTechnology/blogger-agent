@@ -25,7 +25,20 @@ class BilibiliPublisher:
             raise SystemExit("Bilibili upload tab not found. Please open the upload page and retry.")
 
         logger.info(f"Uploading video: {video_path}")
-        self.chrome.set_file_input(t_idx, 'input[type="file"]', video_path)
+        # Target the input specifically inside the video entrance
+        js_video_input = """
+        (function() {
+            const videoInput = Array.from(document.querySelectorAll('input[type="file"]')).find(i => i.accept && i.accept.includes('video'));
+            if (videoInput) {
+                const tempId = "video_upload_input_" + Date.now();
+                videoInput.id = tempId;
+                return "#" + tempId;
+            }
+            return 'input[type="file"]'; // fallback
+        })();
+        """
+        video_selector = self.chrome.execute_javascript(w_idx, t_idx, js_video_input)
+        self.chrome.set_file_input(t_idx, video_selector, video_path)
 
         # Wait for form to load
         logger.info("Waiting for upload form to appear...")
@@ -70,33 +83,39 @@ class BilibiliPublisher:
         self.chrome.execute_javascript(w_idx, t_idx, js_fill_basic)
 
         # Category handling (Tech/AI -> 科技/人工智能)
-        logger.info("Setting category to Tech/AI...")
+        logger.info(f"Setting category to {collection}...")
+        
+        # Mapping for common categories
+        cat_map = {
+            "Tech/AI": ["科技", "人工智能"],
+            "Tech/Code": ["科技", "计算机技术"],
+            "Tech/Software": ["科技", "计算机技术"],
+            "Life": ["生活", "日常"],
+        }
+        
+        target_cats = cat_map.get(collection, ["科技", "人工智能"])
+        
         js_open_category = """
         (function() {
-            const trigger = document.querySelector('.f-select-container');
+            const trigger = document.querySelector('.f-select-container') || document.querySelector('.category-select-content');
             if (trigger) { trigger.click(); return "OPENED"; }
             return "NOT_FOUND";
         })();
         """
         if self.chrome.execute_javascript(w_idx, t_idx, js_open_category) == "OPENED":
             time.sleep(1.0)
-            js_select_tech = """
-            (function() {
-                const tech = Array.from(document.querySelectorAll('.category-item')).find(el => el.innerText.includes('科技'));
-                if (tech) { tech.click(); return "TECH_SELECTED"; }
-                return "TECH_NOT_FOUND";
-            })();
-            """
-            if self.chrome.execute_javascript(w_idx, t_idx, js_select_tech) == "TECH_SELECTED":
-                time.sleep(0.5)
-                js_select_ai = """
-                (function() {
-                    const ai = Array.from(document.querySelectorAll('.category-item')).find(el => el.innerText.includes('人工智能'));
-                    if (ai) { ai.click(); return "AI_SELECTED"; }
-                    return "AI_NOT_FOUND";
-                })();
+            for cat_name in target_cats:
+                js_select_cat = f"""
+                (function() {{
+                    const items = Array.from(document.querySelectorAll('.category-item, .f-select-item'));
+                    const item = items.find(el => el.innerText.includes('{cat_name}'));
+                    if (item) {{ item.click(); return "SELECTED"; }}
+                    return "NOT_FOUND";
+                }})();
                 """
-                self.chrome.execute_javascript(w_idx, t_idx, js_select_ai)
+                res = self.chrome.execute_javascript(w_idx, t_idx, js_select_cat)
+                logger.info(f"Selecting {cat_name}: {res}")
+                time.sleep(0.8)
 
         # Extract tags
         tags_list = article_data.get("tags", ["AI", "Agent", "Architecture"])
@@ -104,7 +123,7 @@ class BilibiliPublisher:
             logger.info(f"Adding tag: {tag}")
             js_focus_tag = """
             (function() {
-                const tagInput = document.querySelector('.tag-container input');
+                const tagInput = document.querySelector('.tag-container input') || document.querySelector('.tag-input input');
                 if (tagInput) {
                     tagInput.focus();
                     tagInput.click();
@@ -120,20 +139,24 @@ class BilibiliPublisher:
                     keystroke "a" using {command down}
                     delay 0.1
                     keystroke "v" using {command down}
-                    delay 0.1
+                    delay 0.2
                     key code 36
                 ''')
-                time.sleep(0.5)
+                time.sleep(0.8)
 
         # Description
         logger.info(f"Filling description: {desc[:50]}...")
         js_fill_desc = f"""
         (function() {{
             const desc = {json.dumps(desc)};
-            const editor = document.querySelector('.video-desc .ql-editor');
+            const editor = document.querySelector('.video-desc .ql-editor') || document.querySelector('.bcc-textarea-container textarea');
             if (editor) {{
                 editor.focus();
-                editor.innerText = desc;
+                if (editor.tagName === 'TEXTAREA') {{
+                    editor.value = desc;
+                }} else {{
+                    editor.innerText = desc;
+                }}
                 editor.dispatchEvent(new Event('input', {{ bubbles: true }}));
                 return "DESC_SET";
             }}
@@ -144,9 +167,43 @@ class BilibiliPublisher:
         
         if cover_path:
             logger.info(f"Uploading cover: {cover_path}")
-            # Bilibili cover upload usually has its own input
-            self.chrome.set_file_input(t_idx, '.cover-upload input[type="file"]', cover_path)
-            time.sleep(2.0)
+            # Dynamically find the cover input if the default selector fails
+            js_find_cover_selector = """
+            (function() {
+                const inputs = Array.from(document.querySelectorAll('input[type="file"]'));
+                const coverInput = inputs.find(input => {
+                    // Skip the one that likely is for video (usually the first one or larger)
+                    if (input.accept && input.accept.includes('video')) return false;
+                    
+                    let p = input.parentElement;
+                    for (let i=0; i<10; i++) {
+                        if (!p) break;
+                        const text = p.innerText || "";
+                        if (text.includes('封面')) return true;
+                        p = p.parentElement;
+                    }
+                    return false;
+                });
+                if (coverInput) {
+                    // Assign a temporary ID to target it precisely
+                    const tempId = "tmp_cover_input_" + Date.now();
+                    coverInput.id = tempId;
+                    return "#" + tempId;
+                }
+                // Fallback to image-only inputs
+                const imgInput = inputs.find(i => i.accept && i.accept.includes('image'));
+                if (imgInput) {
+                    const tempId = "tmp_img_input_" + Date.now();
+                    imgInput.id = tempId;
+                    return "#" + tempId;
+                }
+                return ".cover-upload input[type='file']"; // default fallback
+            })();
+            """
+            cover_selector = self.chrome.execute_javascript(w_idx, t_idx, js_find_cover_selector)
+            logger.info(f"Using cover selector: {cover_selector}")
+            self.chrome.set_file_input(t_idx, cover_selector, cover_path)
+            time.sleep(3.0)
 
         if not dry_run:
             logger.info("Submitting Bilibili video...")

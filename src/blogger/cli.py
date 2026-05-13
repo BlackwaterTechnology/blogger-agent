@@ -39,6 +39,11 @@ def main():
     video_parser.add_argument("--payload", default="articles/test_data", help="Directory containing the article markdown files for metadata")
     video_parser.add_argument("--prompt", help="Prompt for video generation. If not provided, the article content is used.")
     video_parser.add_argument("--platform", default="bilibili,wechat_channels,wechat_video", help="Target platform(s) to publish to, comma-separated (e.g. bilibili,wechat_channels,wechat_video)")
+    video_parser.add_argument(
+        "--no-publish",
+        action="store_true",
+        help="Fill the publish dialog but stop before clicking the final submit button.",
+    )
 
 
     args = parser.parse_args()
@@ -109,7 +114,7 @@ def main():
             from .platforms.bilibili import BilibiliPublisher
             logger.info("Initiating Bilibili publishing flow...")
             publisher = BilibiliPublisher()
-            publisher.publish(article_data)
+            publisher.publish(article_data, dry_run=dry_run)
         elif platform == "wechat_video":
             from .platforms.wechat_video import WechatVideoPublisher
             logger.info("Initiating WeChat Official Account Video publishing flow...")
@@ -160,12 +165,16 @@ def handle_video(args, md_path):
             article_data["video_path"] = video_path
             
             platforms = [p.strip().lower() for p in args.platform.split(",") if p.strip()]
+            dry_run = bool(getattr(args, "no_publish", False))
+            if dry_run:
+                logger.info("--no-publish set: will skip the final submit click on Bilibili.")
+
             for platform in platforms:
                 if platform == "bilibili":
                     from .platforms.bilibili import BilibiliPublisher
                     logger.info("Initiating Bilibili publishing flow...")
                     publisher = BilibiliPublisher()
-                    publisher.publish(article_data)
+                    publisher.publish(article_data, dry_run=dry_run)
                 elif platform == "wechat_channels":
                     from .platforms.wechat_channels import WechatChannelsPublisher
                     logger.info("Initiating WeChat Channels publishing flow...")
