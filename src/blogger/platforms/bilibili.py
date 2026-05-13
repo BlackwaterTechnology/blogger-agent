@@ -144,12 +144,15 @@ class BilibiliPublisher:
                 ''')
                 time.sleep(0.8)
 
-        # Description
+        # Description (简介)
         logger.info(f"Filling description: {desc[:50]}...")
         js_fill_desc = f"""
         (function() {{
             const desc = {json.dumps(desc)};
-            const editor = document.querySelector('.video-desc .ql-editor') || document.querySelector('.bcc-textarea-container textarea');
+            // Bilibili uses Quill editor or a standard textarea
+            const editor = document.querySelector('.video-desc .ql-editor') || 
+                           document.querySelector('.bcc-textarea-container textarea') ||
+                           document.querySelector('textarea[placeholder*="简介"]');
             if (editor) {{
                 editor.focus();
                 if (editor.tagName === 'TEXTAREA') {{
@@ -164,6 +167,33 @@ class BilibiliPublisher:
         }})();
         """
         self.chrome.execute_javascript(w_idx, t_idx, js_fill_desc)
+
+        # Collection (加入合集)
+        if collection:
+            logger.info(f"Adding to collection: {collection}")
+            js_open_series = """
+            (function() {
+                const btn = Array.from(document.querySelectorAll('.app_wrap div, .app_wrap span')).find(el => el.innerText && el.innerText.includes('加入合集'));
+                if (btn) { btn.click(); return "OPENED"; }
+                return "NOT_FOUND";
+            })();
+            """
+            if self.chrome.execute_javascript(w_idx, t_idx, js_open_series) == "OPENED":
+                time.sleep(1.0)
+                # Search and select
+                js_select_series = f"""
+                (function() {{
+                    const collectionName = {json.dumps(collection)};
+                    const items = Array.from(document.querySelectorAll('.bcc-select-item, .series-item'));
+                    const item = items.find(el => el.innerText && el.innerText.includes(collectionName));
+                    if (item) {{
+                        item.click();
+                        return "SELECTED";
+                    }}
+                    return "NOT_FOUND";
+                }})();
+                """
+                self.chrome.execute_javascript(w_idx, t_idx, js_select_series)
         
         if cover_path:
             logger.info(f"Uploading cover: {cover_path}")
