@@ -46,7 +46,7 @@ def publish_article(
     Args:
         title: The title of the article.
         content: The main content of the article in Markdown format.
-        platform: The target platform. Currently 'wechat', 'juejin' and 'csdn' are supported.
+        platform: The target platform. Currently 'wechat', 'juejin', 'csdn' and 'bilibili' are supported.
         summary: A brief summary of the article (must be 60-120 chars for WeChat).
         collection: The name of the collection/tag to add this article to. Must be either 'AI' or 'Agent'.
         author: The author's name.
@@ -55,8 +55,8 @@ def publish_article(
         no_publish: If True, fill the publish dialog but stop before clicking the final submit button.
                     Honored by juejin and csdn; wechat is always manual.
     """
-    if platform.lower() not in ["wechat", "juejin", "csdn"]:
-        return f"Error: Platform '{platform}' is not supported yet. Only 'wechat', 'juejin' and 'csdn' are available."
+    if platform.lower() not in ["wechat", "juejin", "csdn", "bilibili"]:
+        return f"Error: Platform '{platform}' is not supported yet. Only 'wechat', 'juejin', 'csdn' and 'bilibili' are available."
 
     # Create a temporary directory to act as the payload_dir
     payload_dir = Path(tempfile.mkdtemp(prefix="blogger_mcp_"))
@@ -121,6 +121,10 @@ def publish_article(
             from .platforms.csdn import CsdnPublisher
             publisher = CsdnPublisher()
             publisher.publish(article_data, dry_run=no_publish)
+        elif platform.lower() == "bilibili":
+            from .platforms.bilibili import BilibiliPublisher
+            publisher = BilibiliPublisher()
+            publisher.publish(article_data)
 
         return f"Successfully processed and initiated publish for '{title}' to {platform}. Payload kept at {payload_dir}."
 

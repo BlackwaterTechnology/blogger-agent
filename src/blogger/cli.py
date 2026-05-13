@@ -105,6 +105,11 @@ def main():
             logger.info("Initiating CSDN publishing flow...")
             publisher = CsdnPublisher()
             publisher.publish(article_data, dry_run=dry_run)
+        elif platform == "bilibili":
+            from .platforms.bilibili import BilibiliPublisher
+            logger.info("Initiating Bilibili publishing flow...")
+            publisher = BilibiliPublisher()
+            publisher.publish(article_data)
         elif platform == "wechat_video":
             from .platforms.wechat_video import WechatVideoPublisher
             logger.info("Initiating WeChat Official Account Video publishing flow...")
