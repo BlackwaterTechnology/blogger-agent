@@ -20,6 +20,7 @@ dependencies = [
     "python-frontmatter",
     "notebooklm-py",
     "websocket-client",
+    "playwright>=1.59.0",
 ]
 
 [project.scripts]
