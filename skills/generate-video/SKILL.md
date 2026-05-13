@@ -9,6 +9,7 @@ This skill orchestrates video creation across multiple AI providers.
 
 - **Storage**: All generated videos MUST be saved to the `videos/` directory in the project root. Use descriptive subdirectories (e.g., `videos/my-project-explanation/`).
 - **Post-processing**: Many AI providers (like NotebookLM) add "AI-Generated" watermarks. Always suggest or perform watermark removal using the `watermark-remover` skill after a video is downloaded.
+- **Cover Generation**: All videos MUST have a dedicated cover image. Use `notebooklm generate infographic` (with a suitable style like `editorial` or `professional`) to generate one, or use the `generate-diagram` CLI command. Save it as `cover.png` in the video's directory and add `cover: cover.png` to the article's frontmatter.
 - **Metadata & Publishing**: Every video needs a summary or introduction for publishing platforms (WeChat, CSDN, etc.). Use the provider s AI (e.g., `notebooklm ask "为该视频写一段摘要和发布简介"` or `notebooklm summary`) to generate these. 
   - **WeChat Collection**: You MUST read the project root `blogger.toml` -> `[platforms.wechat.accounts.default].video_collections` and select ONE exact case-sensitive match for the collection metadata.
   - Save the results in `metadata.txt` or `README.md` within the video s specific subdirectory.

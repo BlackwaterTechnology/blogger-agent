@@ -292,29 +292,43 @@ class WechatVideoPublisher:
         time.sleep(2)
 
     def _handle_cover_flow(self, w_idx, t_idx, cover_path):
+        if not cover_path:
+            logger.info("No cover specified, skipping cover upload and using WeChat auto-selected frame.")
+            return
         if not self._click_element_by_selector(w_idx, t_idx, ".cover__options__item_empty", "Opening Cover Picker"): return
         time.sleep(3)
         if self._click_element_by_text(w_idx, t_idx, ["Upload file", "上传图片"], "Clicking 'Upload file'"):
             time.sleep(2)
-            self._handle_macos_file_picker(cover_path or Path("videos/notebooklm_auth_modes/cover.png"))
-            time.sleep(5)
-        js_select = """
-        (function() {
-            const imgs = document.querySelectorAll(".weui-desktop-img-picker__img_thumb, .img_pick img, .img_item_bd img, .cover__options__item__image");
-            if (imgs.length === 0) return "NOT_FOUND";
-            const r = imgs[0].getBoundingClientRect();
-            return JSON.stringify({ x: r.left + r.width/2, y: r.top + r.height/2, sx: window.screenX, sy: window.screenY, th: window.outerHeight - window.innerHeight });
-        })()
-        """
-        res_i = self.chrome.execute_javascript(w_idx, t_idx, js_select)
-        if "NOT_FOUND" not in res_i:
-            logger.info("Selecting cover image")
-            g = json.loads(res_i)
-            subprocess.run(["peekaboo", "click", "--coords", f"{int(g['sx']+g['x'])},{int(g['sy']+g['th']+g['y'])}"], check=True)
-            time.sleep(1.5)
-            self._click_element_by_text(w_idx, t_idx, ["Next", "下一步"], "Clicking 'Next' in cover picker")
+            self._handle_macos_file_picker(cover_path)
+            
+            logger.info("Waiting for cover upload to complete...")
+            prefix = cover_path.name[:10]
+            start_time = time.time()
+            for _ in range(10):
+                js_check = f"""
+                (function() {{
+                    const items = Array.from(document.querySelectorAll('.weui-desktop-img-picker__list .weui-desktop-img-picker__item, .img_pick li'));
+                    for (const item of items) {{
+                        if (item.innerText && item.innerText.includes({json.dumps(prefix)})) return "FOUND";
+                    }}
+                    return "WAITING";
+                }})()
+                """
+                if self.chrome.execute_javascript(w_idx, t_idx, js_check) == "FOUND":
+                    break
+                time.sleep(2)
+            
+            elapsed = time.time() - start_time
+            if elapsed < 8:
+                time.sleep(8 - elapsed)
+                
+            self._click_element_by_text(w_idx, t_idx, ["Next", "下一步"], "Clicking 'Next' in cover picker", skip_disabled=True, only_visible=True)
+            
             time.sleep(4)
-            self._click_element_by_text(w_idx, t_idx, ["Done", "完成"], "Clicking 'Done' in cover picker", only_visible=True)
+            for _ in range(5):
+                if self._click_element_by_text(w_idx, t_idx, ["Done", "完成"], "Clicking 'Done' in cover picker", only_visible=True, skip_disabled=True):
+                    break
+                time.sleep(2)
             time.sleep(2)
 
     def _handle_library_page(self, w_idx, t_idx, title):
