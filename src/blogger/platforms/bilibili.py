@@ -22,3 +22,18 @@ class BilibiliPublisher:
             w_idx, t_idx = self.chrome.find_global_tab(["https://member.bilibili.com/platform/upload/video/frame"])
         except Exception:
             raise SystemExit("Bilibili upload tab not found. Please open the upload page and retry.")
+
+        logger.info(f"Uploading video: {video_path}")
+        self.chrome.set_file_input(t_idx, 'input[type="file"]', video_path)
+
+        # Wait for form to load
+        logger.info("Waiting for upload form to appear...")
+        js_wait_form = """
+        (function() {
+            return !!document.querySelector('.video-title .input-val');
+        })();
+        """
+        for _ in range(30):
+            if self.chrome.execute_javascript(w_idx, t_idx, js_wait_form) == "true":
+                break
+            time.sleep(1.0)
