@@ -1,0 +1,14 @@
+[platforms.wechat.accounts.default]
+article_collections = [
+    "AI",
+    "Agent",
+    "AWS",
+    "Web3",
+    "DevOps"
+]
+video_collections = [
+    "agent",
+    "claude code",
+    "程序员",
+    "软件教程"
+]

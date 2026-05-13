@@ -276,7 +276,7 @@ python3 ~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py \
 title: "[有张力、不平铺直叙的标题]"
 author: "Agent"
 desc: "[60–120 字符摘要，凝练主张与反直觉点]"
-collection: "AI"   # 仅限 "AI" 或 "Agent"
+collection: "[必填] 严格从项目根目录 blogger.toml -> platforms.wechat.accounts.default.article_collections 中选择一个（精确匹配，区分大小写）"
 cover: "cover.png" # 必填且固定
 ---
 ```

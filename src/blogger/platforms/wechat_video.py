@@ -5,12 +5,14 @@ import urllib.parse
 from pathlib import Path
 from loguru import logger
 from ..core.jxa_chrome import JxaChromeController
+from ..config import get_wechat_collections
 
 class WechatVideoPublisher:
     def __init__(self):
         self.chrome = JxaChromeController()
 
     def publish(self, article_data: dict) -> None:
+        # 1. Prepare Data
         video_path_raw = article_data.get("video_path")
         if not video_path_raw:
             payload_path = article_data.get("payload_path")
@@ -23,7 +25,15 @@ class WechatVideoPublisher:
         video_path = Path(video_path_raw)
         title = article_data.get("title", video_path.stem)
         desc = article_data.get("desc", "")
-        collection = article_data.get("collection", "AI")
+        
+        # Validate Collection against config
+        allowed_collections = get_wechat_collections(content_type="video")
+        collection = article_data.get("collection", "agent")
+        if collection not in allowed_collections:
+            logger.warning(f"Collection '{collection}' not in allowed video_collections {allowed_collections}. Defaulting to '{allowed_collections[0]}' if available.")
+            if allowed_collections:
+                collection = allowed_collections[0]
+
         cover_path_raw = article_data.get("cover_path")
         cover_path = Path(cover_path_raw) if cover_path_raw else None
 

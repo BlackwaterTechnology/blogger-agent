@@ -3,6 +3,7 @@ from loguru import logger
 import markdown
 import frontmatter
 import re
+from ..config import get_all_wechat_collections
 
 def parse_markdown_payload(md_path: Path) -> dict:
     if not md_path.exists():
@@ -16,7 +17,13 @@ def parse_markdown_payload(md_path: Path) -> dict:
     
     title = post.metadata.get("title", "")
     author = post.metadata.get("author", "")
+    
+    # Validate Collection against config
+    allowed = get_all_wechat_collections()
     collection = post.metadata.get("collection", "AI")
+    if allowed and collection not in allowed:
+        logger.warning(f"Collection '{collection}' in {md_path.name} is not in the allowed list {allowed}. This may cause publishing errors.")
+    
     desc = post.metadata.get("desc", "")
     cover_filename = post.metadata.get("cover", "")
     illustration_filename = post.metadata.get("illustration", "")
