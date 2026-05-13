@@ -133,8 +133,8 @@ class WechatVideoPublisher:
         for selector, label in [(".js_reward_allow_click_cell", "Reward"), (".js_interaction_cell", "Comments")]:
             if self._click_element_by_selector(w_idx, t_idx, selector, f"Opening {label} settings"):
                 time.sleep(2)
-                # Toggle switch in dialog if not checked
-                js_toggle = "const sw = document.querySelector('.weui-desktop-dialog .weui-desktop-switch__input'); if(sw && !sw.checked) sw.click();"
+                # Toggle all switches in dialog if not checked
+                js_toggle = "document.querySelectorAll('.weui-desktop-dialog .weui-desktop-switch__input').forEach(sw => { if(!sw.checked) sw.click(); });"
                 self.chrome.execute_javascript(w_idx, t_idx, js_toggle)
                 time.sleep(1)
                 self._click_element_by_text(w_idx, t_idx, ["Confirm", "确定"], f"Confirming {label} settings", only_visible=True)
