@@ -44,3 +44,52 @@ class BilibiliPublisher:
         if not form_found:
             logger.error("Upload form did not appear after 30 seconds. Video may still be processing or selector changed.")
             return
+
+        logger.info(f"Filling metadata: {title}")
+        js_fill_basic = f"""
+        (function() {{
+            try {{
+                const title = {json.dumps(title)};
+                
+                // 1. Title
+                const titleInput = document.querySelector('.video-title .input-val');
+                if (titleInput) {{
+                    titleInput.value = title;
+                    titleInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                }}
+                
+                // 2. Original Type (自制)
+                const originalRadio = Array.from(document.querySelectorAll('.radio-item')).find(el => el.innerText.includes('自制'));
+                if (originalRadio) originalRadio.click();
+                
+                return "SUCCESS";
+            }} catch(e) {{ return e.message; }}
+        }})();
+        """
+        self.chrome.execute_javascript(w_idx, t_idx, js_fill_basic)
+
+        # Category handling (Tech/AI -> 科技/人工智能)
+        logger.info("Setting category to Tech/AI...")
+        js_fill_category = """
+        (function() {
+            try {
+                const categoryTrigger = document.querySelector('.f-select-container');
+                if (categoryTrigger) categoryTrigger.click();
+                
+                setTimeout(() => {
+                    const tech = Array.from(document.querySelectorAll('.category-item')).find(el => el.innerText.includes('科技'));
+                    if (tech) tech.click();
+                    
+                    setTimeout(() => {
+                        const ai = Array.from(document.querySelectorAll('.category-item')).find(el => el.innerText.includes('人工智能'));
+                        if (ai) ai.click();
+                    }, 500);
+                }, 500);
+                return "CATEGORY_INITIATED";
+            } catch(e) { return e.message; }
+        })();
+        """
+        self.chrome.execute_javascript(w_idx, t_idx, js_fill_category)
+        time.sleep(2.0)
+        
+        logger.info("Metadata filled.")
