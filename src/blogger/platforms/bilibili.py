@@ -167,43 +167,57 @@ class BilibiliPublisher:
         
         if cover_path:
             logger.info(f"Uploading cover: {cover_path}")
-            # Dynamically find the cover input if the default selector fails
-            js_find_cover_selector = """
+            
+            # 1. Click "封面设置" (Cover Setup)
+            js_open_cover = """
             (function() {
-                const inputs = Array.from(document.querySelectorAll('input[type="file"]'));
-                const coverInput = inputs.find(input => {
-                    // Skip the one that likely is for video (usually the first one or larger)
-                    if (input.accept && input.accept.includes('video')) return false;
-                    
-                    let p = input.parentElement;
-                    for (let i=0; i<10; i++) {
-                        if (!p) break;
-                        const text = p.innerText || "";
-                        if (text.includes('封面')) return true;
-                        p = p.parentElement;
-                    }
-                    return false;
-                });
-                if (coverInput) {
-                    // Assign a temporary ID to target it precisely
-                    const tempId = "tmp_cover_input_" + Date.now();
-                    coverInput.id = tempId;
-                    return "#" + tempId;
-                }
-                // Fallback to image-only inputs
-                const imgInput = inputs.find(i => i.accept && i.accept.includes('image'));
-                if (imgInput) {
-                    const tempId = "tmp_img_input_" + Date.now();
-                    imgInput.id = tempId;
-                    return "#" + tempId;
-                }
-                return ".cover-upload input[type='file']"; // default fallback
+                const btn = Array.from(document.querySelectorAll('div, span, button')).find(el => el.innerText && el.innerText.includes('封面设置'));
+                if (btn) { btn.click(); return "CLICKED"; }
+                return "NOT_FOUND";
             })();
             """
-            cover_selector = self.chrome.execute_javascript(w_idx, t_idx, js_find_cover_selector)
-            logger.info(f"Using cover selector: {cover_selector}")
-            self.chrome.set_file_input(t_idx, cover_selector, cover_path)
-            time.sleep(3.0)
+            if self.chrome.execute_javascript(w_idx, t_idx, js_open_cover) == "CLICKED":
+                time.sleep(1.5)
+                
+                # 2. Click "上传封面" (Upload Cover) inside dialog
+                js_click_upload = """
+                (function() {
+                    const btn = Array.from(document.querySelectorAll('.bcc-dialog div, .bcc-dialog span, .bcc-dialog button')).find(el => el.innerText && el.innerText.includes('上传封面'));
+                    if (btn) { btn.click(); return "CLICKED"; }
+                    return "NOT_FOUND";
+                })();
+                """
+                if self.chrome.execute_javascript(w_idx, t_idx, js_click_upload) == "CLICKED":
+                    time.sleep(1.0)
+                    
+                    # 3. Find the input[type="file"] in the dialog and set file
+                    js_find_dialog_input = """
+                    (function() {
+                        const dialog = document.querySelector('.bcc-dialog');
+                        if (!dialog) return "NO_DIALOG";
+                        const input = dialog.querySelector('input[type="file"]');
+                        if (input) {
+                            const tempId = "cover_dialog_input_" + Date.now();
+                            input.id = tempId;
+                            return "#" + tempId;
+                        }
+                        return "NO_INPUT";
+                    })();
+                    """
+                    cover_selector = self.chrome.execute_javascript(w_idx, t_idx, js_find_dialog_input)
+                    if cover_selector.startswith("#"):
+                        self.chrome.set_file_input(t_idx, cover_selector, cover_path)
+                        time.sleep(2.0)
+                        
+                        # 4. Click "完成" or "确定" in the cropper dialog
+                        js_confirm_cover = """
+                        (function() {
+                            const btn = Array.from(document.querySelectorAll('.bcc-dialog button')).find(el => el.innerText && (el.innerText.includes('完成') || el.innerText.includes('确定')));
+                            if (btn) { btn.click(); return "CONFIRMED"; }
+                            return "NOT_FOUND";
+                        })();
+                        """
+                        self.chrome.execute_javascript(w_idx, t_idx, js_confirm_cover)
 
         if not dry_run:
             logger.info("Submitting Bilibili video...")
