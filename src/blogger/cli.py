@@ -38,7 +38,7 @@ def main():
     video_parser = subparsers.add_parser("video", help="Generate a cinematic video and publish to platforms")
     video_parser.add_argument("--payload", default="articles/test_data", help="Directory containing the article markdown files for metadata")
     video_parser.add_argument("--prompt", help="Prompt for video generation. If not provided, the article content is used.")
-    video_parser.add_argument("--platform", default="bilibili,wechat_channels", help="Target platform(s) to publish to, comma-separated (e.g. bilibili,wechat_channels)")
+    video_parser.add_argument("--platform", default="bilibili,wechat_channels,wechat_video", help="Target platform(s) to publish to, comma-separated (e.g. bilibili,wechat_channels,wechat_video)")
 
 
     args = parser.parse_args()
@@ -82,6 +82,7 @@ def main():
         return
 
     article_data = parse_markdown_payload(md_path)
+    article_data["payload_path"] = md_path
     
     platforms = [p.strip().lower() for p in args.platform.split(",") if p.strip()]
     
@@ -104,6 +105,11 @@ def main():
             logger.info("Initiating CSDN publishing flow...")
             publisher = CsdnPublisher()
             publisher.publish(article_data, dry_run=dry_run)
+        elif platform == "wechat_video":
+            from .platforms.wechat_video import WechatVideoPublisher
+            logger.info("Initiating WeChat Official Account Video publishing flow...")
+            publisher = WechatVideoPublisher()
+            publisher.publish(article_data)
         else:
             logger.warning(f"Platform '{platform}' is currently not implemented or unknown for publish command.")
 
@@ -159,6 +165,11 @@ def handle_video(args, md_path):
                     from .platforms.wechat_channels import WechatChannelsPublisher
                     logger.info("Initiating WeChat Channels publishing flow...")
                     publisher = WechatChannelsPublisher()
+                    publisher.publish(article_data)
+                elif platform == "wechat_video":
+                    from .platforms.wechat_video import WechatVideoPublisher
+                    logger.info("Initiating WeChat Official Account Video publishing flow...")
+                    publisher = WechatVideoPublisher()
                     publisher.publish(article_data)
                 elif platform == "none":
                     logger.info("Platform is none, skipping publishing.")
