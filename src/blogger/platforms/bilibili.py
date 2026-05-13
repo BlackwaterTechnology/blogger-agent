@@ -1,5 +1,6 @@
 import time
 import json
+import subprocess
 from loguru import logger
 from ..core.cdp_chrome import CdpChromeController
 
@@ -70,44 +71,58 @@ class BilibiliPublisher:
 
         # Category handling (Tech/AI -> 科技/人工智能)
         logger.info("Setting category to Tech/AI...")
-        js_fill_category = """
+        js_open_category = """
         (function() {
-            try {
-                const categoryTrigger = document.querySelector('.f-select-container');
-                if (categoryTrigger) categoryTrigger.click();
-                
-                setTimeout(() => {
-                    const tech = Array.from(document.querySelectorAll('.category-item')).find(el => el.innerText.includes('科技'));
-                    if (tech) tech.click();
-                    
-                    setTimeout(() => {
-                        const ai = Array.from(document.querySelectorAll('.category-item')).find(el => el.innerText.includes('人工智能'));
-                        if (ai) ai.click();
-                    }, 500);
-                }, 500);
-                return "CATEGORY_INITIATED";
-            } catch(e) { return e.message; }
+            const trigger = document.querySelector('.f-select-container');
+            if (trigger) { trigger.click(); return "OPENED"; }
+            return "NOT_FOUND";
         })();
         """
-        self.chrome.execute_javascript(w_idx, t_idx, js_fill_category)
-        time.sleep(2.0)
+        if self.chrome.execute_javascript(w_idx, t_idx, js_open_category) == "OPENED":
+            time.sleep(1.0)
+            js_select_tech = """
+            (function() {
+                const tech = Array.from(document.querySelectorAll('.category-item')).find(el => el.innerText.includes('科技'));
+                if (tech) { tech.click(); return "TECH_SELECTED"; }
+                return "TECH_NOT_FOUND";
+            })();
+            """
+            if self.chrome.execute_javascript(w_idx, t_idx, js_select_tech) == "TECH_SELECTED":
+                time.sleep(0.5)
+                js_select_ai = """
+                (function() {
+                    const ai = Array.from(document.querySelectorAll('.category-item')).find(el => el.innerText.includes('人工智能'));
+                    if (ai) { ai.click(); return "AI_SELECTED"; }
+                    return "AI_NOT_FOUND";
+                })();
+                """
+                self.chrome.execute_javascript(w_idx, t_idx, js_select_ai)
 
         # Extract tags
         tags_list = article_data.get("tags", ["AI", "Agent", "Architecture"])
         for tag in tags_list[:10]:
-            js_add_tag = f"""
-            (function() {{
+            logger.info(f"Adding tag: {tag}")
+            js_focus_tag = """
+            (function() {
                 const tagInput = document.querySelector('.tag-container input');
-                if (tagInput) {{
-                    tagInput.value = {json.dumps(tag)};
-                    tagInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                    return "READY_FOR_ENTER";
-                }}
+                if (tagInput) {
+                    tagInput.focus();
+                    tagInput.click();
+                    return "FOCUSED";
+                }
                 return "NOT_FOUND";
-            }})();
+            })();
             """
-            if self.chrome.execute_javascript(w_idx, t_idx, js_add_tag) == "READY_FOR_ENTER":
-                self.chrome.run_in_chrome_process('key code 36') # Enter
+            if self.chrome.execute_javascript(w_idx, t_idx, js_focus_tag) == "FOCUSED":
+                # Use clipboard paste to bypass autocomplete issues (Lesson 1/2)
+                subprocess.run(["pbcopy"], input=tag.encode(), check=True)
+                self.chrome.run_in_chrome_process('''
+                    keystroke "a" using {command down}
+                    delay 0.1
+                    keystroke "v" using {command down}
+                    delay 0.1
+                    key code 36
+                ''')
                 time.sleep(0.5)
 
         # Description
@@ -117,6 +132,7 @@ class BilibiliPublisher:
             const desc = {json.dumps(desc)};
             const editor = document.querySelector('.video-desc .ql-editor');
             if (editor) {{
+                editor.focus();
                 editor.innerText = desc;
                 editor.dispatchEvent(new Event('input', {{ bubbles: true }}));
                 return "DESC_SET";
@@ -126,4 +142,27 @@ class BilibiliPublisher:
         """
         self.chrome.execute_javascript(w_idx, t_idx, js_fill_desc)
         
+        if cover_path:
+            logger.info(f"Uploading cover: {cover_path}")
+            # Bilibili cover upload usually has its own input
+            self.chrome.set_file_input(t_idx, '.cover-upload input[type="file"]', cover_path)
+            time.sleep(2.0)
+
+        if not dry_run:
+            logger.info("Submitting Bilibili video...")
+            js_submit = """
+            (function() {
+                const btn = Array.from(document.querySelectorAll('.submit-container .bcc-button')).find(el => el.innerText.includes('立即投稿'));
+                if (btn) {
+                    btn.click();
+                    return "SUBMITTED";
+                }
+                return "SUBMIT_BTN_NOT_FOUND";
+            })();
+            """
+            res = self.chrome.execute_javascript(w_idx, t_idx, js_submit)
+            logger.info(f"Submission result: {res}")
+        else:
+            logger.info("Dry-run: skipping submission.")
+
         logger.info("Metadata filled.")
