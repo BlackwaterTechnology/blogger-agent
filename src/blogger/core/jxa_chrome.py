@@ -36,7 +36,7 @@ function run() {{
                     if (!url) continue;
 
                     for (var p = 0; p < prefixes.length; p++) {{
-                        if (url.startsWith(prefixes[p])) {{
+                        if (url.indexOf(prefixes[p]) !== -1) {{
                             var winId = win.id();
                             var tabId = tab.id();
                             win.index = 1;

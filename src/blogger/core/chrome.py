@@ -348,7 +348,7 @@ end tell
         if not url_prefixes:
             return "true"
         return " or ".join(
-            f'tabUrl starts with "{self._escape_applescript(prefix)}"' for prefix in url_prefixes
+            f'tabUrl contains "{self._escape_applescript(prefix)}"' for prefix in url_prefixes
         )
 
 

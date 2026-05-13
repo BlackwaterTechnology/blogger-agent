@@ -2,7 +2,7 @@ import json
 from chrome import ChromeDomController
 
 system_chrome = ChromeDomController()
-w_idx, t_idx = system_chrome.find_global_tab(["https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_edit"])
+w_idx, t_idx = system_chrome.find_global_tab(["t=media/appmsg_edit"])
 
 js_code = """
 (function() {

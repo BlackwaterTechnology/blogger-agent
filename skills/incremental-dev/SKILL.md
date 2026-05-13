@@ -11,7 +11,8 @@ This skill enforces a high-integrity workflow for developing complex browser and
 2.  **Verify or Die**: For every action, you MUST verify the result before moving to the next.
     *   **Browser**: Use JXA/JS to check for element existence or state changes.
     *   **OS/Dialogs**: Use `peekaboo image` to take a screenshot after the action.
-3.  **No Blind Typing**: Before typing or sending hotkeys, use `peekaboo app switch` and check if the target window/input is actually focused.
+    *   **Dialog Triggers**: Before sending `command+shift+g` or `type`, you MUST verify the target dialog is active (e.g., using `peekaboo list windows` or checking if the browser loses focus/receives an AX window change).
+3.  **Atomic Command Snippets**: Test individual clicks or keystrokes as one-off commands before integrating them into the main loop.
 4.  **Traceable Debugging**: Always save screenshots of failures and intermediate states to a dedicated `screenshots/` directory for analysis.
 
 ## Workflow Pattern
