@@ -91,5 +91,39 @@ class BilibiliPublisher:
         """
         self.chrome.execute_javascript(w_idx, t_idx, js_fill_category)
         time.sleep(2.0)
+
+        # Extract tags
+        tags_list = article_data.get("tags", ["AI", "Agent", "Architecture"])
+        for tag in tags_list[:10]:
+            js_add_tag = f"""
+            (function() {{
+                const tagInput = document.querySelector('.tag-container input');
+                if (tagInput) {{
+                    tagInput.value = {json.dumps(tag)};
+                    tagInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    return "READY_FOR_ENTER";
+                }}
+                return "NOT_FOUND";
+            }})();
+            """
+            if self.chrome.execute_javascript(w_idx, t_idx, js_add_tag) == "READY_FOR_ENTER":
+                self.chrome.run_in_chrome_process('key code 36') # Enter
+                time.sleep(0.5)
+
+        # Description
+        logger.info(f"Filling description: {desc[:50]}...")
+        js_fill_desc = f"""
+        (function() {{
+            const desc = {json.dumps(desc)};
+            const editor = document.querySelector('.video-desc .ql-editor');
+            if (editor) {{
+                editor.innerText = desc;
+                editor.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                return "DESC_SET";
+            }}
+            return "DESC_NOT_FOUND";
+        }})();
+        """
+        self.chrome.execute_javascript(w_idx, t_idx, js_fill_desc)
         
         logger.info("Metadata filled.")
