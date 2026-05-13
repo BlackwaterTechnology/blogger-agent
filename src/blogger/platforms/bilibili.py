@@ -19,7 +19,7 @@ class BilibiliPublisher:
             return
 
         try:
-            w_idx, t_idx = self.chrome.find_global_tab(["https://member.bilibili.com/platform/upload/video/frame"])
+            w_idx, t_idx = self.chrome.find_global_tab(["https://member.bilibili.com/platform/upload/video"])
         except Exception:
             raise SystemExit("Bilibili upload tab not found. Please open the upload page and retry.")
 
@@ -33,7 +33,14 @@ class BilibiliPublisher:
             return !!document.querySelector('.video-title .input-val');
         })();
         """
+        form_found = False
         for _ in range(30):
-            if self.chrome.execute_javascript(w_idx, t_idx, js_wait_form) == "true":
+            res = self.chrome.execute_javascript(w_idx, t_idx, js_wait_form)
+            if res == "True" or res == "true":
+                form_found = True
                 break
             time.sleep(1.0)
+            
+        if not form_found:
+            logger.error("Upload form did not appear after 30 seconds. Video may still be processing or selector changed.")
+            return
