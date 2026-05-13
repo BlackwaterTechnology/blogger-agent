@@ -26,6 +26,7 @@ def parse_markdown_payload(md_path: Path) -> dict:
     
     desc = post.metadata.get("desc", "")
     cover_filename = post.metadata.get("cover", "")
+    video_filename = post.metadata.get("video", "")
     illustration_filename = post.metadata.get("illustration", "")
     content = post.content.strip()
     
@@ -167,6 +168,10 @@ def parse_markdown_payload(md_path: Path) -> dict:
     logger.info(f"Found {len(local_images)} local images inline.")
     
     cover_path = payload_dir / cover_filename if cover_filename and (payload_dir / cover_filename).exists() else None
+    video_path = payload_dir / video_filename if video_filename and (payload_dir / video_filename).exists() else None
+
+    if video_path:
+        logger.info(f"Found video: {video_path.name}")
     
     # We still keep the original illustration check for backwards compatibility if no inline images exist
     illustration_path = payload_dir / illustration_filename if illustration_filename and (payload_dir / illustration_filename).exists() else None
@@ -197,6 +202,7 @@ def parse_markdown_payload(md_path: Path) -> dict:
         "content": content,
         "html_content": html_content,
         "cover_path": cover_path,
+        "video_path": video_path,
         "illustration_path": illustration_path,
         "local_images": all_illustrations,
         "image_captions": image_captions,
