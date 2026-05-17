@@ -1,6 +1,7 @@
+---
 name: incremental-dev
 description: Disciplined, step-by-step automation development. Mandates granular task decomposition, continuous verification via screenshots, and unit testing for every UI interaction. Prevents "black box" failures in complex browser/OS automation flows. Activates when starting new automation features or debugging stuck flows.
-
+---
 # Incremental Development Skill (Step-by-Step Automation)
 
 This skill enforces a high-integrity workflow for developing complex browser and OS-level automation. It is designed to replace "big bang" coding with a "verify-at-every-click" philosophy.

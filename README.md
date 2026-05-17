@@ -163,3 +163,13 @@ Want to chat directly or join the reader / contributor discussion group? Add me 
 ## 🤝 Contributing
 
 Contributions are welcome! If you're interested in adding support for a new platform like Juejin or CSDN, or implementing the AI generation layer, feel free to open a PR.
+
+## 🎬 Publish Video
+
+Use the `publish` command with the video payload and platform:
+
+```bash
+python3 -m src.blogger.cli publish \
+ --payload videos/notebooklm_auth_modes/payload.md \
+ --platform wechat_video
+```

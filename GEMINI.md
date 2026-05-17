@@ -2,58 +2,66 @@
 
 ## Project Overview
 
-`blogger-agent` is an AI agent automation project. The ultimate vision is to allow a user to provide a topic or viewpoint, from which an AI Agent will automatically generate a complete article and publish it to mainstream blog platforms such as WeChat Official Accounts (微信公众号), Juejin (稀土掘金), and CSDN.
+`blogger-agent` is an AI agent automation project. The ultimate vision is to allow a user to provide a topic or viewpoint, from which an AI Agent will automatically generate a complete article and publish it to mainstream blog platforms (WeChat Official Accounts, Juejin, CSDN) and short-video platforms (Bilibili, WeChat Channels).
 
-Currently, the project focuses on the core capability of automating the publishing of local Markdown articles to WeChat Official Accounts. It has been refactored into a standard, extensible Python package with built-in MCP (Model Context Protocol) support for modern AI agent integrations.
+The project offers core capabilities for:
+1. **Article Publishing**: Automating the publishing of local Markdown articles to web-based editors.
+2. **Video Generation**: Generating cinematic videos from documents or URLs using Google NotebookLM.
+3. **Diagram Generation**: Creating infographics and technical diagrams via Kroki.
 
 ## Architecture
 
-This tool uses Python and AppleScript (via `ChromeDomController` and `rookiepy`) to interact with a running instance of Google Chrome on macOS. It parses Markdown files and uses browser automation to inject the content into the web editor.
+This tool uses Python and AppleScript to interact with a running instance of Google Chrome on macOS. It finds the target platform's tab and injects content using a combination of JavaScript execution and simulated keystrokes.
 
-It offers two primary interfaces for Agents:
-1. **MCP Server (`mcp_server.py`)**: Exposes structured JSON-RPC tools (`publish_article`) for modern IDEs like Claude Code, Cursor, and Codex.
-2. **CLI Agent Skill (`cli.py`)**: Provides traditional terminal execution paths (via `uvx` and `SKILL.md`) for Bash-driven agents.
+### Key Components
+- **Chrome Controllers**: Specialized controllers in `src/blogger/core/` (`cdp_chrome.py`, `jxa_chrome.py`, `chrome.py`) handle different aspects of browser interaction. CDP-based controllers allow for deeper interaction, while JXA handles macOS focus management.
+- **Markdown Parser**: `src/blogger/core/markdown_parser.py` uses `python-frontmatter` to parse articles, handling metadata and local image path rewriting.
+- **Platform Publishers**: Platform-specific state machines in `src/blogger/platforms/` manage the complex UI flows for each site.
+- **Interfaces**:
+    1. **MCP Server (`mcp_server.py`)**: Exposes structured JSON-RPC tools for modern IDEs. Note: it uses a round-trip mechanism where it materializes a temp Markdown file for the parser to consume.
+    2. **CLI Agent Skill (`cli.py`)**: Provides traditional terminal execution paths.
 
 ## Directory Structure
 
-*   **`src/blogger/`**: The core Python package.
-    *   **`cli.py`**: The CLI entry point for terminal execution (`blogger --payload ...`).
-    *   **`mcp_server.py`**: The FastMCP server exposing tools for Claude Code and Cursor.
-    *   **`core/`**: Core utilities including `chrome.py` (browser automation) and `markdown_parser.py`.
-    *   **`platforms/`**: Platform-specific publisher state machines (e.g., `wechat.py`).
-*   **`pyproject.toml`**: Standard Python packaging and dependency management.
-*   **`Makefile`**: Standard orchestration for development tasks (`make install`, etc.).
-*   **`skills/blogger-agent/SKILL.md`**: The traditional Agent Skill definition (2026 Open Agent Skills compatible).
-*   **`articles/test_data/`**: Directory containing sample markdown articles and assets for testing the publishing flow.
+*   **`src/blogger/`**: Core Python package.
+    *   **`cli.py`**: CLI entry point and high-level orchestration (handling subcommands like `video`).
+    *   **`mcp_server.py`**: FastMCP server for tool-based agents.
+    *   **`core/`**:
+        *   `cdp_chrome.py` / `jxa_chrome.py` / `chrome.py`: Browser automation core.
+        *   `markdown_parser.py`: YAML frontmatter and image processing.
+        *   `diagrams.py`: Kroki-based diagram generation.
+    *   **`platforms/`**: Publisher implementations.
+        *   `wechat.py`, `csdn.py`, `juejin.py`: Blog platforms.
+        *   `bilibili.py`, `wechat_video.py`, `wechat_channels.py`: Video platforms.
+*   **`skills/`**: Agent skill definitions (`SKILL.md` files) for various capabilities.
+*   **`watermark_remover.py`**: Utility for removing AI-generated watermarks from videos.
+*   **`monitor_video.sh`**: Reference script for the background polling workflow.
 
-## Usage
+## Video Generation Workflow (NotebookLM)
 
-### 1. Zero-Install Integration (For Agents)
+Video generation via Google NotebookLM is a long-running process (15–45 minutes). To maintain efficiency and avoid blocking, agents follow a specialized subagent-based workflow.
 
-**MCP (Claude Code, Gemini CLI, Codex):**
+### 1. Generation
+Initiate cinematic video generation:
 ```bash
-claude mcp add blogger-agent uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger-mcp
+notebooklm generate video --format cinematic "Instructions" --json
 ```
 
-**Skill (Traditional Bash Agents):**
+### 2. Background Polling & Download (Subagent Pattern)
+Do not wait in the main process. Dispatch a subagent (`@generalist`) to handle the polling and download asynchronously:
+
+- **Phase A (Initial Wait)**: `sleep 600`. (Cinematic videos never finish in under 10 minutes).
+- **Phase B (Polling Loop)**: Every 60 seconds, check status using `notebooklm artifact list -n {notebook_id} --json`.
+- **Phase C (Completion)**: Once `status` is `completed`, download the video:
+  ```bash
+  notebooklm download video ./videos/[topic]/video.mp4 -a {artifact_id} -n {notebook_id}
+  ```
+
+### 3. Post-Processing
+After download, the video typically requires watermark removal:
 ```bash
-uvx --from git+https://github.com/BlackwaterTechnology/blogger-agent.git blogger --payload ./payload_dir
+python watermark_remover.py ./videos/[topic]/video.mp4 --model lama
 ```
-
-### 2. Manual Local Development
-
-```bash
-# Setup
-make install
-
-# Run Publisher manually
-blogger --payload articles/test_data/
-```
-
-## Development Context & Guidelines
-
-*   **Extensibility**: When adding new platforms (like Juejin or CSDN), create a new class in `src/blogger/platforms/` that conforms to the publisher pattern, and register it in the CLI parser and MCP tool definitions.
-*   **No Framework Overhead**: Keep dependencies minimal. Ensure that any newly added logic is abstracted cleanly from the `WechatPublisher` state machine.
 
 ## Browser Automation Lessons Learned
 
@@ -72,7 +80,7 @@ CSDN 的文章标签输入框是 Element UI 的 `el-autocomplete` 组件（place
 | **Escape 关闭下拉** | 打字 → `key code 53`(Esc) → Enter | Esc 冒泡关闭了父级发布对话框（modal） |
 | **JS 隐藏下拉 + 分离 Enter** | AppleScript 打字 → JS `display:none` → AppleScript Enter | `execute_javascript` 通过 JXA 调用会**抢走 Chrome input 焦点**，后续 Enter 打空 |
 | **Up 箭头取消高亮** | 打字 → `key code 126`(↑) → Enter | el-autocomplete 的 debounce=0 或极短，打字过程中 autocomplete 已出现并高亮，Up 时机不对 |
-| **缩短延迟** | `keystroke "Agent"` → `delay 0.05` → Enter | AppleScript `keystroke` 是逐字符发送的，0.05s 时文字可能还没打完，导致标签错位 |
+| **缩短延迟** | `keystroke "Agent"` → `delay 0.05` | AppleScript `keystroke` 是逐字符发送的，0.05s 时文字可能还没打完，导致标签错位 |
 | **纯 JS KeyboardEvent** | JS 设值 + `dispatchEvent(new KeyboardEvent('keydown', {key:'Enter'}))` | Vue 不响应合成的 KeyboardEvent |
 
 #### ✅ 最终方案：剪贴板粘贴
@@ -94,7 +102,7 @@ key code 36                          # Enter → 走"添加自定义标签"路�
 
 #### 通用规则
 
-1. **绝不在 AppleScript 操作间插入 JS 调用**：`execute_javascript`（通过 JXA/osascript）会导致 Chrome 的 input 失去焦点。打字和 Enter 必须在同一个 AppleScript 调用中。
+1. **绝不在 AppleScript 操作间插入 JS 调用**：`execute_javascript`（通过 JXA/osascript）会导致 Chrome 的 input 焦点丢失。打字和 Enter 必须在同一个 AppleScript 调用中。
 2. **粘贴优于打字**：对于有 autocomplete/下拉联想的输入框，用 `pbcopy` + `Cmd+V` 代替 `keystroke`，避免逐字符输入触发搜索。
 3. **面板关闭用精确按钮**：标签面板的关闭使用 `button.modal__close-button`（X 按钮），不要点击面板外部（可能点到其他控件）或按 Escape（会关闭父 modal）。
 4. **先标签后分类**：标签和分类共用 `button.tag__btn-tag` 类名，必须先设置标签并关闭面板后再设置分类，避免 DOM 选择器互相干扰。
