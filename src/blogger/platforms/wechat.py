@@ -580,8 +580,9 @@ class WechatPublisher:
                 js_move_cursor_end = """
                 (function() {
                     try {
-                        let editor = document.querySelector('.ProseMirror');
-                        if (!editor) return "Editor not found";
+                        const allEditors = Array.from(document.querySelectorAll('.ProseMirror')).filter(e => e.clientHeight > 0);
+                        if (allEditors.length === 0) return "Editor not found";
+                        let editor = allEditors[allEditors.length - 1];
                         
                         editor.focus();
                         const selection = window.getSelection();
@@ -604,7 +605,8 @@ class WechatPublisher:
                     keystroke "v" using {command down}
                 ''')
                 logger.info("Successfully initiated cover image paste/upload.")
-                time.sleep(2.0)
+                # Wait longer for cover image to upload and be indexed by WeChat
+                time.sleep(6.0)
             except Exception as e:
                 logger.warning(f"Failed to insert cover image: {e}")
             
@@ -624,121 +626,130 @@ class WechatPublisher:
         logger.info("Content copied to clipboard. If the text is missing, you can manually click inside the editor and press Cmd+V.")
         
         logger.info("Setting up cover...")
-        js_cover_setup = """
-        (function() {
-            try {
-                function clickReactElement(el) {
+        # Inject the expected total number of images (inline + cover) to avoid race conditions 
+        # picking the wrong image before the cover has finished uploading.
+        expected_total_images = len(local_images) + (1 if cover_path else 0)
+        js_cover_setup = f"""
+        (function() {{
+            try {{
+                function clickReactElement(el) {{
                     if (!el) return false;
                     const key = Object.keys(el).find(k => k.startsWith('__reactProps$') || k.startsWith('__reactEventHandlers$'));
-                    if (key && el[key] && el[key].onClick) {
-                        el[key].onClick({
-                            preventDefault: () => {},
-                            stopPropagation: () => {},
-                            nativeEvent: new MouseEvent('click', {bubbles: true, cancelable: true}),
+                    if (key && el[key] && el[key].onClick) {{
+                        el[key].onClick({{
+                            preventDefault: () => {{}},
+                            stopPropagation: () => {{}},
+                            nativeEvent: new MouseEvent('click', {{bubbles: true, cancelable: true}}),
                             isDefaultPrevented: () => false,
                             isPropagationStopped: () => false,
                             target: el,
                             currentTarget: el
-                        });
+                        }});
                         return true;
-                    }
+                    }}
                     el.click();
                     return true;
-                }
+                }}
 
-                let state = { is_done: false };
+                let state = {{ is_done: false }};
                 let action = '';
 
                 const coverPreview = document.querySelector('.js_cover_preview_square, .cover_preview_wrapper, .js_cover_preview_new, .first_appmsg_cover');
-                if (coverPreview && coverPreview.clientHeight > 0) {
+                if (coverPreview && coverPreview.clientHeight > 0) {{
                     state.is_done = true;
                     action = 'Cover already set';
-                    return JSON.stringify({state: state, action: action, is_done: true});
-                }
+                    return JSON.stringify({{state: state, action: action, is_done: true}});
+                }}
 
-                if (window.__wechat_automation_cover_done_clicked && (Date.now() - window.__wechat_automation_cover_done_clicked < 5000)) {
+                if (window.__wechat_automation_cover_done_clicked && (Date.now() - window.__wechat_automation_cover_done_clicked < 5000)) {{
                     action = 'Waiting for cover preview to render...';
-                    return JSON.stringify({state: state, action: action, is_done: false});
-                }
+                    return JSON.stringify({{state: state, action: action, is_done: false}});
+                }}
 
                 const dialogs = Array.from(document.querySelectorAll('.weui-desktop-dialog'));
                 const activeDialog = dialogs.find(d => d.style.display !== 'none' && d.clientHeight > 0);
                 
-                if (activeDialog) {
+                if (activeDialog) {{
                     const btns = Array.from(activeDialog.querySelectorAll('button'));
                     
                     const isImageDialog = activeDialog.innerText.includes('Select an image') || activeDialog.innerText.includes('选择图片');
                     
-                    if (isImageDialog) {
+                    if (isImageDialog) {{
                         const nextBtn = btns.find(b => b.innerText.includes('Next') || b.innerText.includes('下一步'));
-                        if (nextBtn && nextBtn.clientHeight > 0) {
+                        if (nextBtn && nextBtn.clientHeight > 0) {{
                             const items = Array.from(activeDialog.querySelectorAll('.appmsg_content_img_item'));
                             const selected = items.find(i => i.classList.contains('selected') || i.querySelector('.selected'));
                             
-                            if (!selected && items.length > 0) {
+                            if (!selected && items.length > 0) {{
+                                const expected = {expected_total_images};
+                                if (items.length < expected) {{
+                                    action = `Waiting for cover to appear in dialog (current: ${{items.length}}, expected: ${{expected}})`;
+                                    return JSON.stringify({{state: state, action: action, is_done: false}});
+                                }}
                                 clickReactElement(items[items.length - 1]);
                                 action = 'Selected last image in dialog (cover)';
-                                return JSON.stringify({state: state, action: action, is_done: false});
-                            }
+                                return JSON.stringify({{state: state, action: action, is_done: false}});
+                            }}
                             
-                            if (selected && !nextBtn.classList.contains('weui-desktop-btn_disabled')) {
+                            if (selected && !nextBtn.classList.contains('weui-desktop-btn_disabled')) {{
                                 setTimeout(() => clickReactElement(nextBtn), 200);
                                 action = 'Clicked Next in image dialog';
-                                return JSON.stringify({state: state, action: action, is_done: false});
-                            }
-                        }
-                    } else {
+                                return JSON.stringify({{state: state, action: action, is_done: false}});
+                            }}
+                        }}
+                    }} else {{
                         const doneBtn = btns.find(b => b.innerText.includes('Confirm') || b.innerText.includes('Done') || b.innerText.includes('完成') || b.innerText.includes('确定') || b.innerText.includes('Next') || b.innerText.includes('下一步'));
-                        if (doneBtn && doneBtn.clientHeight > 0 && !doneBtn.classList.contains('weui-desktop-btn_disabled')) {
+                        if (doneBtn && doneBtn.clientHeight > 0 && !doneBtn.classList.contains('weui-desktop-btn_disabled')) {{
                             window.__wechat_automation_cover_done_clicked = Date.now();
                             setTimeout(() => clickReactElement(doneBtn), 200);
                             action = 'Clicked Done in crop dialog';
-                            return JSON.stringify({state: state, action: action, is_done: false});
-                        }
-                    }
+                            return JSON.stringify({{state: state, action: action, is_done: false}});
+                        }}
+                    }}
                     
                     action = 'Waiting in dialog...';
-                    return JSON.stringify({state: state, action: action, is_done: false});
-                }
+                    return JSON.stringify({{state: state, action: action, is_done: false}});
+                }}
 
                 const selectBtns = Array.from(document.querySelectorAll('.js_selectCoverFromContent'));
                 const visibleSelectBtn = selectBtns.find(b => b.clientHeight > 0 || b.offsetWidth > 0);
-                if (visibleSelectBtn) {
+                if (visibleSelectBtn) {{
                     clickReactElement(visibleSelectBtn);
                     action = 'Clicked Choose from content';
-                    return JSON.stringify({state: state, action: action, is_done: false});
-                }
+                    return JSON.stringify({{state: state, action: action, is_done: false}});
+                }}
                 
                 const emptyCover = document.querySelector('.select-cover__btn');
                 const filledCoverWrap = document.querySelector('.js_chooseCoverWrap');
                 
-                if (emptyCover && (emptyCover.clientHeight > 0 || emptyCover.offsetWidth > 0)) {
-                    const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true, cancelable: true });
+                if (emptyCover && (emptyCover.clientHeight > 0 || emptyCover.offsetWidth > 0)) {{
+                    const mouseEnterEvent = new MouseEvent('mouseenter', {{ bubbles: true, cancelable: true }});
                     emptyCover.dispatchEvent(mouseEnterEvent);
                     clickReactElement(emptyCover);
-                }
+                }}
                 
-                if (filledCoverWrap && (filledCoverWrap.clientHeight > 0 || filledCoverWrap.offsetWidth > 0)) {
-                    const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true, cancelable: true });
+                if (filledCoverWrap && (filledCoverWrap.clientHeight > 0 || filledCoverWrap.offsetWidth > 0)) {{
+                    const mouseEnterEvent = new MouseEvent('mouseenter', {{ bubbles: true, cancelable: true }});
                     filledCoverWrap.dispatchEvent(mouseEnterEvent);
                     clickReactElement(filledCoverWrap);
-                }
+                }}
                 
-                if (selectBtns.length > 0) {
-                    for (let btn of selectBtns) {
+                if (selectBtns.length > 0) {{
+                    for (let btn of selectBtns) {{
                         clickReactElement(btn);
-                    }
+                    }}
                     action = 'Hovered cover area and clicked Choose from content';
-                    return JSON.stringify({state: state, action: action, is_done: false});
-                }
+                    return JSON.stringify({{state: state, action: action, is_done: false}});
+                }}
 
                 action = 'Cover UI not found';
-                return JSON.stringify({state: state, action: action, is_done: false});
-            } catch (e) {
-                return JSON.stringify({state: {error: e.toString()}, action: 'Error: ' + e.toString(), is_done: false});
-            }
-        })();
+                return JSON.stringify({{state: state, action: action, is_done: false}});
+            }} catch (e) {{
+                return JSON.stringify({{state: {{error: e.toString()}}, action: 'Error: ' + e.toString(), is_done: false}});
+            }}
+        }})();
         """
+
         if cover_path:
             self.run_ui_state_machine("Cover Setup", w_idx, t_idx, js_cover_setup, max_steps=15)
             
@@ -746,8 +757,9 @@ class WechatPublisher:
             js_delete_cover = """
             (function() {
                 try {
-                    const editor = document.querySelector('.ProseMirror');
-                    if (!editor) return "Editor not found";
+                    const allEditors = Array.from(document.querySelectorAll('.ProseMirror')).filter(e => e.clientHeight > 0);
+                    if (allEditors.length === 0) return "Editor not found";
+                    const editor = allEditors[allEditors.length - 1];
 
                     // Filter out ProseMirror-separator (zero-size internal placeholder).
                     // Real WeChat content images carry the wxw-img class.
