@@ -30,6 +30,14 @@ def parse_markdown_payload(md_path: Path) -> dict:
     illustration_filename = post.metadata.get("illustration", "")
     content = post.content.strip()
     
+    # 避免正文开头重复出现标题（很多 Markdown 写作习惯会在正文开头写 # 标题，发布平台通常有独立标题字段）
+    lines = content.splitlines()
+    if lines and lines[0].strip().startswith('#'):
+        heading_text = lines[0].strip().lstrip('#').strip()
+        if heading_text == title.strip():
+            lines.pop(0)
+            content = '\n'.join(lines).strip()
+            
     if desc:
         if len(desc) < 60 or len(desc) > 120:
             logger.warning(f"Summary (简介) length is {len(desc)} chars. It should be between 60 and 120 chars!")
