@@ -20,9 +20,18 @@ class BilibiliPublisher:
             return
 
         try:
+            # 1. Try to find an existing upload tab
             w_idx, t_idx = self.chrome.find_global_tab(["https://member.bilibili.com/platform/upload/video"])
         except Exception:
-            raise SystemExit("Bilibili upload tab not found. Please open the upload page and retry.")
+            try:
+                # 2. If not found, look for any Bilibili member page (logged in)
+                logger.info("Bilibili upload tab not found. Searching for member homepage...")
+                w_idx, t_idx = self.chrome.find_global_tab(["https://member.bilibili.com"])
+                logger.info("Found Bilibili member page. Navigating to upload...")
+                self.chrome.set_tab_url(w_idx, t_idx, "https://member.bilibili.com/platform/upload/video")
+                time.sleep(2.0) # Wait for navigation
+            except Exception:
+                raise SystemExit("Bilibili upload tab not found. Please open the Bilibili member page (https://member.bilibili.com) and ensure you are logged in.")
 
         logger.info(f"Uploading video: {video_path}")
         # Target the input specifically inside the video entrance
@@ -87,6 +96,7 @@ class BilibiliPublisher:
         
         # Mapping for common categories
         cat_map = {
+            "agent": ["科技", "人工智能"],
             "Tech/AI": ["科技", "人工智能"],
             "Tech/Code": ["科技", "计算机技术"],
             "Tech/Software": ["科技", "计算机技术"],
@@ -97,19 +107,31 @@ class BilibiliPublisher:
         
         js_open_category = """
         (function() {
-            const trigger = document.querySelector('.f-select-container') || document.querySelector('.category-select-content');
-            if (trigger) { trigger.click(); return "OPENED"; }
+            const trigger = document.querySelector('.f-select-container') || 
+                            document.querySelector('.category-select-content') ||
+                            document.querySelector('.video-category-select') ||
+                            Array.from(document.querySelectorAll('div, span')).find(el => el.innerText && el.innerText.includes('选择分区'));
+            if (trigger) { 
+                trigger.click(); 
+                return "OPENED"; 
+            }
             return "NOT_FOUND";
         })();
         """
-        if self.chrome.execute_javascript(w_idx, t_idx, js_open_category) == "OPENED":
+        open_res = self.chrome.execute_javascript(w_idx, t_idx, js_open_category)
+        logger.info(f"Opening category dropdown: {open_res}")
+        
+        if open_res == "OPENED":
             time.sleep(1.0)
             for cat_name in target_cats:
                 js_select_cat = f"""
                 (function() {{
-                    const items = Array.from(document.querySelectorAll('.category-item, .f-select-item'));
+                    const items = Array.from(document.querySelectorAll('.category-item, .f-select-item, .bcc-select-item, .item-main'));
                     const item = items.find(el => el.innerText.includes('{cat_name}'));
-                    if (item) {{ item.click(); return "SELECTED"; }}
+                    if (item) {{ 
+                        item.click(); 
+                        return "SELECTED"; 
+                    }}
                     return "NOT_FOUND";
                 }})();
                 """
@@ -146,27 +168,32 @@ class BilibiliPublisher:
 
         # Description (简介)
         logger.info(f"Filling description: {desc[:50]}...")
-        js_fill_desc = f"""
-        (function() {{
-            const desc = {json.dumps(desc)};
-            // Bilibili uses Quill editor or a standard textarea
+        js_focus_desc = """
+        (function() {
             const editor = document.querySelector('.video-desc .ql-editor') || 
+                           document.querySelector('.editor-main') ||
+                           document.querySelector('.ql-editor') ||
                            document.querySelector('.bcc-textarea-container textarea') ||
                            document.querySelector('textarea[placeholder*="简介"]');
-            if (editor) {{
+            if (editor) {
                 editor.focus();
-                if (editor.tagName === 'TEXTAREA') {{
-                    editor.value = desc;
-                }} else {{
-                    editor.innerText = desc;
-                }}
-                editor.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                return "DESC_SET";
-            }}
+                editor.click();
+                return "FOCUSED";
+            }
             return "DESC_NOT_FOUND";
-        }})();
+        })();
         """
-        self.chrome.execute_javascript(w_idx, t_idx, js_fill_desc)
+        if self.chrome.execute_javascript(w_idx, t_idx, js_focus_desc) == "FOCUSED":
+            subprocess.run(["pbcopy"], input=desc.encode('utf-8'), check=True)
+            self.chrome.run_in_chrome_process('''
+                keystroke "a" using {command down}
+                delay 0.1
+                keystroke "v" using {command down}
+                delay 0.2
+            ''')
+            logger.info("Description pasted via clipboard.")
+        else:
+            logger.warning("Could not find description editor.")
 
         # Collection (加入合集)
         if collection:

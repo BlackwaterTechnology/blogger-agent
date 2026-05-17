@@ -17,9 +17,17 @@ class WechatVideoPublisher:
         if not video_path_raw:
             payload_path = article_data.get("payload_path")
             if payload_path:
-                payload_dir = Path(payload_path).parent
-                mp4s = list(payload_dir.glob("*.mp4"))
-                if mp4s: video_path_raw = mp4s[0]
+                payload_dir = Path(payload_path)
+                if payload_dir.is_file():
+                    payload_dir = payload_dir.parent
+                    
+                # Prioritize watermark-removed video
+                clean_mp4s = list(payload_dir.glob("*_clean.mp4"))
+                if clean_mp4s:
+                    video_path_raw = clean_mp4s[0]
+                else:
+                    mp4s = list(payload_dir.glob("*.mp4"))
+                    if mp4s: video_path_raw = mp4s[0]
         
         if not video_path_raw: raise ValueError("No video file found.")
         video_path = Path(video_path_raw)
@@ -35,6 +43,16 @@ class WechatVideoPublisher:
                 collection = allowed_collections[0]
 
         cover_path_raw = article_data.get("cover_path")
+        if not cover_path_raw:
+            payload_path = article_data.get("payload_path")
+            if payload_path:
+                payload_dir = Path(payload_path)
+                if payload_dir.is_file():
+                    payload_dir = payload_dir.parent
+                potential_cover = payload_dir / "cover.png"
+                if potential_cover.exists():
+                    cover_path_raw = str(potential_cover)
+
         cover_path = Path(cover_path_raw) if cover_path_raw else None
 
         try:
@@ -284,7 +302,7 @@ class WechatVideoPublisher:
 
     def _handle_macos_file_picker(self, file_path: Path):
         subprocess.run(["peekaboo", "app", "switch", "--to", "Google Chrome"], capture_output=True)
-        time.sleep(1); subprocess.run(["peekaboo", "hotkey", "command+shift+g"], check=True)
+        time.sleep(2.5); subprocess.run(["peekaboo", "hotkey", "command+shift+g"], check=True)
         time.sleep(1.5); subprocess.run(["peekaboo", "type", str(file_path.absolute())], check=True)
         time.sleep(1); subprocess.run(["peekaboo", "press", "return"], check=True)
         time.sleep(1.5); subprocess.run(["peekaboo", "press", "return"], check=True)

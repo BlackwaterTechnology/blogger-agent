@@ -62,32 +62,68 @@ def main():
 
     # Fallback/Default to publish
     payload_path = Path(args.payload)
+    md_path = None
     
     if payload_path.is_file() and payload_path.suffix == ".md":
         md_path = payload_path
     else:
         md_files = list(payload_path.glob("*.md"))
         if not md_files:
-            logger.error(f"No Markdown files found in {payload_path}")
+            mp4_files = list(payload_path.glob("*.mp4"))
+            if not mp4_files:
+                logger.error(f"No Markdown files found in {payload_path}")
+                return
+            else:
+                logger.info(f"No Markdown files found, but found video files in {payload_path}. Operating in video-only mode.")
+        else:
+            # Prioritize the default name if it exists, otherwise pick the first one
+            default_path = payload_path / "ARC-AGI-文章.md"
+            if default_path in md_files:
+                md_path = default_path
+            else:
+                md_path = md_files[0]
+                if len(md_files) > 1:
+                    logger.warning(f"Multiple Markdown files found. Using {md_path.name}")
+    
+    if md_path:
+        logger.info(f"Parsing payload from: {md_path}")
+        
+        if args.command == "video":
+            handle_video(args, md_path)
+            return
+
+        article_data = parse_markdown_payload(md_path)
+        article_data["payload_path"] = md_path
+    else:
+        if args.command == "video":
+            logger.error(f"Command 'video' currently requires a Markdown payload for metadata. Not found in {payload_path}")
             return
             
-        # Prioritize the default name if it exists, otherwise pick the first one
-        default_path = payload_path / "ARC-AGI-文章.md"
-        if default_path in md_files:
-            md_path = default_path
+        article_data = {"payload_path": payload_path}
+        
+        # Prioritize watermark-removed video if it exists
+        clean_mp4s = list(payload_path.glob("*_clean.mp4"))
+        if clean_mp4s:
+            article_data["video_path"] = clean_mp4s[0]
         else:
-            md_path = md_files[0]
-            if len(md_files) > 1:
-                logger.warning(f"Multiple Markdown files found. Using {md_path.name}")
-    
-    logger.info(f"Parsing payload from: {md_path}")
-    
-    if args.command == "video":
-        handle_video(args, md_path)
-        return
-
-    article_data = parse_markdown_payload(md_path)
-    article_data["payload_path"] = md_path
+            all_mp4s = list(payload_path.glob("*.mp4"))
+            if all_mp4s:
+                article_data["video_path"] = all_mp4s[0]
+                
+        metadata_file = payload_path / "metadata.txt"
+        if metadata_file.exists():
+            logger.info(f"Parsing basic metadata from: {metadata_file}")
+            content = metadata_file.read_text(encoding="utf-8")
+            import re
+            title_match = re.search(r"###\s*标题：\s*(.*?)(?:\n|$)", content)
+            if title_match:
+                article_data["title"] = title_match.group(1).strip()
+            
+            desc_match = re.search(r"####\s*【发布简介/文案】\s*\n(.*)", content, re.DOTALL)
+            if desc_match:
+                article_data["desc"] = desc_match.group(1).strip()
+            else:
+                article_data["desc"] = content.strip()
     
     platforms = [p.strip().lower() for p in args.platform.split(",") if p.strip()]
     
