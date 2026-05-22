@@ -37,7 +37,7 @@ description: Use when the user asks to write a technical article, blog post, or 
 - **文件系统**：建 Payload 目录、保存图片与 Markdown。
 - **图片生成**（按内容类型分工，参数详见阶段 2）：
   - **角色 / 场景化封面、概念意象图**：原生 AI 绘图工具（如 `generate_image`）。
-  - **排版式封面（书评 / 杂志风）**：Python `matplotlib`（无 AI 绘图工具时的兜底）。
+  - **排版式封面（书评 / 杂志风）**：Python `matplotlib`（模板位于 `templates/covers/magazine_cover.py`）。
   - **结构化图表（架构 / 流程 / 拓扑 / 思维导图 / UML）**：本地离线渲染优先：
     - `~/bin/mmdc`（官方 `@mermaid-js/mermaid-cli`，Puppeteer + Dagre 布局，**Mermaid 首选**）
     - `~/bin/plantuml.jar`（PlantUML，配合 `!pragma layout smetana` 无需 Graphviz）
@@ -194,6 +194,10 @@ rsvg-convert -w 1600 --background-color=white x.svg -o x.png               # 再
 ```bash
 python3 your_chart.py     # 直接出 PNG
 ```
+- **排版式封面（Magazine Style）**：对于书评、深度综述类文章，**优先使用 matplotlib 渲染文字海报封面**，而非 Mermaid 图。
+  - 模板：`templates/covers/magazine_cover.py`。
+  - 风格规范：深色背景（#102A43）、黄金色强调（#F0B429）、大字报标题。
+  - 字体：`Hiragino Sans GB` (macOS 最佳) 或 `Heiti TC`。
 - **字体 fallback 链**（macOS 实测顺序）：
   ```python
   mpl.rcParams["font.sans-serif"] = [
@@ -375,12 +379,14 @@ cover: "cover.png" # 必填且固定
 ### 重申与边界
 [再说一次主张，并说明它在哪些情况下不成立。避免说成放之四海而皆准。]
 ```
-
 **类型 6：书评 / 读书笔记**
 ```markdown
 [钩子段：用一个具体场景或数据指出"为什么现在重读这本书"，避免"最近读了 XX 这本好书"的开场。]
 
+> 💡 **封面建议**：书评类文章**强制使用** `templates/covers/magazine_cover.py` 风格的排版封面，以提升专业感和点击率。
+
 ### 这本书在说什么
+...
 [用 200 字内复述全书最核心的一两个论点。带一两条原文引用（注明章节 / 页码 / 作者推特日期）。
 这一节决定读者要不要继续看下去——复述要忠实，不要夹私货。]
 
