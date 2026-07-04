@@ -6,7 +6,7 @@ description: Use when the user asks to publish or push an article to platforms, 
 # Publish Article Skill
 
 ## Overview
-This skill takes a completed, reviewed Markdown payload directory and invokes the `blogger` CLI tool to automatically push the draft to configured platforms (WeChat Official Accounts, Juejin, CSDN).
+This skill takes a completed, reviewed Markdown payload directory and invokes the `blogger` CLI tool to automatically push the draft to configured platforms (WeChat Official Accounts, Juejin, CSDN, Blogger).
 
 ## Prerequisites（启动前必查，跳过会报错）
 
@@ -25,7 +25,7 @@ This skill takes a completed, reviewed Markdown payload directory and invokes th
 确认前置条件后，运行发布工具：
 
 ```bash
-blogger --payload ./articles/<文章标题目录> --platform wechat
+blogger --payload ./articles/<文章标题目录> --platform wechat,blogger
 ```
 
 ### 阶段 2：监控输出与状态汇报

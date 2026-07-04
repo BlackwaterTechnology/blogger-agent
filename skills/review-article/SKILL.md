@@ -6,7 +6,7 @@ description: Use when invoked by a main agent to review an article draft, or exp
 # Review Article Skill
 
 ## Overview
-This skill acts as a strict reviewer for article drafts. It checks the article's front matter, the integration of visual assets, and aggressively removes "AI tone" cliches from the text.
+This skill acts as a strict reviewer for article drafts. It checks the article's front matter, the integration of visual assets, and aggressively removes "AI tone" cliches from the text. Once reviewed, drafts can be published to platforms including WeChat, Juejin, CSDN, and Blogger.
 
 ## Workflow
 

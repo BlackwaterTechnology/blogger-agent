@@ -19,13 +19,13 @@ def main():
     # Publish command
     publish_parser = subparsers.add_parser("publish", help="Publish an article payload")
     publish_parser.add_argument("--payload", default="articles/test_data", help="Directory containing the article markdown files")
-    publish_parser.add_argument("--platform", default="wechat", help="Target platform(s) to publish to, comma-separated (e.g. wechat,juejin,csdn)")
+    publish_parser.add_argument("--platform", default="wechat", help="Target platform(s) to publish to, comma-separated (e.g. wechat,juejin,csdn,blogger)")
     publish_parser.add_argument(
         "--no-publish",
         action="store_true",
         help="Fill the publish dialog but stop before clicking the final submit button. "
              "Useful for previewing or testing without spamming the platform. "
-             "Currently honored by juejin and csdn; wechat is always manual.",
+             "Currently honored by juejin, csdn and blogger; wechat is always manual.",
     )
 
     # Diagram command
@@ -154,6 +154,11 @@ def main():
             from .platforms.bilibili import BilibiliPublisher
             logger.info("Initiating Bilibili publishing flow...")
             publisher = BilibiliPublisher()
+            publisher.publish(article_data, dry_run=dry_run)
+        elif platform == "blogger":
+            from .platforms.blogger import BloggerPublisher
+            logger.info("Initiating Blogger publishing flow...")
+            publisher = BloggerPublisher()
             publisher.publish(article_data, dry_run=dry_run)
         elif platform == "wechat_video":
             from .platforms.wechat_video import WechatVideoPublisher
