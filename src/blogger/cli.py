@@ -109,6 +109,10 @@ def main():
             all_mp4s = list(payload_path.glob("*.mp4"))
             if all_mp4s:
                 article_data["video_path"] = all_mp4s[0]
+
+        cover_pngs = list(payload_path.glob("cover.png"))
+        if cover_pngs:
+            article_data["cover_path"] = cover_pngs[0]
                 
         metadata_file = payload_path / "metadata.txt"
         if metadata_file.exists():
@@ -155,6 +159,11 @@ def main():
             from .platforms.wechat_video import WechatVideoPublisher
             logger.info("Initiating WeChat Official Account Video publishing flow...")
             publisher = WechatVideoPublisher()
+            publisher.publish(article_data)
+        elif platform == "wechat_channels":
+            from .platforms.wechat_channels import WechatChannelsPublisher
+            logger.info("Initiating WeChat Channels publishing flow...")
+            publisher = WechatChannelsPublisher()
             publisher.publish(article_data)
         else:
             logger.warning(f"Platform '{platform}' is currently not implemented or unknown for publish command.")

@@ -220,6 +220,27 @@ end tell
     def close_tab(self, window_index: int, tab_index: int) -> None:
         script = f'tell application "{self.app_name}" to close tab {tab_index} of window {window_index}'
         self._run_osascript(script)
+
+    def create_tab(self, url: str) -> tuple[int, int]:
+        escaped_url = self._escape_applescript(url)
+        script = f'''
+tell application "{self.app_name}"
+  if (count of windows) is 0 then
+    make new window
+  end if
+  tell front window
+    make new tab with properties {{URL:"{escaped_url}"}}
+    set tabIndex to count of tabs
+    return "1" & linefeed & (tabIndex as text)
+  end tell
+end tell
+'''
+        raw = self._run_osascript(script).strip()
+        w_text, _, t_text = raw.partition("\n")
+        try:
+            return int(w_text.strip()), int(t_text.strip())
+        except ValueError as exc:
+            raise RuntimeError(f"unexpected create_tab return: {raw!r}") from exc
         
     def get_cookie(self, name: str, domain: str) -> str:
         try:
