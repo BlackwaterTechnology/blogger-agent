@@ -62,7 +62,7 @@ class CdpChromeController:
     """
 
     port: int = field(default_factory=_default_port)
-    timeout: float = 5.0
+    timeout: float = 15.0
     # Cache of long-lived per-target WebSocket sessions. We need these for
     # Page.addScriptToEvaluateOnNewDocument: that command's effect lives
     # only as long as the session does, so if every CDP call opens and

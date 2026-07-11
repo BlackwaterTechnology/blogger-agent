@@ -246,6 +246,15 @@ wheels = [
 ]
 
 [[package]]
+name = "filelock"
+version = "3.29.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/91/f5/3557bf28e0f1943e4849154c821533706e6dea010f96fb6aa0b6949037d1/filelock-3.29.3.tar.gz", hash = "sha256:7fc1b3f39cf172fd8203812043c57b8a65aef9969f38b6704f628b881f761a84", size = 61956, upload-time = "2026-06-10T17:37:11.832Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/81/8f/b61d427c4f49a8bdadc93f4e7e74df8a6df6f77ee6e26bf0df53d3925363/filelock-3.29.3-py3-none-any.whl", hash = "sha256:e58333029cc9b925f39aad59b1d8f0a1ad836af4e60d7217f4a4dba87461261d", size = 42324, upload-time = "2026-06-10T17:37:10.37Z" },
+]
+
+[[package]]
 name = "greenlet"
 version = "3.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -463,10 +472,11 @@ wheels = [
 
 [[package]]
 name = "notebooklm-py"
-version = "0.3.4"
-source = { git = "https://github.com/xilu0/notebooklm-py.git#7706710bf8b0515055b8d6c18155f8e9890a1e06" }
+version = "0.8.0"
+source = { git = "https://github.com/xilu0/notebooklm-py.git#4eddc9a2ab545549be141debbb849d6ec7d54e81" }
 dependencies = [
     { name = "click" },
+    { name = "filelock" },
     { name = "httpx" },
     { name = "rich" },
 ]
