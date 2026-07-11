@@ -22,6 +22,57 @@ class MediumPublisher:
         if process.returncode != 0:
             raise RuntimeError(f"osascript copy HTML failed: {stderr.decode('utf-8')}")
 
+    def native_click(self, w_idx: int, t_idx: str, get_element_js: str) -> str:
+        """Finds an element using the provided JS expression, gets its coordinates,
+        and dispatches a native mouse click via CDP. Falls back to programmatic click."""
+        js_get_coords = f"""
+        (function() {{
+            const el = ({get_element_js});
+            if (!el) return "NOT_FOUND";
+            const rect = el.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return "NOT_VISIBLE";
+            return JSON.stringify({{
+                x: Math.round(rect.left + rect.width / 2),
+                y: Math.round(rect.top + rect.height / 2)
+            }});
+        }})();
+        """
+        coords_str = self.chrome.execute_javascript(w_idx, t_idx, js_get_coords, settle_seconds=0.2)
+        if coords_str and coords_str not in ("NOT_FOUND", "NOT_VISIBLE"):
+            try:
+                coords = json.loads(coords_str)
+                x, y = coords["x"], coords["y"]
+                logger.info(f"Clicking element natively at coordinates ({x}, {y})")
+                self.chrome._call_on(t_idx, "Input.dispatchMouseEvent", {
+                    "type": "mousePressed",
+                    "x": x,
+                    "y": y,
+                    "button": "left",
+                    "clickCount": 1
+                })
+                time.sleep(0.1)
+                self.chrome._call_on(t_idx, "Input.dispatchMouseEvent", {
+                    "type": "mouseReleased",
+                    "x": x,
+                    "y": y,
+                    "button": "left",
+                    "clickCount": 1
+                })
+                return "CLICKED_NATIVE"
+            except Exception as e:
+                logger.warning(f"Native click failed, attempting programmatic click fallback: {e}")
+        
+        # Fallback to programmatic click
+        js_fallback = f"""
+        (function() {{
+            const el = ({get_element_js});
+            if (!el) return "NOT_FOUND";
+            el.click();
+            return "CLICKED_PROGRAMMATIC";
+        }})();
+        """
+        return self.chrome.execute_javascript(w_idx, t_idx, js_fallback, settle_seconds=0.5)
+
     def inject_cover_into_content(self, content: str, cover_filename: str) -> str:
         if cover_filename in content:
             logger.info(f"Medium platform: cover image {cover_filename} is already present in the article body. Skipping injection.")
@@ -304,22 +355,20 @@ class MediumPublisher:
 
         # 8. Trigger Publish Dialog
         logger.info("Opening publish settings menu...")
-        js_click_publish = """
+        js_get_publish_btn = """
         (function() {
             const btn = document.querySelector('.button--publish, .js-publishButton');
-            if (!btn) return "NO_PUBLISH_BTN";
-            if (btn.disabled || btn.classList.contains('button--disabledPrimary')) {
-                return "DISABLED";
+            if (!btn || btn.disabled || btn.classList.contains('button--disabledPrimary')) {
+                return null;
             }
-            btn.click();
-            return "CLICKED";
-        })();
+            return btn;
+        })()
         """
         publish_clicked = False
         for _ in range(10):
-            res = self.chrome.execute_javascript(w_idx, t_idx, js_click_publish, settle_seconds=1.0)
+            res = self.native_click(w_idx, t_idx, js_get_publish_btn)
             logger.info(f"Publish button click attempt: {res}")
-            if res == "CLICKED":
+            if "CLICKED" in res:
                 publish_clicked = True
                 break
             time.sleep(1.0)
@@ -405,19 +454,14 @@ class MediumPublisher:
 
         # 11. Final Submit
         logger.info("Submitting article to Medium...")
-        js_submit = """
+        js_get_submit_btn = """
         (function() {
-            const btn = Array.from(document.querySelectorAll('button')).find(
+            return Array.from(document.querySelectorAll('button')).find(
                 b => b.innerText.trim() === 'Publish now' || 
                      b.innerText.trim() === 'Publish' || 
                      b.innerText.trim() === 'Submit'
             );
-            if (btn) {
-                btn.click();
-                return "SUBMIT_CLICKED";
-            }
-            return "SUBMIT_BTN_NOT_FOUND";
-        })();
+        })()
         """
-        res_submit = self.chrome.execute_javascript(w_idx, t_idx, js_submit, settle_seconds=2.0)
+        res_submit = self.native_click(w_idx, t_idx, js_get_submit_btn)
         logger.info(f"Publish final result: {res_submit}")

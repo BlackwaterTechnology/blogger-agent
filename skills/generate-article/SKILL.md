@@ -20,6 +20,7 @@ description: Use when the user asks to write a technical article, blog post, or 
 - **图片生成**（按内容类型分工，参数详见阶段 2）：
   - **角色 / 场景化封面、概念意象图**：原生 AI 绘图工具（如 `generate_image`）。
   - **排版式封面（书评 / 杂志风）**：Python `matplotlib`（无 AI 绘图工具时的兜底）。
+  - **二维坐标轴 / 精美自定义图表**：AI 生成或手写原生 SVG，利用 macOS 系统的 `sips` 工具进行本地 PNG 渲染。在需要高主观审美颜值、非标准或精确的坐标轴与信息图卡片时使用。
   - **结构化图表（架构 / 流程 / 拓扑 / 思维导图 / 对比网格）**：本地离线渲染优先：
     - `~/bin/plantuml.jar`（PlantUML，**首选引擎**。排版精密，可控性强，支持高 DPI。配合 `!pragma layout smetana` 无需 Graphviz）
     - `~/bin/mmdc`（官方 `@mermaid-js/mermaid-cli`，Puppeteer + Dagre 布局，**备选/极简图表引擎**）
@@ -116,12 +117,20 @@ description: Use when the user asks to write a technical article, blog post, or 
 |---|---|
 | 角色 / 场景 / 概念封面 | `generate_image` 等 AI 绘图 |
 | 流程图 / 架构图 / 状态机 / 时序图 | `plantuml.jar`（**首选，排版精密清晰**）或 `mmdc`（仅用于极简单线流图） |
+| 二维直角坐标系 / 高级自定义信息图表 | 原生 SVG + macOS `sips` 本地转换 |
 | 思维导图 / 分类树 / 标题封面 | `plantuml.jar` (`@startmindmap`) |
 | 饼图 / 数据可视化 | Python `matplotlib` |
 | 雷达图 / 对比表 / 结构化矩阵 | `plantuml.jar`（利用 `-[hidden]right-` 等控制为扁平网格） |
 
+##### 2.2.1 SVG 与 PlantUML 的分工边界原则
+在构思图表设计时，应根据图形特性在 **SVG** 与 **PlantUML** 之间进行理性选择：
+- **首选 SVG**：适用于**节点数量较少（通常少于 10 个）、布局结构高度可预测的图形**（例如：2D 直角坐标系、2x2 矩阵分布图、结构化对比卡片、概念金字塔等）。SVG 允许 AI 运用线性渐变、毛玻璃投影、现代系统级字体及更高级的 CSS 样式，达到极高美学上限。
+- **首选 PlantUML**：适用于**结构复杂、节点连线繁多、逻辑关系密集的图表**（例如：系统架构图、调用链路时序图、复杂业务逻辑流、类图、继承关系等）。PlantUML 的引擎会自动进行数学避让和自动对齐，避免因 AI 人脑口算绝对坐标产生文本遮挡或线条重叠。
+
+
 #### 2.3 渲染命令
 参考本地渲染工具规范。
+- **SVG 高清渲染与转换 (sips)**：直接运行 `sips -s format png <input.svg> --out <output.png>`。在设计 `.svg` 源码时，务必通过 `viewBox` (如 `0 0 800 500`) 约束合理的扁平化比例。字体使用现代无衬线系统字体（如 `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`），确保转换出来的 PNG 在高分屏（Retina）上达到极高清晰度和极佳排版效果。源码（.svg）需与渲染后的 PNG 一并保留。
 - **PlantUML 渲染与超分**：直接运行 `java -jar ~/bin/plantuml.jar -png <input.puml>`。在 `.puml` 源码首部必须加上 `skinparam dpi 300` 以及 `skinparam Shadowing false`，并且为了美观，首行应加上 `hide stereotype`，使用圆角框及马卡龙/扁平风格配色（如 `#e3f2fd` 表示蓝框，`#ffebee` 表示红框），保障 Retina 高画质与现代审美。
 - **Mermaid 超分渲染**：使用 `mmdc` 编译 `.mmd` 时，必须显式附加 `-s 3` 或 `--scale 3` 参数进行超分辨率缩放（例如 `mmdc -s 3 -i input.mmd -o output.png`），确保最终的 PNG 图片在高分屏下文字清晰可见。
 - **微信封面处理**：所有封面必须最后执行一次 `fit_wechat_cover.py` 转换至目标比例。
