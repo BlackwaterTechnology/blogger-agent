@@ -2,11 +2,11 @@ import time
 import json
 import pathlib
 from loguru import logger
-from ..core.chrome import ChromeDomController
+from ..core.jxa_chrome import JxaChromeController
 
 class WechatChannelsPublisher:
     def __init__(self):
-        self.chrome = ChromeDomController()
+        self.chrome = JxaChromeController()
 
     def publish(self, article_data: dict) -> None:
         title = article_data.get("title", "")
@@ -45,22 +45,16 @@ class WechatChannelsPublisher:
         
         # AppleScript to interact with macOS file open dialog
         abs_path = pathlib.Path(video_path).absolute()
-        applescript_file_dialog = f'''
-        tell application "System Events"
-            tell process "Google Chrome"
-                set frontmost to true
-                delay 1.0
-                keystroke "g" using {{command down, shift down}}
-                delay 1.0
-                keystroke "{abs_path}"
-                delay 1.0
-                keystroke return
-                delay 1.0
-                keystroke return
-            end tell
-        end tell
+        dialog_body = f'''
+            keystroke "g" using {{command down, shift down}}
+            delay 1.0
+            keystroke "{abs_path}"
+            delay 1.0
+            keystroke return
+            delay 1.0
+            keystroke return
         '''
-        self.chrome._run_osascript(applescript_file_dialog)
+        self.chrome.run_in_chrome_process(dialog_body)
         logger.info("Initiated file selection dialog.")
         
         # Wait for form to appear

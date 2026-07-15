@@ -126,19 +126,20 @@ description: Use when the user asks to write a technical article, blog post, or 
 在构思图表设计时，应根据图形特性在 **SVG** 与 **PlantUML** 之间进行理性选择：
 - **首选 SVG**：适用于**节点数量较少（通常少于 10 个）、布局结构高度可预测的图形**（例如：2D 直角坐标系、2x2 矩阵分布图、结构化对比卡片、概念金字塔等）。SVG 允许 AI 运用线性渐变、毛玻璃投影、现代系统级字体及更高级的 CSS 样式，达到极高美学上限。
 - **首选 PlantUML**：适用于**结构复杂、节点连线繁多、逻辑关系密集的图表**（例如：系统架构图、调用链路时序图、复杂业务逻辑流、类图、继承关系等）。PlantUML 的引擎会自动进行数学避让和自动对齐，避免因 AI 人脑口算绝对坐标产生文本遮挡或线条重叠。
+- **⚠ PlantUML 截断时的逃逸路径**：若 PlantUML 渲染后图像右侧或底部出现截断（节点/文字被裁掉），**正确的修复路径是切换到 SVG 横向泳道布局**，而不是改回纵向（纵向只会把截断问题从横向转移到纵向）。判断标准：横向节点超过 6 个、或图宽估算超过 1600px，应直接选 SVG。
 
 
 #### 2.3 渲染命令
 参考本地渲染工具规范。
-- **SVG 高清渲染与转换 (sips)**：直接运行 `sips -s format png <input.svg> --out <output.png>`。在设计 `.svg` 源码时，务必通过 `viewBox` (如 `0 0 800 500`) 约束合理的扁平化比例。字体使用现代无衬线系统字体（如 `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`），确保转换出来的 PNG 在高分屏（Retina）上达到极高清晰度和极佳排版效果。源码（.svg）需与渲染后的 PNG 一并保留。
-- **PlantUML 渲染与超分**：直接运行 `java -jar ~/bin/plantuml.jar -png <input.puml>`。在 `.puml` 源码首部必须加上 `skinparam dpi 300` 以及 `skinparam Shadowing false`，并且为了美观，首行应加上 `hide stereotype`，使用圆角框及马卡龙/扁平风格配色（如 `#e3f2fd` 表示蓝框，`#ffebee` 表示红框），保障 Retina 高画质与现代审美。
+- **SVG 高清渲染与转换 (sips)**：直接运行 `sips -s format png <input.svg> --out <output.png>`。在设计 `.svg` 源码时，务必通过 `viewBox` (如 `0 0 800 500`) 约束合理的扁平化比例。字体使用现代无衬线系统字体（如 `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`），确保转换出来的 PNG 在高分屏（Retina）上达到极高清晰度和极佳排版效果。**⚠ 避坑指南**：在 SVG 转换中，不要将 `linearGradient` 渐变色作为 `fill="url(#id)"` 应用在多字节中文字符 `text` 标签上，否则 macOS 的字形转换可能会出现乱码；应直接使用纯色十六进制 `fill` 值。源码（.svg）需与渲染后的 PNG 一并保留。
+- **PlantUML 渲染与超分**：直接运行 `java -jar ~/bin/plantuml.jar -png <input.puml>`。在 `.puml` 源码首部必须加上 `skinparam dpi 300` 以及 `skinparam Shadowing false`，并且为了美观，首行应加上 `hide stereotype`，使用圆角框及马卡龙/扁平风格配色（如 `#e3f2fd` 表示蓝框，`#ffebee` 表示红框），保障 Retina 高画质与现代审美。当图表节点较多、预计图面较大时，必须同时加上 `skinparam pageWidth 2400` 与 `skinparam pageHeight 1600`（或更大值），防止 PlantUML 默认画板不足导致内容被截断。
 - **Mermaid 超分渲染**：使用 `mmdc` 编译 `.mmd` 时，必须显式附加 `-s 3` 或 `--scale 3` 参数进行超分辨率缩放（例如 `mmdc -s 3 -i input.mmd -o output.png`），确保最终的 PNG 图片在高分屏下文字清晰可见。
 - **微信封面处理**：所有封面必须最后执行一次 `fit_wechat_cover.py` 转换至目标比例。
 
 #### 2.4 构图与布局守则
 - **“宽图优先，情愿宽而不要高”原则**：正文插图宁可宽一些（横向拉开），也绝不接受高而窄的纵向图。高图极其不适合手机和网页阅读。
   - **Mermaid 规范**：首选 `graph LR`；如果内部有子流程，通过 `direction LR` 将子图横向化。
-  - **PlantUML 规范**：使用 `left to right direction` 将默认流转为水平；或者对于双层模型（如冰山模型、矩阵对比），使用 `-[hidden]right-`（而非 `-[hidden]down-`）将元素在同一排拉开，让整体构图呈现 **1.5:1 至 2.5:1 之间的黄金扁平比**。
+  - **PlantUML 规范**：使用 `left to right direction` 将默认流转为水平；或者对于双层模型（如冰山模型、矩阵对比），使用 `-[hidden]right-`（而非 `-[hidden]down-`）将元素在同一排拉开，让整体构图呈现 **1.5:1 至 2.5:1 之间的黄金扁平比**。⚠ `left to right direction` 适用于横向节点 ≤ 6 个的场景；超过此阈值时横向总宽容易溢出，此时应改用 **SVG 横向泳道**（用色块分层、组件横排），由 AI 精确控制 `viewBox` 宽高比，彻底规避截断风险。
 - **文字精简**：图表节点内部的文本必须极度精简（限制在 4-8 个字内，仅作为短语标识），严禁塞入长句，详细逻辑在正文中解释。
 - **横纵比窗口**：正文插图 1.2:1 ~ 2.5:1（严禁高度大于宽度的纵向插图）。封面 16:9 或 1:1。
 - **节点数控制**：单图节点数限制在 12 个以下。
