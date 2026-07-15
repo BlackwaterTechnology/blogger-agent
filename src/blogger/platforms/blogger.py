@@ -14,6 +14,10 @@ class BloggerPublisher:
         self.chrome = CdpChromeController()
 
     def convert_to_html_with_base64_images(self, content: str, payload_dir: Path) -> str:
+        # Preprocess math formulas in content first (renders block formulas to base64 images)
+        from ..core.markdown_parser import preprocess_math
+        content = preprocess_math(content, payload_dir)
+
         # Find all markdown images: ![alt](path)
         def replacer(match):
             alt = match.group(1)
@@ -348,7 +352,7 @@ class BloggerPublisher:
         # (Title and Labels setting moved to Compose view stage right before publishing)
             
         # 5. Convert markdown to HTML with base64 images
-        logger.info("Converting Markdown content to HTML and encoding local images to base64...")
+        logger.info("Converting Markdown content to HTML and encoding local images to base64 (with formulas)...")
         html_content = self.convert_to_html_with_base64_images(content, payload_dir)
         
         # 6. Ensure HTML view

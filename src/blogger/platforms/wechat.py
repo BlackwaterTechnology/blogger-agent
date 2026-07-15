@@ -52,8 +52,8 @@ class WechatPublisher:
         html_content = article_data["html_content"]
         collection = article_data["collection"]
         cover_path = article_data["cover_path"]
-        local_images = article_data.get("local_images", [])
-        image_captions = article_data.get("image_captions", [])
+        local_images = article_data.get("wechat_local_images", article_data.get("local_images", []))
+        image_captions = article_data.get("wechat_image_captions", article_data.get("image_captions", []))
 
         try:
             w_idx, t_idx = self.chrome.find_global_tab(["https://mp.weixin.qq.com"])

@@ -3,7 +3,109 @@ from loguru import logger
 import markdown
 import frontmatter
 import re
+import hashlib
 from ..config import get_all_wechat_collections
+
+def render_math_formula(formula: str, output_path: Path):
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        
+        # Clean up common unsupported LaTeX sequences in matplotlib
+        formula_clean = formula.replace(r'\le ', r'\leq ').replace(r'\ge ', r'\geq ')
+        formula_clean = formula_clean.replace(r'\le}', r'\leq}').replace(r'\ge}', r'\geq}')
+        formula_clean = formula_clean.strip()
+        
+        # Configure matplotlib to support Chinese characters and prevent errors
+        matplotlib.rcParams['font.sans-serif'] = ['Heiti TC', 'Heiti SC', 'sans-serif']
+        matplotlib.rcParams['axes.unicode_minus'] = False
+        matplotlib.rcParams['mathtext.fontset'] = 'custom'
+        matplotlib.rcParams['mathtext.rm'] = 'Heiti TC'
+        matplotlib.rcParams['mathtext.it'] = 'Heiti TC'
+        matplotlib.rcParams['mathtext.bf'] = 'Heiti TC'
+        
+        fig = plt.figure(figsize=(8, 1.5))
+        text_str = formula_clean if formula_clean.startswith('$') else f"${formula_clean}$"
+        
+        fig.text(0.5, 0.5, text_str, size=16, va="center", ha="center", color="black")
+        
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=200, transparent=True, bbox_inches='tight', pad_inches=0.04)
+        plt.close(fig)
+    except Exception as e:
+        logger.error(f"Failed to render math formula '{formula}' to {output_path}: {e}")
+
+def latex_to_unicode(latex_str: str) -> str:
+    text = latex_str
+    replacements = {
+        r'\Delta': 'Δ',
+        r'\approx': '≈',
+        r'\leq': '≤',
+        r'\le': '≤',
+        r'\geq': '≥',
+        r'\ge': '≥',
+        r'\times': '×',
+        r'\%': '%',
+        r'\_': '_',
+    }
+    for k, v in replacements.items():
+        text = text.replace(k, v)
+    text = re.sub(r'\\text\{([^}]+)\}', r'\1', text)
+    text = re.sub(r'_\{([^}]+)\}', r'_\1', text)
+    text = text.replace('{', '').replace('}', '')
+    return text
+
+def is_likely_latex(s: str) -> bool:
+    s = s.strip()
+    if not s:
+        return False
+    if len(s) <= 5:
+        return True
+    math_chars = ['\\', '_', '^', '+', '-', '*', '/', '=', '<', '>', '{', '}']
+    if any(c in s for c in math_chars):
+        return True
+    return False
+
+def preprocess_math(content: str, payload_dir: Path) -> str:
+    # 1. Process Block Math $$ ... $$
+    block_pattern = re.compile(r'\$\$(.*?)\$\$', re.DOTALL)
+    
+    def block_replacer(match):
+        formula = match.group(1).strip()
+        if not formula:
+            return ""
+        hash_val = hashlib.md5(formula.encode('utf-8')).hexdigest()[:16]
+        relative_path = f"formulas/formula_{hash_val}.png"
+        full_path = payload_dir / relative_path
+        
+        if not full_path.exists():
+            logger.info(f"Rendering LaTeX block formula to {relative_path}...")
+            render_math_formula(formula, full_path)
+            
+        try:
+            import base64
+            with open(full_path, "rb") as f:
+                img_data = f.read()
+            b64_str = base64.b64encode(img_data).decode("utf-8")
+            return f'\n\n<div style="text-align: center; margin: 16px 0;"><img src="data:image/png;base64,{b64_str}" alt="formula" style="max-width: 100%;" /></div>\n\n'
+        except Exception as e:
+            logger.error(f"Failed to inline formula to base64: {e}")
+            return f"\n\n![formula]({relative_path})\n\n"
+        
+    content = block_pattern.sub(block_replacer, content)
+    
+    # 2. Process Inline Math $ ... $
+    inline_pattern = re.compile(r'\$([^\s$](?:[^$\n]*?[^\s$])?)\$')
+    
+    def inline_replacer(match):
+        formula = match.group(1).strip()
+        if is_likely_latex(formula):
+            return latex_to_unicode(formula)
+        return match.group(0)
+        
+    content = inline_pattern.sub(inline_replacer, content)
+    return content
 
 def parse_markdown_payload(md_path: Path) -> dict:
     if not md_path.exists():
@@ -28,6 +130,9 @@ def parse_markdown_payload(md_path: Path) -> dict:
     cover_filename = post.metadata.get("cover", "")
     video_filename = post.metadata.get("video", "")
     illustration_filename = post.metadata.get("illustration", "")
+    payload_dir = md_path.parent
+    
+    # Use post content as raw content (for Juejin/CSDN)
     content = post.content.strip()
     
     # 避免正文开头重复出现标题（很多 Markdown 写作习惯会在正文开头写 # 标题，发布平台通常有独立标题字段）
@@ -42,15 +147,22 @@ def parse_markdown_payload(md_path: Path) -> dict:
         if len(desc) < 60 or len(desc) > 120:
             logger.warning(f"Summary (简介) length is {len(desc)} chars. It should be between 60 and 120 chars!")
             
-    payload_dir = md_path.parent
-
+    # For Juejin/CSDN, scan the raw content to find normal local images
     local_images = []
-    image_alts: dict[Path, str] = {}
+    for match in re.finditer(r'!\[(.*?)\]\((.*?)\)', content):
+        img_src = match.group(2)
+        if not (img_src.startswith('http://') or img_src.startswith('https://')):
+            local_img_path = payload_dir / img_src
+            if local_img_path.exists() and local_img_path not in local_images:
+                local_images.append(local_img_path)
 
-    # 抓 alt 文本:发布器会在 paste 后把 ProseMirror 自动补的 trailing empty <p>
-    # 填成图注(用 alt 文本 + 图注样式)。不在这里把 caption 拼进 HTML——实测
-    # ProseMirror 即使下一个是可写 <p> 也仍然要补 trailing,放在 HTML 里就会和
-    # 那个 trailing 空段叠加,反而出现"图—空段—图注"。
+    # For WeChat, we preprocess math formulas (render block formulas to PNGs, translate inline to Unicode)
+    wechat_content = preprocess_math(content, payload_dir)
+    
+    # Scan wechat_content to find both normal local images and generated formula images
+    wechat_local_images = []
+    image_alts: dict[Path, str] = {}
+    
     def wechat_image_replacer(match):
         alt_text = (match.group(1) or '').strip()
         img_src = match.group(2)
@@ -59,13 +171,13 @@ def parse_markdown_payload(md_path: Path) -> dict:
         local_img_path = payload_dir / img_src
         if not local_img_path.exists():
             return match.group(0)
-        if local_img_path not in local_images:
-            local_images.append(local_img_path)
+        if local_img_path not in wechat_local_images:
+            wechat_local_images.append(local_img_path)
         if alt_text and local_img_path not in image_alts:
             image_alts[local_img_path] = alt_text
         return f"[UPLOAD_IMAGE: {local_img_path.absolute()}]"
 
-    wechat_content = re.sub(r'!\[(.*?)\]\((.*?)\)', wechat_image_replacer, content)
+    wechat_content = re.sub(r'!\[(.*?)\]\((.*?)\)', wechat_image_replacer, wechat_content)
 
     # python-markdown 的 sane_lists 扩展严格要求列表前有空行;否则
     # `段落：\n- item` 会被并进同一个 <p>,导致微信里出现 "段落：- item" 单行长串。
@@ -185,11 +297,17 @@ def parse_markdown_payload(md_path: Path) -> dict:
     illustration_path = payload_dir / illustration_filename if illustration_filename and (payload_dir / illustration_filename).exists() else None
 
     # Merge inline images with front-matter illustration for the publishers to process
+    # 1. Normal illustrations (for Juejin/CSDN)
     all_illustrations = list(local_images)
     if illustration_path and illustration_path not in all_illustrations:
         all_illustrations.insert(0, illustration_path)
 
-    # 与 all_illustrations 同序的 caption 文本(没有/不达标就空串),供发布器
+    # 2. WeChat illustrations (including formulas)
+    wechat_illustrations = list(wechat_local_images)
+    if illustration_path and illustration_path not in wechat_illustrations:
+        wechat_illustrations.insert(0, illustration_path)
+
+    # 与 illustrations 同序的 caption 文本(没有/不达标就空串),供发布器
     # 在 paste 后把 ProseMirror trailing empty <p> 填成图注。
     # 过滤"不像图注"的:空值、太短(<5)、或干脆就是文件名(![architecture.png](architecture.png))。
     def _captionable(alt: str, path: Path) -> str:
@@ -201,17 +319,20 @@ def parse_markdown_payload(md_path: Path) -> dict:
         return a
 
     image_captions = [_captionable(image_alts.get(p, ''), p) for p in all_illustrations]
+    wechat_image_captions = [_captionable(image_alts.get(p, ''), p) for p in wechat_illustrations]
 
     return {
         "title": title,
         "author": author,
         "collection": collection,
         "desc": desc,
-        "content": content,
-        "html_content": html_content,
+        "content": content,  # Raw markdown (LaTeX intact)
+        "html_content": html_content,  # WeChat HTML (LaTeX converted to PNG/Unicode)
         "cover_path": cover_path,
         "video_path": video_path,
         "illustration_path": illustration_path,
-        "local_images": all_illustrations,
+        "local_images": all_illustrations,  # Normal images only
+        "wechat_local_images": wechat_illustrations,  # Normal + formulas
         "image_captions": image_captions,
+        "wechat_image_captions": wechat_image_captions,
     }
