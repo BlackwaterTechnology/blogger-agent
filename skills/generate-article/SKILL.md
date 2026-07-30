@@ -133,7 +133,9 @@ description: Use when the user asks to write a technical article, blog post, or 
 参考本地渲染工具规范，图像输出需按引擎特性精准设置清晰度：
 - **PlantUML 最高清晰度渲染**：直接运行 `java -jar ~/bin/plantuml.jar -png <input.puml>`。源码首部必须显式加上 `skinparam dpi 300`（高精密图表推荐 `dpi 360`）以及 `skinparam Shadowing false`，并且为了美观与防止截断，同时加上 `skinparam pageWidth 2400` 与 `skinparam pageHeight 1600`，保障文本及节点字体绝对抗锯齿。
 - **Mermaid 最高清晰度渲染**：使用 `mmdc` 编译 `.mmd` 时，必须显式附加 `-s 3` 或 `--scale 3` 参数进行 DPI 300+ 级别超分缩放。
-- **SVG / PNG 1080p~2K 渲染 (sips)**：设计 `.svg` 源码时使用 1080p ~ 2K 尺寸（如 `viewBox="0 0 1200 675"` 到 `viewBox="0 0 1920 1080"`），直接运行 `sips -s format png <input.svg> --out <output.png>`。若 `viewBox` 坐标偏小，导出时可通过 `--resampleWidth 1920` 保持 1080p/2K Retina 最佳画质。字体使用现代无衬线系统字体（如 `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`）。**⚠ 避坑指南**：不要将 `linearGradient` 渐变色作为 `fill="url(#id)"` 应用在多字节中文字符 `text` 标签上。源码（.svg）需与渲染后的 PNG 一并保留。
+- **SVG / PNG 1080p~2K 渲染 (sips)**：设计 `.svg` 源码时使用 1080p ~ 2K 尺寸（如 `viewBox="0 0 1200 675"` 到 `viewBox="0 0 1920 1080"`）。转换命令**必须显式带上 `--resampleWidth`**：
+  `sips -s format png --resampleWidth 1920 <input.svg> --out <output.png>`
+  ⚠ **避坑指南**：不带 `--resampleWidth` 会导致 macOS `sips` 默认按 1x (72 DPI) 栅格化导致高分屏显示发虚。同时，不要将 `linearGradient` 渐变色作为 `fill="url(#id)"` 应用在多字节中文字符 `text` 标签上。源码（.svg）需与渲染后的 PNG 一并保留。
 - **Matplotlib 数据可视化**：使用 Python Matplotlib 绘图导出时，必须设置 `plt.savefig(..., dpi=300, bbox_inches='tight')`。
 - **微信封面处理**：所有封面必须最后执行一次 `fit_wechat_cover.py` 转换至目标比例。
 
