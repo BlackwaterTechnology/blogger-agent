@@ -129,11 +129,12 @@ description: Use when the user asks to write a technical article, blog post, or 
 - **⚠ PlantUML 截断时的逃逸路径**：若 PlantUML 渲染后图像右侧或底部出现截断（节点/文字被裁掉），**正确的修复路径是切换到 SVG 横向泳道布局**，而不是改回纵向（纵向只会把截断问题从横向转移到纵向）。判断标准：横向节点超过 6 个、或图宽估算超过 1600px，应直接选 SVG。
 
 
-#### 2.3 渲染命令
-参考本地渲染工具规范。
-- **SVG 高清渲染与转换 (sips)**：直接运行 `sips -s format png <input.svg> --out <output.png>`。在设计 `.svg` 源码时，务必通过 `viewBox` (如 `0 0 800 500`) 约束合理的扁平化比例。字体使用现代无衬线系统字体（如 `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`），确保转换出来的 PNG 在高分屏（Retina）上达到极高清晰度和极佳排版效果。**⚠ 避坑指南**：在 SVG 转换中，不要将 `linearGradient` 渐变色作为 `fill="url(#id)"` 应用在多字节中文字符 `text` 标签上，否则 macOS 的字形转换可能会出现乱码；应直接使用纯色十六进制 `fill` 值。源码（.svg）需与渲染后的 PNG 一并保留。
-- **PlantUML 渲染与超分**：直接运行 `java -jar ~/bin/plantuml.jar -png <input.puml>`。在 `.puml` 源码首部必须加上 `skinparam dpi 300` 以及 `skinparam Shadowing false`，并且为了美观，首行应加上 `hide stereotype`，使用圆角框及马卡龙/扁平风格配色（如 `#e3f2fd` 表示蓝框，`#ffebee` 表示红框），保障 Retina 高画质与现代审美。当图表节点较多、预计图面较大时，必须同时加上 `skinparam pageWidth 2400` 与 `skinparam pageHeight 1600`（或更大值），防止 PlantUML 默认画板不足导致内容被截断。
-- **Mermaid 超分渲染**：使用 `mmdc` 编译 `.mmd` 时，必须显式附加 `-s 3` 或 `--scale 3` 参数进行超分辨率缩放（例如 `mmdc -s 3 -i input.mmd -o output.png`），确保最终的 PNG 图片在高分屏下文字清晰可见。
+#### 2.3 渲染命令（1080p~2K 标准与 DPI 300+ 规范）
+参考本地渲染工具规范，图像输出需按引擎特性精准设置清晰度：
+- **PlantUML 最高清晰度渲染**：直接运行 `java -jar ~/bin/plantuml.jar -png <input.puml>`。源码首部必须显式加上 `skinparam dpi 300`（高精密图表推荐 `dpi 360`）以及 `skinparam Shadowing false`，并且为了美观与防止截断，同时加上 `skinparam pageWidth 2400` 与 `skinparam pageHeight 1600`，保障文本及节点字体绝对抗锯齿。
+- **Mermaid 最高清晰度渲染**：使用 `mmdc` 编译 `.mmd` 时，必须显式附加 `-s 3` 或 `--scale 3` 参数进行 DPI 300+ 级别超分缩放。
+- **SVG / PNG 1080p~2K 渲染 (sips)**：设计 `.svg` 源码时使用 1080p ~ 2K 尺寸（如 `viewBox="0 0 1200 675"` 到 `viewBox="0 0 1920 1080"`），直接运行 `sips -s format png <input.svg> --out <output.png>`。若 `viewBox` 坐标偏小，导出时可通过 `--resampleWidth 1920` 保持 1080p/2K Retina 最佳画质。字体使用现代无衬线系统字体（如 `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`）。**⚠ 避坑指南**：不要将 `linearGradient` 渐变色作为 `fill="url(#id)"` 应用在多字节中文字符 `text` 标签上。源码（.svg）需与渲染后的 PNG 一并保留。
+- **Matplotlib 数据可视化**：使用 Python Matplotlib 绘图导出时，必须设置 `plt.savefig(..., dpi=300, bbox_inches='tight')`。
 - **微信封面处理**：所有封面必须最后执行一次 `fit_wechat_cover.py` 转换至目标比例。
 
 #### 2.4 构图与布局守则

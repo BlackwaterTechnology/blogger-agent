@@ -149,3 +149,12 @@ if (cb && !cb.checked) {
 1. **区分"新建"和"展开"**：`button.tag__btn-tag` 在标签区和分类区含义不同。标签区是"添加文章标签"（打开搜索面板），分类区是"新建分类专栏"（打开新建输入框）。不要假设同类名按钮功能相同。
 2. **Click 层级要精确**：Vue/Element UI 的 checkbox 必须直接 click `input` 元素。click 外层 `div`/`label` 可能不触发 Vue 的响应式更新。
 3. **浮动面板无需展开**：`position: absolute` 的面板可能已在 DOM 中渲染，只是通过定位浮在父容器外，不需要额外的展开/显示操作。
+
+### 图片生成与渲染质量标准
+
+1. **清晰度与分辨率分工**：
+   - **PlantUML / Mermaid 图表引擎**：必须保持 **DPI 300+**（PlantUML 设置 `skinparam dpi 300` 或 `360`，Mermaid 使用 `-s 3` 3x 采样），保障复杂节点与文字线条达到最高精密清晰度。
+   - **SVG / PNG 画布**：分辨率采用 **1080p ~ 2K 标准**（图片宽度控制在 **1200px – 1920px** 之间），兼顾移动端 3x Retina 高分屏锐利显示与加载速度。
+2. **SVG 高画质转换**：SVG 源码采用 `viewBox="0 0 1200 675"` 至 `viewBox="0 0 1920 1080"` 尺寸，`sips` 导出 PNG 时使用 `--resampleWidth 1920` 进行无损渲染。
+3. **PlantUML / Mermaid 高画质**：PlantUML 统一使用 `skinparam dpi 300` (最高画质可设为 `360`) 结合 `pageWidth 2400`；Mermaid 编译时显式附加 `-s 3` 参数。
+4. **Matplotlib**：Python 导出图表必须显式声明 `plt.savefig(..., dpi=300, bbox_inches='tight')`。
