@@ -24,6 +24,23 @@ description: Use when the user asks to write a technical article, blog post, or 
 
 ---
 
+## 📱 移动端优先（Mobile-First）排版与字号规范
+
+针对微信手机端（375px~414px 屏宽），所有生成的渲染图片必须严格遵守**移动端优先规范**，防止“小字密密麻麻在手机端无法看清”：
+
+1. **字号硬性底线（Font Size Floor）**：
+   - 主标题：`32px ~ 40px`
+   - 分类卡片 / 标签：`24px ~ 28px`
+   - 正文节点 / 核心关键词：**绝对禁止低于 20px - 22px**！在 1600px 宽度画布中低于 20px 的文字在手机端缩放后会沦为不辨认的微雕。
+2. **极致极简短语化（Extreme Abstraction）**：
+   - 节点与卡片文本控制在 **4 ~ 8 个字以内**（短语化、短文本列举、符号连接如 `杏仁核主导 · 去甲肾上腺素`）。
+   - **严禁在图片中填入多行整句长句或解释段落**。详细逻辑与推导全盘留给 Markdown 正文。
+3. **视觉职责分工**：
+   - 移动端图片 = **视觉锚点与关键词矩阵 (Visual Anchors)**
+   - 正文 Markdown = **推理逻辑与长句表达 (Narrative)**
+
+---
+
 ## Required Tools
 
 - **bash**：跑图片生成子进程。
@@ -78,7 +95,7 @@ description: Use when the user asks to write a technical article, blog post, or 
    □ 概念分类 / 思维层级 / 大纲 → PlantUML `mindmap` / `@startwbs`
    □ 时间线 / 演进 / 版本史 → Mermaid `timeline` 或 PlantUML
    □ 数据分布 / 占比 / 工作量 → matplotlib 饼图 / 条形 / 堆叠
-   □ 维度对比 / 评分 / 雷达 → matplotlib 雷达图 + SVG 对比卡片
+   □ 维度对比 / 评分 / 雷达 → SVG 极简卡片矩阵（字号≥22px）
    □ 类比 / 隐喻 / 场景化封面 → AI 绘图 / 自定义 SVG
    □ 真实截图 / 终端输出 / 用户手稿 → 用户素材（§2.0 优先）
    ⚠ "想不到要画什么"通常意味着主张/证据还不具体——回去重新打磨第 1-3 题，别硬凑图。
@@ -101,14 +118,12 @@ description: Use when the user asks to write a technical article, blog post, or 
 - 摘要 desc 长度严格 60–120 字符。
 - cover 必填且文件名固定为 cover.png。
 - 正文配图 ≥ 2 张（来自 1A Q4 视觉建模清单），每张图必须在文中被显式引用并解释，不能孤儿。
-- 优先级：模型 / 图表 / 数据图 > AI 生成插图 > 装饰性图。封面除外。
+- 图表字号：正文图片节点字号是否 ≥ 20px-22px？无长句堆砌？
 ```
 
 ---
 
 ### 阶段 2：视觉资产生成
-
-依据阶段 1A 的 **Q4 视觉建模清单** + 证据清单 + 文章类型，规划配图。
 
 #### 2.0 素材盘点：先看用户给了什么
 1. 列出会话中已有的素材图。
@@ -118,29 +133,21 @@ description: Use when the user asks to write a technical article, blog post, or 
 - **必出 1 张封面**：`cover.png`（16:9 或 1:1）。
 - **正文图 2–4 张起步**，语义化命名（如 `tao-architecture.png`）。
 
-#### 2.2 工具选择与 SVG / PlantUML 逃逸原则
-| 配图类型 | 推荐工具 |
-|---|---|
-| 角色 / 场景 / 概念封面 | `generate_image` 等 AI 绘图 |
-| 流程图 / 架构图 / 状态机 / 时序图 | `plantuml.jar`（**首选，排版精密清晰**） |
-| 2D 坐标轴 / 流程卡片 / 对比图 / 逃逸场景 | **原生 SVG + macOS `sips` 渲染** |
-| 思维导图 / 分类树 | `plantuml.jar` (`@startmindmap`) |
-| 饼图 / 数据可视化 | Python `matplotlib` |
+#### 2.2 工具选择与移动端极简原则
+| 配图类型 | 推荐工具 | 移动端字号要求 |
+|---|---|---|
+| 角色 / 场景 / 概念封面 | `generate_image` 等 AI 绘图 | N/A |
+| 流程图 / 架构图 / 状态机 | `plantuml.jar`（首选） | 节点字号 ≥ 20px |
+| 对比矩阵 / 2D 坐标卡片 | **原生 SVG + sips** | 正文字号 ≥ 22px，极简 4-8 字 |
+| 思维导图 / 分类树 | `plantuml.jar` (`@startmindmap`) | 节点字号 ≥ 20px |
 
-##### 2.2.1 PlantUML 截断逃逸路径（CRITICAL）
-- 若 PlantUML 渲染后图像右侧或底部出现**截断/文字裁切/边框不全**（如图宽估计超过 1600px 或横向节点 > 4 个），**必须立即切换为原生 SVG 横向泳道布局**（如 `viewBox="0 0 1600 900"`），通过 CSS 色块与 Flex/Grid 式相对坐标彻底消除截断风险。
+##### 2.2.1 PlantUML 截断与小字逃逸路径（CRITICAL）
+- 若 PlantUML 渲染后图像出现**小字密麻**、**文字裁切**或**图宽估计超过 1600px**，**必须立即切换为原生 SVG 横向泳道布局**（`viewBox="0 0 1600 900"`），正文使用 `22px ~ 24px` 字号，通过 CSS 卡片与 4-8 字短语彻底规避移动端看不清的问题。
 
 #### 2.3 渲染命令（1080p~2K 标准与 DPI 300+ 规范）
-- **PlantUML 高清渲染**：`java -jar ~/bin/plantuml.jar -png <input.puml>`。源码头部加入 `skinparam dpi 300`、`skinparam Shadowing false`、`skinparam pageWidth 2400`。**严禁引入废弃指令**如 `skinparam handwritten false`。
+- **PlantUML 高清渲染**：`java -jar ~/bin/plantuml.jar -png <input.puml>`。源码头部加入 `skinparam dpi 300`、`skinparam Shadowing false`、`skinparam pageWidth 2400`。
 - **SVG / PNG 1080p~2K 渲染 (sips)**：设计 `.svg` 源码使用 `viewBox="0 0 1600 900"`。转换命令**必须包含 `--resampleWidth 1920`**：
   `sips -s format png --resampleWidth 1920 <input.svg> --out <output.png>`
-
-#### 2.4 布局与构图守则
-- **黄金扁平比**：正文插图控制在 **1.5:1 至 2.5:1** 之间（宽图优先，严禁高度大于宽度的纵向高图）。
-- **文字极简**：节点内部文字 4-8 字以内，长句在正文中解释。
-
-#### 2.5 渲染后必查
-用 `view_file` 或 Read 工具检查 PNG：文字无溢出、无截断、无重叠、中文清晰。不达标则重渲。
 
 ---
 
@@ -148,26 +155,11 @@ description: Use when the user asks to write a technical article, blog post, or 
 
 在 Payload 目录下创建 `article.md`。
 
-#### Front Matter（固定）
-```markdown
----
-title: "[具备反直觉张力与极化主张的标题]"
-author: "Agent"
-desc: "[60–120 字符摘要，凝练核心主张与社交货币概念]"
-collection: "[必填] 严格从 blogger.toml -> platforms.wechat.accounts.default.article_collections 中选择"
-cover: "cover.png" # 必填且固定
----
-```
-
 ---
 
 ### 阶段 4：Dispatch Review (Subagent)
 
 **CRITICAL INSTRUCTION**: Writing is now complete, but you MUST NOT proceed to publish.
 You MUST dispatch a subagent (`@self` 或 `@generalist`) 并指示其使用 `review-article` skill 审阅草案。
-
-**Action to take:**
-1. Call the `invoke_subagent` tool.
-2. Prompt: `Please review the article draft at [Path to article.md] using the 'review-article' skill. Ensure you follow the 100-point quality rubric, execute all pre-flight checks, and apply necessary edits to the file.`
 
 完成审阅后，告知用户可运行 `/publish-article` 进行推送。
