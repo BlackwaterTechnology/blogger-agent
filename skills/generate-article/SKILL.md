@@ -7,11 +7,22 @@ description: Use when the user asks to write a technical article, blog post, or 
 
 ## Overview
 
-把任意输入（草稿、对话、观点、技术笔记）转化为**结构清晰、论点锐利、以图代言**的中文技术文章，生成插图与封面。
+把任意输入（草稿、对话、观点、技术笔记）转化为**结构清晰、论点锐利、以图代言、具备高维社交货币**的中文技术与商业文章，生成高清插图与封面。
 
-与浏览器自动化不同，此 skill 走的是「Markdown payload + CLI」管道。本 skill 同时是**创作助手 + 编辑助手 + 建模助手**：它会逼你先想清楚「主张是什么」「证据是什么」「哪些概念该建模成图」再开写。
+本 skill 同时是**创作助手 + 编辑助手 + 建模助手**：基于第一性原理（First Principles Thinking）与 **T-A-O 认知协作架构**，逼迫创作过程完成从低维“知识记忆”到高维“架构定义与终审”的跃迁。
 
-**核心原则：模型 / 图表 / 数据图 > 文字描述。** 一张架构图、状态机、对比雷达、流程图能解释清楚的事，不要写成 200 字段落让读者自己脑补。技术写作里能图示化的对象（架构、流程、调用链、状态变化、分类层级、数据分布、维度对比）就建模成图——文字只用来补图无法说清的细节、上下文、推理。
+---
+
+## 核心底层哲学：4 大硬核业务假设
+
+每一篇文章的创作与视觉建模，均必须建立在以下 4 个可被数据验证的业务假设之上：
+
+1. **【极化主张假设】(Click Dissonance)**：标题必须具备反直觉张力与明确立场（CTR > 8%）。拒绝平铺直叙的话题陈述。
+2. **【图文认知密度假设】(Visual Density)**：人脑处理图形比文本快 60,000 倍。用结构图表（PlantUML / SVG）替代冗长文字，将完读率提升至 50%+。
+3. **【社交货币假设】(Social Currency)**：微信朋友圈转发的本质是“自我人设塑造”。文章必须提炼至少 **1 个命名实体或方法论框架**（如 T-A-O 架构、审核权倒置悖论），转发率 > 5%。
+4. **【T-A-O 人机协同假设】(Orchestration)**：人类负责 Context Framing（问题高维定义）与 Checklist 终审背书；AI 负责 80% 的资料检索与文本草稿编译。
+
+---
 
 ## Required Tools
 
@@ -26,6 +37,8 @@ description: Use when the user asks to write a technical article, blog post, or 
     - `~/bin/mmdc`（官方 `@mermaid-js/mermaid-cli`，Puppeteer + Dagre 布局，**备选/极简图表引擎**）
   - **最后兜底**：`blogger generate-diagram --type mermaid|plantuml --input x --output x.png`（kroki.io，受公网限制，仅本地工具不可用时使用）
 - **封面 letterbox 工具**：`~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py`（随 skill 分发）——把任意比例的封面 letterbox 到目标比例（默认 16:9，可选 1:1），支持 `--bg white|black|auto|#RRGGBB` 与 `-o/--output` alias。详见 §2.3。
+
+---
 
 ## Workflow
 
@@ -42,17 +55,18 @@ description: Use when the user asks to write a technical article, blog post, or 
 ```text
 【内容质量自检】
 1. 一句话主张：这篇文章想让读者改变看法 / 学到的那一句话是什么？
-   - 必须是陈述句、有动词、有立场。
+   - 必须是陈述句、有动词、有立场、具备反直觉张力。
    - 反例："Agent Harness 的演进趋势"（话题，不是主张）
    - 正例："Harness 不再是工程师的护城河，模型本身正在吞掉框架"
 
-2. 反直觉点：这个主张里最让读者意外 / 反共识的点是什么？
-   - 如果你答不出来，先回去重新打磨主张，再继续。
+2. 社交货币与命名实体：本文提炼出了哪 1 个具备传播力的概念实体/方法论？
+   - 正例：T-A-O 认知协作架构、审核权倒置悖论、Context Framing。
+   - 如果答不上来，重新提炼命名实体后再继续。
 
 3. 证据清单：我准备用哪 2-3 件具体证据支撑主张？必须落到下面至少两类：
    □ 代码 / 命令 / 配置片段
    □ 数据 / 数字 / 时间线
-   □ 真实产品、项目、人物的具体例子（带名字）
+   □ 真实产品、项目、人物、法律判例（带名字）
    □ 引用或一手资料（带出处）
    ⚠ 不允许全文都是「我们认为」「业界普遍」「值得思考」这类无证据陈述。
 
@@ -64,28 +78,26 @@ description: Use when the user asks to write a technical article, blog post, or 
    □ 概念分类 / 思维层级 / 大纲 → PlantUML `mindmap` / `@startwbs`
    □ 时间线 / 演进 / 版本史 → Mermaid `timeline` 或 PlantUML
    □ 数据分布 / 占比 / 工作量 → matplotlib 饼图 / 条形 / 堆叠
-   □ 维度对比 / 评分 / 雷达 → matplotlib 雷达图 + Markdown 表格
+   □ 维度对比 / 评分 / 雷达 → matplotlib 雷达图 + SVG 对比卡片
    □ 类比 / 隐喻 / 场景化封面 → AI 绘图 / 自定义 SVG
    □ 真实截图 / 终端输出 / 用户手稿 → 用户素材（§2.0 优先）
    ⚠ "想不到要画什么"通常意味着主张/证据还不具体——回去重新打磨第 1-3 题，别硬凑图。
-   ⚠ **大段文字描述一个能画出来的东西**（架构、流程、对比、状态机），是技术写作的最大反模式。优先想"这段能不能换成一张图 + 一句话说明"。
+   ⚠ 大段文字描述一个能画出来的东西（架构、流程、对比、状态机），是技术写作的最大反模式。
 
 5. 文章类型：这是哪种文章？(选一个，决定阶段 3 的结构)
    □ 现象解读 / 新闻评论：hook → 事实 → 我的解读 → 影响
    □ 技术解析 / 概念科普：钩子 → 类比 → 拆解 → 边界
    □ 产品 / 项目对比：场景 → 维度对比 → 推荐
-   □ 经验沉淀 / 踩坑：背景 → 操作 → 翻车 → 教训
+   □ 经验沉淀 / 踩坑方法论：背景 → 理论/架构 → 实践步骤 → 训练法
    □ 观点檄文 / 立场：论点 → 反方 → 论据 → 重申
-   □ 书评 / 读书笔记：钩子 → 这本书在说什么 → 我同意的部分 → 我不同意/补充的部分 → 它适合谁不适合谁
-   ⚠ 默认套「痛点→方案→总结」是套路化的根源，不要选这个。
-   ⚠ 书评不要硬塞「观点檄文」——书评的力气应该花在"复述 + 校准"，而不是"开战"。
+   □ 书评 / 读书笔记：钩子 → 这本书在说什么 → 我同意的部分 → 我补充的部分
 ```
 
 #### B. 形式自检
 
 ```text
 【形式自检】
-- 人称：全文使用「我们/大家」，不用「你/你的」（带说教感）。
+- 人称：全文使用「我们/大家」，严格不用「你/你的」（带说教感）。
 - 摘要 desc 长度严格 60–120 字符。
 - cover 必填且文件名固定为 cover.png。
 - 正文配图 ≥ 2 张（来自 1A Q4 视觉建模清单），每张图必须在文中被显式引用并解释，不能孤儿。
@@ -96,95 +108,66 @@ description: Use when the user asks to write a technical article, blog post, or 
 
 ### 阶段 2：视觉资产生成
 
-依据阶段 1A 的 **Q4 视觉建模清单** + 证据清单 + 文章类型，规划配图。**第一步永远是 §2.0 素材盘点——先看用户给了什么**，再决定要不要新生成。然后 §2.2 表把 Q4 勾的每一项映射到具体工具，挨个产出。
+依据阶段 1A 的 **Q4 视觉建模清单** + 证据清单 + 文章类型，规划配图。
 
-#### 2.0 素材盘点：先看用户给了什么（在生成任何新图之前）
-1. **列清单**：把会话里出现过的每张图过一遍，记下"画的是什么"。
-2. **逐张定用途**：
-   - **当正文配图**：截图、产品图、终端输出——拷贝进 Payload 目录，按语义重命名。
-   - **当封面**：构图紧凑、视觉冲击强的图，letterbox 到 16:9 或 1:1。严禁使用横向图当封面。
-   - **跳过**：模糊 / 跑题图。
-3. **找缺口**：剩下的视觉需求才是新生成的目标。
-4. **位置原则**：每张图必须紧跟它支撑的那段正文，严禁文末堆砌。
+#### 2.0 素材盘点：先看用户给了什么
+1. 列出会话中已有的素材图。
+2. 决定用途（正文插图、封面或忽略）。
 
 #### 2.1 数量与命名
-- **必出 1 张封面**：`cover.png`。严禁常规横向流程图当封面。
-- **正文图 2–4 张起步**。
-- 文件名要语义化（如 `harness-vs-runtime.png`）。源码（.mmd, .puml）一并保留。
+- **必出 1 张封面**：`cover.png`（16:9 或 1:1）。
+- **正文图 2–4 张起步**，语义化命名（如 `tao-architecture.png`）。
 
-#### 2.2 工具选择
+#### 2.2 工具选择与 SVG / PlantUML 逃逸原则
 | 配图类型 | 推荐工具 |
 |---|---|
 | 角色 / 场景 / 概念封面 | `generate_image` 等 AI 绘图 |
-| 流程图 / 架构图 / 状态机 / 时序图 | `plantuml.jar`（**首选，排版精密清晰**）或 `mmdc`（仅用于极简单线流图） |
-| 二维直角坐标系 / 高级自定义信息图表 | 原生 SVG + macOS `sips` 本地转换 |
-| 思维导图 / 分类树 / 标题封面 | `plantuml.jar` (`@startmindmap`) |
+| 流程图 / 架构图 / 状态机 / 时序图 | `plantuml.jar`（**首选，排版精密清晰**） |
+| 2D 坐标轴 / 流程卡片 / 对比图 / 逃逸场景 | **原生 SVG + macOS `sips` 渲染** |
+| 思维导图 / 分类树 | `plantuml.jar` (`@startmindmap`) |
 | 饼图 / 数据可视化 | Python `matplotlib` |
-| 雷达图 / 对比表 / 结构化矩阵 | `plantuml.jar`（利用 `-[hidden]right-` 等控制为扁平网格） |
 
-##### 2.2.1 SVG 与 PlantUML 的分工边界原则
-在构思图表设计时，应根据图形特性在 **SVG** 与 **PlantUML** 之间进行理性选择：
-- **首选 SVG**：适用于**节点数量较少（通常少于 10 个）、布局结构高度可预测的图形**（例如：2D 直角坐标系、2x2 矩阵分布图、结构化对比卡片、概念金字塔等）。SVG 允许 AI 运用线性渐变、毛玻璃投影、现代系统级字体及更高级的 CSS 样式，达到极高美学上限。
-- **首选 PlantUML**：适用于**结构复杂、节点连线繁多、逻辑关系密集的图表**（例如：系统架构图、调用链路时序图、复杂业务逻辑流、类图、继承关系等）。PlantUML 的引擎会自动进行数学避让和自动对齐，避免因 AI 人脑口算绝对坐标产生文本遮挡或线条重叠。
-- **⚠ PlantUML 截断时的逃逸路径**：若 PlantUML 渲染后图像右侧或底部出现截断（节点/文字被裁掉），**正确的修复路径是切换到 SVG 横向泳道布局**，而不是改回纵向（纵向只会把截断问题从横向转移到纵向）。判断标准：横向节点超过 6 个、或图宽估算超过 1600px，应直接选 SVG。
-
+##### 2.2.1 PlantUML 截断逃逸路径（CRITICAL）
+- 若 PlantUML 渲染后图像右侧或底部出现**截断/文字裁切/边框不全**（如图宽估计超过 1600px 或横向节点 > 4 个），**必须立即切换为原生 SVG 横向泳道布局**（如 `viewBox="0 0 1600 900"`），通过 CSS 色块与 Flex/Grid 式相对坐标彻底消除截断风险。
 
 #### 2.3 渲染命令（1080p~2K 标准与 DPI 300+ 规范）
-参考本地渲染工具规范，图像输出需按引擎特性精准设置清晰度：
-- **PlantUML 最高清晰度渲染**：直接运行 `java -jar ~/bin/plantuml.jar -png <input.puml>`。源码首部必须显式加上 `skinparam dpi 300`（高精密图表推荐 `dpi 360`）以及 `skinparam Shadowing false`，并且为了美观与防止截断，同时加上 `skinparam pageWidth 2400` 与 `skinparam pageHeight 1600`，保障文本及节点字体绝对抗锯齿。
-- **Mermaid 最高清晰度渲染**：使用 `mmdc` 编译 `.mmd` 时，必须显式附加 `-s 3` 或 `--scale 3` 参数进行 DPI 300+ 级别超分缩放。
-- **SVG / PNG 1080p~2K 渲染 (sips)**：设计 `.svg` 源码时使用 1080p ~ 2K 尺寸（如 `viewBox="0 0 1200 675"` 到 `viewBox="0 0 1920 1080"`）。转换命令**必须显式带上 `--resampleWidth`**：
+- **PlantUML 高清渲染**：`java -jar ~/bin/plantuml.jar -png <input.puml>`。源码头部加入 `skinparam dpi 300`、`skinparam Shadowing false`、`skinparam pageWidth 2400`。**严禁引入废弃指令**如 `skinparam handwritten false`。
+- **SVG / PNG 1080p~2K 渲染 (sips)**：设计 `.svg` 源码使用 `viewBox="0 0 1600 900"`。转换命令**必须包含 `--resampleWidth 1920`**：
   `sips -s format png --resampleWidth 1920 <input.svg> --out <output.png>`
-  ⚠ **避坑指南**：不带 `--resampleWidth` 会导致 macOS `sips` 默认按 1x (72 DPI) 栅格化导致高分屏显示发虚。同时，不要将 `linearGradient` 渐变色作为 `fill="url(#id)"` 应用在多字节中文字符 `text` 标签上。源码（.svg）需与渲染后的 PNG 一并保留。
-- **Matplotlib 数据可视化**：使用 Python Matplotlib 绘图导出时，必须设置 `plt.savefig(..., dpi=300, bbox_inches='tight')`。
-- **微信封面处理**：所有封面必须最后执行一次 `fit_wechat_cover.py` 转换至目标比例。
 
-#### 2.4 构图与布局守则
-- **“宽图优先，情愿宽而不要高”原则**：正文插图宁可宽一些（横向拉开），也绝不接受高而窄的纵向图。高图极其不适合手机和网页阅读。
-  - **Mermaid 规范**：首选 `graph LR`；如果内部有子流程，通过 `direction LR` 将子图横向化。
-  - **PlantUML 规范**：使用 `left to right direction` 将默认流转为水平；或者对于双层模型（如冰山模型、矩阵对比），使用 `-[hidden]right-`（而非 `-[hidden]down-`）将元素在同一排拉开，让整体构图呈现 **1.5:1 至 2.5:1 之间的黄金扁平比**。⚠ `left to right direction` 适用于横向节点 ≤ 6 个的场景；超过此阈值时横向总宽容易溢出，此时应改用 **SVG 横向泳道**（用色块分层、组件横排），由 AI 精确控制 `viewBox` 宽高比，彻底规避截断风险。
-- **文字精简**：图表节点内部的文本必须极度精简（限制在 4-8 个字内，仅作为短语标识），严禁塞入长句，详细逻辑在正文中解释。
-- **横纵比窗口**：正文插图 1.2:1 ~ 2.5:1（严禁高度大于宽度的纵向插图）。封面 16:9 或 1:1。
-- **节点数控制**：单图节点数限制在 12 个以下。
-- **颜色和字号**：合理控制，避免过饱和度刺眼配色，统一风格。
-
+#### 2.4 布局与构图守则
+- **黄金扁平比**：正文插图控制在 **1.5:1 至 2.5:1** 之间（宽图优先，严禁高度大于宽度的纵向高图）。
+- **文字极简**：节点内部文字 4-8 字以内，长句在正文中解释。
 
 #### 2.5 渲染后必查
-用 `Read` 打开PNG：文字无溢出、无重叠、方向正确、比例合理、中文清晰。不达标则重渲。
+用 `view_file` 或 Read 工具检查 PNG：文字无溢出、无截断、无重叠、中文清晰。不达标则重渲。
 
 ---
 
-### 阶段 3：起草 Markdown（按文章类型选骨架）
+### 阶段 3：起草 Markdown
 
-在 Payload 目录下创建 `article.md`。Front matter **格式固定**，正文骨架**按阶段 1 选定的文章类型**走对应模板。
+在 Payload 目录下创建 `article.md`。
 
 #### Front Matter（固定）
 ```markdown
 ---
-title: "[有张力、不平铺直叙的标题]"
+title: "[具备反直觉张力与极化主张的标题]"
 author: "Agent"
-desc: "[60–120 字符摘要，凝练主张与反直觉点]"
-collection: "[必填] 严格从项目根目录 blogger.toml -> platforms.wechat.accounts.default.article_collections 中选择一个（精确匹配，区分大小写）"
+desc: "[60–120 字符摘要，凝练核心主张与社交货币概念]"
+collection: "[必填] 严格从 blogger.toml -> platforms.wechat.accounts.default.article_collections 中选择"
 cover: "cover.png" # 必填且固定
 ---
 ```
-
-#### 正文骨架
-
-根据【文章类型】选择合理的行文结构，确保：
-- 每张生成的图都有 `![图注：...](xx.png)` 的引用。
-- 图不堆砌在文末，必须紧贴解释段落。
 
 ---
 
 ### 阶段 4：Dispatch Review (Subagent)
 
 **CRITICAL INSTRUCTION**: Writing is now complete, but you MUST NOT proceed to publish.
-You MUST dispatch a subagent (`@generalist`) and instruct it to review your drafted `article.md` using the `review-article` skill.
+You MUST dispatch a subagent (`@self` 或 `@generalist`) 并指示其使用 `review-article` skill 审阅草案。
 
 **Action to take:**
-1. Call the `invoke_agent` tool.
-2. Set `agent_name` to `generalist`.
-3. Set `prompt` to: `Please review the article draft at [Path to article.md] using the 'review-article' skill. Ensure you follow all pre-flight checks and apply necessary edits to the file.`
+1. Call the `invoke_subagent` tool.
+2. Prompt: `Please review the article draft at [Path to article.md] using the 'review-article' skill. Ensure you follow the 100-point quality rubric, execute all pre-flight checks, and apply necessary edits to the file.`
 
-Once the subagent completes its review, inform the user they can now run `/publish-article` to push it to the platform. Do not run the publish command yourself.
+完成审阅后，告知用户可运行 `/publish-article` 进行推送。

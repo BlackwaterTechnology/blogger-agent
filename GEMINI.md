@@ -156,5 +156,5 @@ if (cb && !cb.checked) {
    - **PlantUML / Mermaid 图表引擎**：必须保持 **DPI 300+**（PlantUML 设置 `skinparam dpi 300` 或 `360`，Mermaid 使用 `-s 3` 3x 采样），保障复杂节点与文字线条达到最高精密清晰度。
    - **SVG / PNG 画布**：分辨率采用 **1080p ~ 2K 标准**（图片宽度控制在 **1200px – 1920px** 之间），兼顾移动端 3x Retina 高分屏锐利显示与加载速度。
 2. **SVG 高画质转换命令**：`sips` 转换 SVG 为 PNG 时**必须强制包含 `--resampleWidth 1920`** (例如 `sips -s format png --resampleWidth 1920 input.svg --out output.png`)，防止 `sips` 默认 1x 低分辨率栅格化导致 Retina 屏下发虚。SVG 源码采用 `viewBox="0 0 1200 675"` 至 `viewBox="0 0 1920 1080"` 尺寸。
-3. **PlantUML / Mermaid 高画质**：PlantUML 统一使用 `skinparam dpi 300` (最高画质可设为 `360`) 结合 `pageWidth 2400`；Mermaid 编译时显式附加 `-s 3` 参数。
+3. **PlantUML / Mermaid 高画质**：PlantUML 统一使用 `skinparam dpi 300` (最高画质可设为 `360`) 结合 `pageWidth 2400`；严禁使用已废弃指令（例如 `skinparam handwritten false`），防止新版 PlantUML 引擎在生成的图片顶部打印黄色 Warning 提示条。Mermaid 编译时显式附加 `-s 3` 参数。
 4. **Matplotlib**：Python 导出图表必须显式声明 `plt.savefig(..., dpi=300, bbox_inches='tight')`。
