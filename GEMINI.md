@@ -34,6 +34,7 @@ This tool uses Python and AppleScript to interact with a running instance of Goo
         *   `wechat.py`, `csdn.py`, `juejin.py`: Blog platforms.
         *   `bilibili.py`, `wechat_video.py`, `wechat_channels.py`: Video platforms.
 *   **`skills/`**: Agent skill definitions (`SKILL.md` files) for various capabilities.
+*   **`articles/`**: 文章 Payload 目录。所有新建文章目录**必须前置当前日期**，格式为 `YYYY-MM-DD-<slug>`（例如 `2026-08-03-true-nobility`）。
 *   **`watermark_remover.py`**: Utility for removing AI-generated watermarks from videos.
 *   **`monitor_video.sh`**: Reference script for the background polling workflow.
 

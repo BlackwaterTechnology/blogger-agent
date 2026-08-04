@@ -153,7 +153,11 @@ description: Use when the user asks to write a technical article, blog post, or 
 
 ### 阶段 3：起草 Markdown
 
-在 Payload 目录下创建 `article.md`。
+在 `articles/YYYY-MM-DD-<slug>` Payload 目录下创建 `article.md`。
+
+目录命名强制规范：
+- 格式：`articles/YYYY-MM-DD-<slug>`（例如 `articles/2026-08-03-true-nobility`）
+- 必须前置当前日期（YYYY-MM-DD），使用连字符 `-` 连接日期与语义化英文 slug。
 
 ---
 

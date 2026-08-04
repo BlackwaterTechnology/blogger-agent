@@ -118,7 +118,7 @@ def parse_markdown_payload(md_path: Path) -> dict:
         raise ValueError(f"Invalid Front Matter format in {md_path}") from e
     
     title = post.metadata.get("title", "")
-    author = post.metadata.get("author", "")
+    author = str(post.metadata.get("author", "") or "").strip() or "Agent"
     
     # Validate Collection against config
     allowed = get_all_wechat_collections()
