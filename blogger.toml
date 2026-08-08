@@ -4,7 +4,10 @@ article_collections = [
     "Agent",
     "AWS",
     "Web3",
-    "DevOps"
+    "DevSecOps"
+    "认知思维"
+    "信息安全"
+    "Iac"
 ]
 video_collections = [
     "agent",
