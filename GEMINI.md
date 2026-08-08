@@ -159,3 +159,9 @@ if (cb && !cb.checked) {
 2. **SVG 高画质转换命令**：`sips` 转换 SVG 为 PNG 时**必须强制包含 `--resampleWidth 1920`** (例如 `sips -s format png --resampleWidth 1920 input.svg --out output.png`)，防止 `sips` 默认 1x 低分辨率栅格化导致 Retina 屏下发虚。SVG 源码采用 `viewBox="0 0 1200 675"` 至 `viewBox="0 0 1920 1080"` 尺寸。
 3. **PlantUML / Mermaid 高画质**：PlantUML 统一使用 `skinparam dpi 300` (最高画质可设为 `360`) 结合 `pageWidth 2400`；严禁使用已废弃指令（例如 `skinparam handwritten false`），防止新版 PlantUML 引擎在生成的图片顶部打印黄色 Warning 提示条。Mermaid 编译时显式附加 `-s 3` 参数。
 4. **Matplotlib**：Python 导出图表必须显式声明 `plt.savefig(..., dpi=300, bbox_inches='tight')`。
+
+### 文章 Markdown 文本与符号渲染规范
+
+1. **禁用 LaTeX 箭号数学公式**：在生成面向微信公众号、掘金、CSDN 等平台的 Markdown 文章时，**严禁使用 LaTeX 行内数学公式语法（如 `$\rightarrow$`, `$\Leftarrow$`）表示逻辑方向**。微信公众号等主流编辑器的 Markdown 解析器不会编译行内 LaTeX 数学公式，会导致文章中直接暴露 `\rightarrow` 等原始字符串。
+2. **统一使用原生 Unicode 符号**：文章正文中的逻辑连接符必须直接使用标准的原生 Unicode 符号（如 `→`, `←`, `↑`, `↓`, `⇒`, `⇔`），确保在所有移动端与 WEB 编辑器中 100% 正确渲染。
+
