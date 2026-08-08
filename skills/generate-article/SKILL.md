@@ -116,6 +116,7 @@ description: Use when the user asks to write a technical article, blog post, or 
 【形式自检】
 - 人称：全文使用「我们/大家」，严格不用「你/你的」（带说教感）。
 - 摘要 desc 长度严格 60–120 字符。
+- 微信合集 collection：必须且只能从配置文件 blogger.toml 的 [platforms.wechat.accounts.default].article_collections 列表中选择（如 AI, Agent, AWS, Web3, DevSecOps, 认知思维, 信息安全, Iac, 云原生）。
 - cover 必填且文件名固定为 cover.png。
 - 正文配图 ≥ 2 张（来自 1A Q4 视觉建模清单），每张图必须在文中被显式引用并解释，不能孤儿。
 - 图表字号：正文图片节点字号是否 ≥ 20px-22px？无长句堆砌？
@@ -158,6 +159,24 @@ description: Use when the user asks to write a technical article, blog post, or 
 目录命名强制规范：
 - 格式：`articles/YYYY-MM-DD-<slug>`（例如 `articles/2026-08-03-true-nobility`）
 - 必须前置当前日期（YYYY-MM-DD），使用连字符 `-` 连接日期与语义化英文 slug。
+
+#### Front Matter 规范 (CRITICAL)
+
+`article.md` 头部必须包含合规的 YAML Front Matter：
+
+```yaml
+---
+title: "文章标题"
+author: "Agent"
+desc: "60-120字的凝练摘要"
+collection: "AI" # ⚠️ 微信文章合集：必须且只能从 blogger.toml 的 article_collections 列表中选择！
+cover: "cover.png"
+---
+```
+
+**`collection` (微信文章合集) 强制校验规则**：
+- `collection` 字段值**必须且只能**选择自项目根目录 `blogger.toml` 中 `[platforms.wechat.accounts.default].article_collections` 定义的有效合集名称列表（例如 `["AI", "Agent", "AWS", "Web3", "DevSecOps", "认知思维", "信息安全", "Iac", "云原生"]`）。
+- 严禁在 Front Matter 中填入未在 `blogger.toml` 中配置的合集名称。若需要新增合集，必须先编辑 `blogger.toml` 添加对应项目后再使用。
 
 ---
 
