@@ -15,7 +15,7 @@ class BloggerPublisher:
 
     def convert_to_html_with_base64_images(self, content: str, payload_dir: Path) -> str:
         # Preprocess math formulas in content first (renders block formulas to base64 images)
-        from ..core.markdown_parser import preprocess_math
+        from ..core.markdown_parser import preprocess_math, ensure_blank_before_lists
         content = preprocess_math(content, payload_dir)
 
         # Find all markdown images: ![alt](path)
@@ -72,7 +72,8 @@ class BloggerPublisher:
             
         converted_content = re.sub(r'<img\s+([^>]*?)>', html_img_replacer, converted_content)
         
-        # Convert markdown to html
+        # Convert markdown to html with list blank line guarantees
+        converted_content = ensure_blank_before_lists(converted_content)
         html = markdown.markdown(converted_content, extensions=['fenced_code', 'tables', 'sane_lists'])
         return html
 

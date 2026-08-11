@@ -163,7 +163,7 @@ description: Use when the user asks to write a technical article, blog post, or 
    - **右栏 (60% 宽度)**：**必须包含高对比度微型信息图/数据对比卡片 (Micro-Infographic Card)**（如：“静态对冲收益腰斩 11%➔3%” vs “机构四大 Alpha 矩阵”）。
 
 3. **三种封面模式分级**：
-   - **模式 1 (推荐)：复合矢量信息图封面** (使用 SVG 设计左文右图卡片，`sips -s format png --resampleWidth 1920` 渲染)。
+   - **模式 1 (强制首选)：复合矢量信息图封面** (默认必须使用 SVG 设计左文 Hook + 右侧微型信息图卡片，`sips -s format png --resampleWidth 1920` 渲染)，严禁生成无右侧信息图卡片的平铺标题封面。
    - **模式 2：大字极简数据冲突封面** (突出巨大核心数据对比 `11% ➔ 3%`)。
    - **模式 3：AI 概念场景插图 + 文字叠加** (`generate_image` 生成无字 2D 矢量图 + 叠加爆破 Hook)。
 
@@ -176,6 +176,7 @@ description: Use when the user asks to write a technical article, blog post, or 
 目录命名强制规范：
 - 格式：`articles/YYYY-MM-DD-<slug>`（例如 `articles/2026-08-03-true-nobility`）
 - 必须前置当前日期（YYYY-MM-DD），使用连字符 `-` 连接日期与语义化英文 slug。
+- **列表空行硬性规范**：无序列表（`*`, `-`）与有序列表（`1.`, `2.`）与其上方的正文段落之间，必须显式插入空行（如 `段落说明：\n\n* 列表项1`），防止在 Blogger / 微信 / CSDN 编辑器中被合并为无换行的单行长段落。
 
 #### Front Matter 规范 (CRITICAL)
 

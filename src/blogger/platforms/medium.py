@@ -314,8 +314,9 @@ class MediumPublisher:
 
         # 5. Convert Markdown to HTML
         logger.info("Converting Markdown content to HTML (with math formulas)...")
-        from ..core.markdown_parser import preprocess_math
+        from ..core.markdown_parser import preprocess_math, ensure_blank_before_lists
         preprocessed_content = preprocess_math(content, payload_dir)
+        preprocessed_content = ensure_blank_before_lists(preprocessed_content)
         html_content = markdown.markdown(preprocessed_content, extensions=['fenced_code', 'tables', 'sane_lists'])
         # Strip horizontal rules (<hr>) as requested by user
         html_content = re.sub(r'<hr\s*/?>', '', html_content)
