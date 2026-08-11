@@ -46,14 +46,14 @@ description: Use when the user asks to write a technical article, blog post, or 
 - **bash**：跑图片生成子进程。
 - **文件系统**：建 Payload 目录、保存图片与 Markdown。
 - **图片生成**（按内容类型分工，参数详见阶段 2）：
-  - **角色 / 场景化封面、概念意象图**：原生 AI 绘图工具（如 `generate_image`）。
-  - **排版式封面（书评 / 杂志风）**：Python `matplotlib`（无 AI 绘图工具时的兜底）。
+  - **瑞士平面排版封面（首选/无AI噪点）**：`python tools/generate_cover.py` (支持 `swiss_red`, `navy_gold`, `emerald`, `slate_lime` 4 种杂志级主题配色)。
+  - **扁平矢量概念封面**：`generate_image` 等 AI 绘图工具（**必须带 2D 扁平矢量 Prompt 约束，严禁 3D 霓虹/发光脑/科幻 HUD/假文字等 AI 俗套**）。
   - **二维坐标轴 / 精美自定义图表**：AI 生成或手写原生 SVG，利用 macOS 系统的 `sips` 工具进行本地 PNG 渲染。在需要高主观审美颜值、非标准或精确的坐标轴与信息图卡片时使用。
   - **结构化图表（架构 / 流程 / 拓扑 / 思维导图 / 对比网格）**：本地离线渲染优先：
     - `~/bin/plantuml.jar`（PlantUML，**首选引擎**。排版精密，可控性强，支持高 DPI。配合 `!pragma layout smetana` 无需 Graphviz）
     - `~/bin/mmdc`（官方 `@mermaid-js/mermaid-cli`，Puppeteer + Dagre 布局，**备选/极简图表引擎**）
   - **最后兜底**：`blogger generate-diagram --type mermaid|plantuml --input x --output x.png`（kroki.io，受公网限制，仅本地工具不可用时使用）
-- **封面 letterbox 工具**：`~/.claude/skills/blogger-agent/tools/fit_wechat_cover.py`（随 skill 分发）——把任意比例的封面 letterbox 到目标比例（默认 16:9，可选 1:1），支持 `--bg white|black|auto|#RRGGBB` 与 `-o/--output` alias。详见 §2.3。
+- **封面 letterbox 工具**：`tools/fit_wechat_cover.py`——把任意比例的封面 letterbox 到目标比例（默认 16:9，可选 1:1），支持 `--bg white|black|auto|#RRGGBB` 与 `-o/--output` alias。详见 §2.3。
 
 ---
 
@@ -147,8 +147,25 @@ description: Use when the user asks to write a technical article, blog post, or 
 
 #### 2.3 渲染命令（1080p~2K 标准与 DPI 300+ 规范）
 - **PlantUML 高清渲染**：`java -jar ~/bin/plantuml.jar -png <input.puml>`。源码头部加入 `skinparam dpi 300`、`skinparam Shadowing false`、`skinparam pageWidth 2400`。
-- **SVG / PNG 1080p~2K 渲染 (sips)**：设计 `.svg` 源码使用 `viewBox="0 0 1600 900"`。转换命令**必须包含 `--resampleWidth 1920`**：
+- **SVG / PNG 1080p~2K 渲染 (sips)**：设计 `.svg` 源码使用 `viewBox="0 0 1600 900"`（封面 `1920 1080`）。转换命令**必须包含 `--resampleWidth 1920`**：
   `sips -s format png --resampleWidth 1920 <input.svg> --out <output.png>`
+
+#### 2.4 封面设计高阶规范 (Editorial Cover Design Standards)
+
+**严禁把正文全长标题直接填入封面**！封面是社交吸引力锚点，必须遵守**【双栏复合杂志架构 (Composite Editorial Layout)】**：
+
+1. **解耦“封面 Hook”与“正文 H1 标题”**：
+   - **封面大标题**：必须炼字为 **4 ~ 8 字认知冲突爆破短语**（例如：“11% 的谎言？”、“破局 5% 年化”），绝不使用 20+ 字的全长技术标题。
+   - **正文标题**：保留完整的 SEO 严密技术标题。
+
+2. **双栏复合杂志排版 (Dual-Column Architecture)**：
+   - **左栏 (40% 宽度)**：分类 Badge + 极简爆破短语 + 副标题 + 品牌/日期 Header。
+   - **右栏 (60% 宽度)**：**必须包含高对比度微型信息图/数据对比卡片 (Micro-Infographic Card)**（如：“静态对冲收益腰斩 11%➔3%” vs “机构四大 Alpha 矩阵”）。
+
+3. **三种封面模式分级**：
+   - **模式 1 (推荐)：复合矢量信息图封面** (使用 SVG 设计左文右图卡片，`sips -s format png --resampleWidth 1920` 渲染)。
+   - **模式 2：大字极简数据冲突封面** (突出巨大核心数据对比 `11% ➔ 3%`)。
+   - **模式 3：AI 概念场景插图 + 文字叠加** (`generate_image` 生成无字 2D 矢量图 + 叠加爆破 Hook)。
 
 ---
 

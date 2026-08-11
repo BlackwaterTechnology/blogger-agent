@@ -52,6 +52,7 @@ description: Use when invoked by a main agent to review an article draft, or exp
 9. 0 真实性幻觉：核对文中所有 API 参数、法律判例、历史年份与项目名称，确保 100% 真实准确。
 10. LaTeX 符号过滤：检查正文中是否存在 `$\rightarrow$`、`$\Leftarrow$` 等行内 LaTeX 数学符号。若有，一律自动替换为原生 Unicode 箭头（`→`、`⇒`），防止微信富文本渲染失真。
 11. 微信合集校验 (collection)：检查 Front Matter 中的 collection 字段是否包含在 `blogger.toml` 的 `article_collections` 列表中。若不在列表中，必须修正为 `blogger.toml` 定义的有效合集。
+12. 封面 AI 味审查 (De-AI Cover Check)：用 view_file 检查 `cover.png`。**严禁使用 3D 霓虹/发光脑/科幻 HUD/满屏假字等 AI 俗套封面**！若发现此类封面，必须调用 `python tools/generate_cover.py` 重新生成瑞士平面排版封面进行替换。
 ```
 
 ---

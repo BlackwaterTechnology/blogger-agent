@@ -14,7 +14,7 @@ description: 自动生成高质量中文技术/商业文章 Payload（符合 YYY
 
 ## 2. 视觉资产生成 (Generate Visual Assets)
 按主题生成高清配图：
-1. **封面图 `cover.png`**：16:9 或 1:1 高质量概念意象图（生成后通过 `fit_wechat_cover.py` 处理）。**严禁使用宽幅技术图表作为封面**。
+1. **封面图 `cover.png`**：**优先使用程序化瑞士平面排版直出**（`python tools/generate_cover.py --title "..." --subtitle "..." --category "..." --theme swiss_red|navy_gold|emerald|slate_lime`），彻底杜绝 AI 噪点与伪字。若确需使用 AI 绘图，必须使用 2D 扁平矢量插画风格，**严禁使用 3D 霓虹/发光脑/科幻 HUD/满屏假字等 AI 俗套图**。
 2. **正文插图 (2-4 张)**：使用 PlantUML (`dpi 300`) 或原生 SVG + `sips` (`--resampleWidth 1920`) 生成结构化图表。严格执行移动端字号硬性底线（节点字号 ≥ 20px - 22px），文本极简抽象为 4-8 字短语。
 
 ## 3. 构造 Payload 目录与正文 (Create Payload)
