@@ -138,9 +138,10 @@ description: Use when the user asks to write a technical article, blog post, or 
 | 配图类型 | 推荐工具 | 移动端字号要求 |
 |---|---|---|
 | 角色 / 场景 / 概念封面 | `generate_image` 等 AI 绘图 | N/A |
-| 流程图 / 架构图 / 状态机 | `plantuml.jar`（首选） | 节点字号 ≥ 20px |
-| 对比矩阵 / 2D 坐标卡片 | **原生 SVG + sips** | 正文字号 ≥ 22px，极简 4-8 字 |
+| 交互序列图 / 时序图 / 对比矩阵 | **原生 SVG + sips（强制首选）** | 节点/流程字号 ≥ 20px-22px，零截断 |
+| 基础流程图 / 拓扑 / 状态机 | **原生 SVG（首选）** 或 `plantuml.jar`（备选） | 节点字号 ≥ 20px |
 | 思维导图 / 分类树 | `plantuml.jar` (`@startmindmap`) | 节点字号 ≥ 20px |
+
 
 ##### 2.2.1 PlantUML 截断与小字逃逸路径（CRITICAL）
 - 若 PlantUML 渲染后图像出现**小字密麻**、**文字裁切**或**图宽估计超过 1600px**，**必须立即切换为原生 SVG 横向泳道布局**（`viewBox="0 0 1600 900"`），正文使用 `22px ~ 24px` 字号，通过 CSS 卡片与 4-8 字短语彻底规避移动端看不清的问题。
