@@ -490,20 +490,23 @@ class BloggerPublisher:
             logger.info("Dry-run mode: skipping final publish step. Post saved as draft.")
             return
             
-        logger.info("Publishing post...")
+        logger.info("Publishing / Updating post...")
         js_click_publish = """
         (function() {
             const btns = Array.from(document.querySelectorAll('button, div[role="button"]'));
-            const publishBtn = btns.find(b => 
+            const actionBtn = btns.find(b => 
                 (b.getAttribute('aria-label') === 'Publish' || 
-                 b.innerText.trim().toLowerCase().includes('publish') || 
-                 b.innerText.trim().includes('发布')) &&
+                 b.getAttribute('aria-label') === 'Update' || 
+                 b.innerText.trim().toLowerCase() === 'publish' || 
+                 b.innerText.trim().toLowerCase() === 'update' || 
+                 b.innerText.trim().includes('发布') ||
+                 b.innerText.trim().includes('更新')) &&
                 b.offsetWidth > 0 && b.offsetHeight > 0
             );
-            if (publishBtn) {
-                publishBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-                publishBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-                publishBtn.click();
+            if (actionBtn) {
+                actionBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                actionBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+                actionBtn.click();
                 return "CLICKED";
             }
             return "NOT_FOUND";
@@ -511,7 +514,7 @@ class BloggerPublisher:
         """
         publish_res = self.chrome.execute_javascript(w_idx, t_idx, js_click_publish, settle_seconds=2.0)
         if publish_res == "CLICKED":
-            logger.info("Confirming publication...")
+            logger.info("Checking for confirmation dialog or update completion...")
             js_confirm_publish = """
             (function() {
                 const allDialogBtns = Array.from(document.querySelectorAll('div[role="dialog"] button, div[role="dialog"] div[role="button"], div[role="alertdialog"] button, div[role="alertdialog"] div[role="button"]'));
@@ -525,10 +528,10 @@ class BloggerPublisher:
                     confirmBtn.click();
                     return "CONFIRMED";
                 }
-                return "CONFIRM_NOT_FOUND";
+                return "DIRECT_UPDATED";
             })();
             """
             confirm_res = self.chrome.execute_javascript(w_idx, t_idx, js_confirm_publish, settle_seconds=2.0)
-            logger.info(f"Publish result: {confirm_res}")
+            logger.info(f"Publish/Update result: {confirm_res}")
         else:
-            logger.warning("Could not find Publish button in editor.")
+            logger.warning("Could not find Publish or Update button in editor.")
