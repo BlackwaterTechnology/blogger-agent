@@ -20,7 +20,7 @@ description: Use when the user asks to create, design, or publish a WeChat Photo
    - 封面大标题必须提炼为 **4 ~ 8 字认知冲突短语/爆破钩子**（如 `0.99刀的真相？`、`穿仓的必然性`），CTR > 10%。
 2. **【3:4 竖版高密画册假设】(Visual Density Floor)**：
    - 统一采用移动端黄金比例 **3:4**（`1200 x 1600 px`）。
-   - 单张卡片以 **4 ~ 8 字短语** 与 **高对比度模块卡片** 承载，字号严格保持 **≥ 22px**，将滑动率与完播率拉升至 70%+。
+   - 单张卡片以 **4 ~ 8 字短语** 与 **高对比度模块卡片** 承载，正文字号严格保持 **≥ 28px**（标签与次要说明 ≥ 24px-26px），将滑动率与完播率拉升至 70%+。
 3. **【切片沉淀与公域破圈双轮驱动】(Matrix Synergy)**：
    - 长文做深度沉淀与私域专家壁垒；图片消息做公域推荐破圈与快速涨粉。两者互相链接，形成内容矩阵。
 4. **【T-A-O 认知协作架构】(Orchestration)**：
@@ -28,7 +28,7 @@ description: Use when the user asks to create, design, or publish a WeChat Photo
 
 ---
 
-## 📱 移动端优先（Mobile-First）排版与字符底线（CRITICAL）
+## 📱 移动端优先（Mobile-First）排版与字号底线（CRITICAL）
 
 微信图片消息的描述文案输入框（Description）在微信端具有 **1000 字符硬性上限**。为确保发布 100% 成功且具备移动端阅读沉浸感，必须遵守以下铁律：
 
@@ -41,10 +41,10 @@ description: Use when the user asks to create, design, or publish a WeChat Photo
    - 引用统一使用 `💡 核心洞察：` 引导行，禁用 `>` 语法。
    - 列表项使用原生 Unicode 符号（`• ` 或 `1. `）。
    - 强调使用自然标点（如「」、“”），避免大面积使用 `**粗体**` 产生字符噪点。
-3. **字号硬性底线（Font Size Floor）**：
-   - **大标题 / Hook 核心词**：`42px ~ 68px`（超粗加重）
-   - **模块标题 / Badge 标签**：`26px ~ 34px`
-   - **正文要点 / 节点说明**：**严格禁止低于 22px ~ 24px**！在手机端缩放后低于 22px 的文字无法辨识。
+3. **移动端字号硬性底线（Mobile Typography Floor）**：
+   - **大标题 / Hook 核心词**：`56px ~ 72px`（超粗加重，8字以内爆破短语）
+   - **模块标题 / 核心节点**：`34px ~ 42px`
+   - **正文要点 / 节点说明 / 标签**：**严格禁止低于 26px ~ 28px**！在 1200px 宽度的 3:4 卡片中，缩放至手机屏幕（360px）时缩放比仅 0.30，低于 26px 的文字会缩水为 <7.8px 的模糊小点，严重伤害阅读体验。
 4. **极致短语化（Extreme Abstraction）**：
    - 卡片节点文字控制在 **4 ~ 8 个字以内**（短语化、符号化、加粗关键词如 `第一性原理 · 边界审计`）。
    - **严禁在卡片中堆砌整段长句或复杂段落**。
@@ -53,10 +53,31 @@ description: Use when the user asks to create, design, or publish a WeChat Photo
 
 ---
 
+## 🎨 3:4 封面设计三大模式与多模态策略
+
+为避免整套卡片从头到尾清一色冷色框图，首图（`01_cover.png`）支持 3 大封面模式：
+
+### 模式 A (默认)：SVG 复合杂志信息卡片 (`photo_card_generator.py`)
+- **适用**：硬核系统、逻辑拆解、方法论清单。
+- **结构**：顶部大字号爆破 Hook（68px） + 副标题（32px） + 3 行高对比度认知冲突微型卡片（36px+28px）。
+
+### 模式 B：AI 具象概念场景隐喻封面 (`generate_image` 3:4 比例)
+- **适用**：反直觉认知、重型 vs 轻量对抗、哲学反思、爆款破圈。
+- **生成方式**：调用 `generate_image`（设置 `AspectRatio: "3:4"`），使用 **5 大去 AI 味杂志社论流派**（杜绝发光脑、机械手、科幻 HUD、乱码假字），生成高审美具象物理隐喻画面。
+- **5 大流派 Prompt 模板**：
+  1. **现代社论扁平插画**：`Modern editorial vector illustration, 3:4 vertical poster, flat 2D graphic design, elegant bold silhouettes, clean textured geometry, contemporary magazine style, subtle paper texture, cohesive color palette of slate gray, amber and deep navy. Scene depicting [具体场景]. No text, no words.`
+  2. **实体机械/物理隐喻对比**：`Conceptual physical metaphor illustration, 3:4 vertical composition, vintage intricate mechanism contrasting with sleek modern minimalist artifact, rich tactile textures, warm atmospheric cinematic lighting. Scene showing [具体物理对比]. No text, no glowing sci-fi clichés.`
+  3. **复古清晰线稿与版画 (Ligne Claire)**：`Ligne claire illustration style, Moebius inspired ink line art with subtle watercolor wash, 3:4 vertical layout, matte muted earth tones (terracotta, olive green, cream paper). Scene showing [具体场景]. Zero text.`
+  4. **等轴测微缩黏土模型**：`Isometric stylized miniature diorama, 3:4 vertical composition, handcrafted matte clay and folded paper aesthetic, soft tactile studio lighting, mint green and cream harmony. Scene showing [微缩系统场景]. No text.`
+  5. **包豪斯构成主义**：`Bauhaus constructivist graphic art, 3:4 vertical poster, Swiss typographic style, bold abstract geometric forms, diagonal dynamic balance, matte screen print texture. Concept representing [抽象力学平衡]. No text.`
+
+---
+
 ## 🛠️ Required Tools
 
 - **卡片渲染引擎**：`tools/generate_photo_cards.py`（支持单张或通过 JSON/YAML 配置批量生成）。
 - **底座模块**：`src/blogger/core/photo_card_generator.py`（内置 5 大布局模板与 4 款杂志级主题配色）。
+- **AI 绘图工具**：`generate_image`（支持 3:4 竖版具象概念隐喻封面生成）。
 - **转换工具**：macOS 原生 `sips`（配合 `--resampleWidth 1200` 实现 Retina 级别清晰度，零锯齿与发虚）。
 - **文件系统**：管理 `articles/YYYY-MM-DD-photo-<slug>/` 目录结构。
 
@@ -66,11 +87,11 @@ description: Use when the user asks to create, design, or publish a WeChat Photo
 
 | 模板标识 | 适用场景 | 关键视觉要素 |
 |---|---|---|
-| **`cover`** | 首图 Hook / 封面 | 分类 Badge + 4~8 字爆破短语 + 副标题 + 3 行微型数据/认知对比卡 + 滑动提示 |
-| **`vs_comparison`** | 二元对抗 / 新旧对比 | 双栏对比矩阵（左侧 ❌ 传统旧模式 vs 右侧 ✅ 现代新范式） + 底部核心结论条 |
-| **`bullet_points`** | 核心支柱 / 模块清单 | 3~4 个独立圆角卡片，含序号 Pill、加粗要点、短语描述与底部标签组 |
-| **`pipeline_steps`** | 步骤流转 / 工程链路 | 垂直连线流转卡片（Step 01 → Step 02 → Step 03） + 阶段交付物 + 底部铁律栏 |
-| **`summary_cta`** | 复盘清单 / 互动引流 | 3~4 项核心 Checklist + 突出的大号互动探讨卡片（💬 提问） + 点赞/收藏/转发栏 |
+| **`cover`** | 首图 Hook / 封面 | 分类 Badge + 4~8 字爆破短语 (68px) + 副标题 (32px) + 3 行微型数据/认知对比卡 (36px/28px) + 滑动提示 |
+| **`vs_comparison`** | 二元对抗 / 新旧对比 | 双栏对比矩阵（左侧 ❌ 传统旧模式 vs 右侧 ✅ 现代新范式） + 底部核心结论条 (28px) |
+| **`bullet_points`** | 核心支柱 / 模块清单 | 3~4 个独立圆角卡片，含序号 Pill、加粗要点 (36px)、短语描述 (28px) 与底部标签组 (24px) |
+| **`pipeline_steps`** | 步骤流转 / 工程链路 | 垂直连线流转卡片（Step 01 → Step 02 → Step 03） + 阶段交付物 (26px) + 底部铁律栏 (26px) |
+| **`summary_cta`** | 复盘清单 / 互动引流 | 3~4 项核心 Checklist (28px) + 突出的大号互动探讨卡片（💬 提问 34px） + 点赞/收藏/转发栏 (26px) |
 
 ---
 
@@ -99,7 +120,7 @@ description: Use when the user asks to create, design, or publish a WeChat Photo
 1. 爆破 Hook（4-8字）：封面想击穿读者哪个固有偏见？（如：0.99刀的真相？/ 穿仓的必然性）
 2. 社交货币命名实体：本文提炼了哪 1 个具备传播力的概念/方法论？（如：1.111B Class / 动态 Delta 引擎）
 3. 3~7 张卡片规划清单：
-   - 卡片 01 (cover)：爆破 Hook + 核心冲突数据
+   - 卡片 01 (cover)：爆破 Hook + 核心冲突数据（或 AI 具象概念隐喻封面）
    - 卡片 02 (vs_comparison / points)：旧模式痛点 vs 新范式解法
    - 卡片 03 (bullet_points / pipeline)：三大支柱 / 关键机制
    - 卡片 04 (pipeline_steps / points)：四步实操落地链路
@@ -110,8 +131,9 @@ description: Use when the user asks to create, design, or publish a WeChat Photo
 ```text
 【形式自检】
 - 画布比例：严格 3:4 竖版（1200 x 1600 px）。
-- 字号底线：标题 ≥ 42px，正文节点 ≥ 22px，无整段长句堆砌。
+- 字号底线：大标题 56-72px，卡片标题 ≥ 34px，正文节点严格 ≥ 28px（标签/辅助 ≥ 24px），无整段长句堆砌。
 - 配色主题：统一从 navy_gold / swiss_red / emerald / slate_lime 中选取 1 种。
+- 0 AI 俗套审查：若使用 AI 绘图生成封面，绝无发光蓝脑、机械手、科幻 HUD、乱码假字。
 - 微信合集 collection：必须且只能从 blogger.toml 的 photo_collections 列表中选择。
 - 伴随文案字数：严格控制在 350 ~ 700 字符（上限绝对 ≤ 900 字符），0 Markdown 语法污染。
 - 符号规范：100% 使用原生 Unicode 符号，0 LaTeX 行内公式。
@@ -197,8 +219,9 @@ photos:
 你必须调用子代理（`@self` 或 `@generalist`）并指示其使用 `review-article` 或针对图片消息的打分卡进行审查：
 - 伴随文案纯文本字符数是否严格在 **350 ~ 700 字符** 且 **≤ 900 字符**？
 - 卡片是否为严格 3:4 比例（1200x1600）？
-- 移动端字号是否全部 ≥ 22px？
+- 移动端字号是否全部严格 ≥ 28px（核心节点 ≥ 34px，标签/辅助 ≥ 24px）？
 - 封面是否有 4~8 字爆破 Hook？
+- 若首图为 AI 生成，是否 100% 杜绝了发光蓝脑、机械手、科幻 HUD、乱码假字？
 - 正文是否为 0 LaTeX 公式、0 Markdown 语法污染（无 `###`、`---`、`**`）？
 - `collection` 是否严格属于 `blogger.toml` 的 `photo_collections`？
 

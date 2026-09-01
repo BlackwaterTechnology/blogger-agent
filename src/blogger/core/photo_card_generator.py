@@ -113,24 +113,24 @@ def _render_header_svg(
     cat_text = _escape_xml(category.upper())
     idx_text = _escape_xml(page_idx)
 
-    badge_w = max(120, len(cat_text) * 22 + 40)
+    badge_w = max(140, len(cat_text) * 24 + 48)
 
     return f"""
     <!-- Top Header Bar -->
     <g id="header">
         <!-- Category Badge -->
-        <rect x="{margin_x}" y="{curr_y}" width="{badge_w}" height="44" rx="8" fill="{palette['badge_bg']}" />
-        <text x="{margin_x + 20}" y="{curr_y + 29}" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="bold" fill="{palette['badge_fg']}">{cat_text}</text>
+        <rect x="{margin_x}" y="{curr_y}" width="{badge_w}" height="48" rx="10" fill="{palette['badge_bg']}" />
+        <text x="{margin_x + badge_w / 2}" y="{curr_y + 32}" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="{palette['badge_fg']}">{cat_text}</text>
         
         <!-- Author / Brand -->
-        <text x="{margin_x + badge_w + 20}" y="{curr_y + 29}" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="600" fill="{palette['muted']}">{author_text}</text>
+        <text x="{margin_x + badge_w + 24}" y="{curr_y + 32}" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="600" fill="{palette['muted']}">{author_text}</text>
         
         <!-- Page Indicator -->
-        <rect x="{1200 - margin_x - 110}" y="{curr_y}" width="110" height="44" rx="8" fill="{palette['card_sub_bg']}" stroke="{palette['border']}" stroke-width="1.5" />
-        <text x="{1200 - margin_x - 55}" y="{curr_y + 29}" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="18" font-weight="bold" fill="{palette['primary']}">{idx_text}</text>
+        <rect x="{1200 - margin_x - 130}" y="{curr_y}" width="130" height="48" rx="10" fill="{palette['card_sub_bg']}" stroke="{palette['border']}" stroke-width="1.5" />
+        <text x="{1200 - margin_x - 65}" y="{curr_y + 32}" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="{palette['primary']}">{idx_text}</text>
         
         <!-- Divider -->
-        <line x1="{margin_x}" y1="{curr_y + 65}" x2="{1200 - margin_x}" y2="{curr_y + 65}" stroke="{palette['border']}" stroke-width="1.5" />
+        <line x1="{margin_x}" y1="{curr_y + 70}" x2="{1200 - margin_x}" y2="{curr_y + 70}" stroke="{palette['border']}" stroke-width="1.5" />
     </g>
     """
 
@@ -147,8 +147,8 @@ def _render_footer_svg(
     <!-- Footer -->
     <g id="footer">
         <line x1="{margin_x}" y1="{y - 20}" x2="{1200 - margin_x}" y2="{y - 20}" stroke="{palette['border']}" stroke-width="1.5" />
-        <text x="{margin_x}" y="{y + 15}" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="18" font-weight="500" fill="{palette['muted']}">BLOGGER AGENT // {date_str}</text>
-        <text x="{1200 - margin_x}" y="{y + 15}" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="18" font-weight="bold" fill="{palette['primary']}">{_escape_xml(footer_text)}</text>
+        <text x="{margin_x}" y="{y + 18}" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="500" fill="{palette['muted']}">BLOGGER AGENT // {date_str}</text>
+        <text x="{1200 - margin_x}" y="{y + 18}" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="26" font-weight="bold" fill="{palette['primary']}">{_escape_xml(footer_text)}</text>
     </g>
     """
 
@@ -196,25 +196,25 @@ def render_cover_card(data: Dict[str, Any], palette: Dict[str, str]) -> str:
         box_stroke = palette["good_color"] if is_good else (palette["bad_color"] if is_bad else palette["primary"])
         badge_fill = box_stroke
         badge_str = s.get('badge', '')
-        badge_w = max(130, len(badge_str) * 22 + 30)
+        badge_w = max(150, len(badge_str) * 24 + 36)
 
         stats_svg += f"""
         <g transform="translate({margin_x}, {box_y})">
             <rect width="{content_w}" height="{card_h}" rx="18" fill="{palette['card_bg']}" stroke="{box_stroke}" stroke-width="2" />
             
             <!-- Badge -->
-            <rect x="36" y="32" width="{badge_w}" height="38" rx="8" fill="{badge_fill}" />
-            <text x="50" y="58" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="18" font-weight="bold" fill="#FFFFFF">{_escape_xml(badge_str)}</text>
+            <rect x="36" y="28" width="{badge_w}" height="42" rx="8" fill="{badge_fill}" />
+            <text x="50" y="56" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="#FFFFFF">{_escape_xml(badge_str)}</text>
             
             <!-- Value/Title -->
-            <text x="36" y="118" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="30" font-weight="bold" fill="{palette['title']}">{_escape_xml(s.get('val', ''))}</text>
+            <text x="36" y="120" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="36" font-weight="bold" fill="{palette['title']}">{_escape_xml(s.get('val', ''))}</text>
             
             <!-- Note -->
-            <text x="36" y="166" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="22" font-weight="500" fill="{palette['muted']}">{_escape_xml(s.get('note', ''))}</text>
+            <text x="36" y="172" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="500" fill="{palette['muted']}">{_escape_xml(s.get('note', ''))}</text>
             
             <!-- Right Accent Icon -->
-            <circle cx="{content_w - 50}" cy="{card_h / 2}" r="18" fill="{palette['card_sub_bg']}" stroke="{box_stroke}" stroke-width="2" />
-            <text x="{content_w - 50}" y="{card_h / 2 + 7}" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="18" font-weight="bold" fill="{box_stroke}">➔</text>
+            <circle cx="{content_w - 50}" cy="{card_h / 2}" r="22" fill="{palette['card_sub_bg']}" stroke="{box_stroke}" stroke-width="2" />
+            <text x="{content_w - 50}" y="{card_h / 2 + 8}" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="22" font-weight="bold" fill="{box_stroke}">➔</text>
         </g>
         """
 
@@ -243,11 +243,11 @@ def render_cover_card(data: Dict[str, Any], palette: Dict[str, str]) -> str:
         <rect x="0" y="0" width="12" height="160" rx="6" fill="{palette['primary']}" />
         
         <!-- Big Bold Explosive Title -->
-        <text x="32" y="70" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="64" font-weight="900" fill="{palette['title']}" letter-spacing="-1">{hook_escaped}</text>
-        <text x="32" y="145" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="64" font-weight="900" fill="{palette['primary']}" letter-spacing="-1">{_escape_xml(data.get('hook_accent', ''))}</text>
+        <text x="32" y="70" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="68" font-weight="900" fill="{palette['title']}" letter-spacing="-1">{hook_escaped}</text>
+        <text x="32" y="145" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="68" font-weight="900" fill="{palette['primary']}" letter-spacing="-1">{_escape_xml(data.get('hook_accent', ''))}</text>
         
         <!-- Subtitle -->
-        <text x="32" y="225" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="500" fill="{palette['text']}">{subtitle_escaped}</text>
+        <text x="32" y="225" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="32" font-weight="500" fill="{palette['text']}">{subtitle_escaped}</text>
     </g>
 
     <!-- Micro Infographics / Core Cards -->
@@ -301,11 +301,11 @@ def render_vs_comparison_card(data: Dict[str, Any], palette: Dict[str, str]) -> 
         left_items_svg += f"""
         <g transform="translate(24, {item_y})">
             <rect width="{col_w - 48}" height="135" rx="14" fill="{palette['card_sub_bg']}" stroke="{palette['border']}" stroke-width="1.5" />
-            <circle cx="34" cy="40" r="16" fill="{palette['bad_color']}22" stroke="{palette['bad_color']}" stroke-width="2" />
-            <text x="34" y="47" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="16" font-weight="bold" fill="{palette['bad_color']}">✕</text>
+            <circle cx="34" cy="40" r="18" fill="{palette['bad_color']}22" stroke="{palette['bad_color']}" stroke-width="2" />
+            <text x="34" y="48" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="18" font-weight="bold" fill="{palette['bad_color']}">✕</text>
             
-            <text x="64" y="47" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="{palette['title']}">{_escape_xml(item.get('title', item) if isinstance(item, dict) else item)}</text>
-            <text x="28" y="96" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="500" fill="{palette['muted']}">{_escape_xml(item.get('desc', '') if isinstance(item, dict) else '')}</text>
+            <text x="68" y="48" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="bold" fill="{palette['title']}">{_escape_xml(item.get('title', item) if isinstance(item, dict) else item)}</text>
+            <text x="28" y="98" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="500" fill="{palette['muted']}">{_escape_xml(item.get('desc', '') if isinstance(item, dict) else '')}</text>
         </g>
         """
 
@@ -322,11 +322,11 @@ def render_vs_comparison_card(data: Dict[str, Any], palette: Dict[str, str]) -> 
         right_items_svg += f"""
         <g transform="translate(24, {item_y})">
             <rect width="{col_w - 48}" height="135" rx="14" fill="{palette['card_sub_bg']}" stroke="{palette['good_color']}55" stroke-width="1.5" />
-            <circle cx="34" cy="40" r="16" fill="{palette['good_color']}22" stroke="{palette['good_color']}" stroke-width="2" />
-            <text x="34" y="47" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="16" font-weight="bold" fill="{palette['good_color']}">✓</text>
+            <circle cx="34" cy="40" r="18" fill="{palette['good_color']}22" stroke="{palette['good_color']}" stroke-width="2" />
+            <text x="34" y="48" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="18" font-weight="bold" fill="{palette['good_color']}">✓</text>
             
-            <text x="64" y="47" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="{palette['title']}">{_escape_xml(item.get('title', item) if isinstance(item, dict) else item)}</text>
-            <text x="28" y="96" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="500" fill="{palette['muted']}">{_escape_xml(item.get('desc', '') if isinstance(item, dict) else '')}</text>
+            <text x="68" y="48" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="bold" fill="{palette['title']}">{_escape_xml(item.get('title', item) if isinstance(item, dict) else item)}</text>
+            <text x="28" y="98" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="500" fill="{palette['muted']}">{_escape_xml(item.get('desc', '') if isinstance(item, dict) else '')}</text>
         </g>
         """
 
@@ -337,7 +337,7 @@ def render_vs_comparison_card(data: Dict[str, Any], palette: Dict[str, str]) -> 
     <!-- Section Title -->
     <g transform="translate({margin_x}, 200)">
         <text x="0" y="46" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="44" font-weight="900" fill="{palette['title']}">{_escape_xml(title)}</text>
-        <text x="0" y="96" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="500" fill="{palette['muted']}">{_escape_xml(subtitle)}</text>
+        <text x="0" y="96" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="500" fill="{palette['muted']}">{_escape_xml(subtitle)}</text>
     </g>
 
     <!-- Left Column (Old) -->
@@ -346,9 +346,9 @@ def render_vs_comparison_card(data: Dict[str, Any], palette: Dict[str, str]) -> 
         
         <!-- Header -->
         <rect x="0" y="0" width="{col_w}" height="80" rx="20" fill="{palette['bad_color']}15" />
-        <rect x="24" y="22" width="120" height="36" rx="8" fill="{palette['bad_color']}" />
-        <text x="84" y="47" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="18" font-weight="bold" fill="#FFFFFF">{_escape_xml(left_col.get('badge', '旧模式 ✕'))}</text>
-        <text x="160" y="48" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="{palette['title']}">{_escape_xml(left_col.get('title', '脆弱型架构'))}</text>
+        <rect x="24" y="20" width="130" height="40" rx="8" fill="{palette['bad_color']}" />
+        <text x="89" y="48" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="#FFFFFF">{_escape_xml(left_col.get('badge', '旧模式 ✕'))}</text>
+        <text x="170" y="50" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="30" font-weight="bold" fill="{palette['title']}">{_escape_xml(left_col.get('title', '脆弱型架构'))}</text>
         
         {left_items_svg}
     </g>
@@ -359,9 +359,9 @@ def render_vs_comparison_card(data: Dict[str, Any], palette: Dict[str, str]) -> 
         
         <!-- Header -->
         <rect x="0" y="0" width="{col_w}" height="80" rx="20" fill="{palette['good_color']}15" />
-        <rect x="24" y="22" width="120" height="36" rx="8" fill="{palette['good_color']}" />
-        <text x="84" y="47" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="18" font-weight="bold" fill="#FFFFFF">{_escape_xml(right_col.get('badge', '新范式 ✓'))}</text>
-        <text x="160" y="48" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="{palette['title']}">{_escape_xml(right_col.get('title', '反脆弱系统'))}</text>
+        <rect x="24" y="20" width="130" height="40" rx="8" fill="{palette['good_color']}" />
+        <text x="89" y="48" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="#FFFFFF">{_escape_xml(right_col.get('badge', '新范式 ✓'))}</text>
+        <text x="170" y="50" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="30" font-weight="bold" fill="{palette['title']}">{_escape_xml(right_col.get('title', '反脆弱系统'))}</text>
         
         {right_items_svg}
     </g>
@@ -370,8 +370,8 @@ def render_vs_comparison_card(data: Dict[str, Any], palette: Dict[str, str]) -> 
     <g transform="translate({margin_x}, 1320)">
         <rect width="{1200 - 2 * margin_x}" height="130" rx="16" fill="{palette['card_bg']}" stroke="{palette['primary']}" stroke-width="2" />
         <rect x="30" y="45" width="8" height="40" rx="4" fill="{palette['primary']}" />
-        <text x="56" y="56" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="bold" fill="{palette['primary']}">CORE TAKEAWAY / 核心结论</text>
-        <text x="56" y="98" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="{palette['title']}">{_escape_xml(takeaway)}</text>
+        <text x="56" y="56" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="{palette['primary']}">CORE TAKEAWAY / 核心结论</text>
+        <text x="56" y="100" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="bold" fill="{palette['title']}">{_escape_xml(takeaway)}</text>
     </g>
 
     {footer_svg}
@@ -437,29 +437,29 @@ def render_bullet_points_card(data: Dict[str, Any], palette: Dict[str, str]) -> 
         tags = p.get("tags", [])
         tag_x = 40
         for t in tags[:4]:
-            t_w = len(t) * 20 + 26
+            t_w = len(t) * 26 + 32
             tags_svg += f"""
-            <rect x="{tag_x}" y="255" width="{t_w}" height="42" rx="8" fill="{palette['tag_bg']}" stroke="{palette['border']}" stroke-width="1" />
-            <text x="{tag_x + t_w / 2}" y="282" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="18" font-weight="600" fill="{palette['tag_fg']}">{_escape_xml(t)}</text>
+            <rect x="{tag_x}" y="252" width="{t_w}" height="46" rx="8" fill="{palette['tag_bg']}" stroke="{palette['border']}" stroke-width="1" />
+            <text x="{tag_x + t_w / 2}" y="283" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="600" fill="{palette['tag_fg']}">{_escape_xml(t)}</text>
             """
-            tag_x += t_w + 14
+            tag_x += t_w + 16
 
         cards_svg += f"""
         <g transform="translate({margin_x}, {box_y})">
             <rect width="{content_w}" height="{card_h}" rx="22" fill="{palette['card_bg']}" stroke="{palette['border']}" stroke-width="2" />
             
             <!-- Index Pill Badge -->
-            <rect x="40" y="38" width="60" height="38" rx="8" fill="{palette['primary']}" />
-            <text x="70" y="64" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="900" fill="{palette['badge_fg']}">{_escape_xml(p.get('idx', f'0{i+1}'))}</text>
+            <rect x="40" y="34" width="70" height="42" rx="8" fill="{palette['primary']}" />
+            <text x="75" y="64" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="900" fill="{palette['badge_fg']}">{_escape_xml(p.get('idx', f'0{i+1}'))}</text>
             
             <!-- Category Tag -->
-            <text x="116" y="64" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="18" font-weight="bold" fill="{palette['muted']}" letter-spacing="1">{_escape_xml(p.get('badge', 'PILLAR'))}</text>
+            <text x="130" y="64" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="{palette['muted']}" letter-spacing="1">{_escape_xml(p.get('badge', 'PILLAR'))}</text>
             
             <!-- Point Title -->
-            <text x="40" y="132" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="bold" fill="{palette['title']}">{_escape_xml(p.get('title', ''))}</text>
+            <text x="40" y="136" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="36" font-weight="bold" fill="{palette['title']}">{_escape_xml(p.get('title', ''))}</text>
             
             <!-- Point Description -->
-            <text x="40" y="188" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="500" fill="{palette['text']}">{_escape_xml(p.get('desc', ''))}</text>
+            <text x="40" y="195" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="500" fill="{palette['text']}">{_escape_xml(p.get('desc', ''))}</text>
             
             <!-- Tags Row -->
             {tags_svg}
@@ -473,7 +473,7 @@ def render_bullet_points_card(data: Dict[str, Any], palette: Dict[str, str]) -> 
     <!-- Header Title -->
     <g transform="translate({margin_x}, 195)">
         <text x="0" y="46" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="44" font-weight="900" fill="{palette['title']}">{_escape_xml(title)}</text>
-        <text x="0" y="96" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="500" fill="{palette['muted']}">{_escape_xml(subtitle)}</text>
+        <text x="0" y="96" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="500" fill="{palette['muted']}">{_escape_xml(subtitle)}</text>
     </g>
 
     <!-- Point Cards Container -->
@@ -529,8 +529,8 @@ def render_pipeline_steps_card(data: Dict[str, Any], palette: Dict[str, str]) ->
             arrow_svg = f"""
             <!-- Down Arrow -->
             <g transform="translate({margin_x + content_w / 2}, {box_y + step_h + 8})">
-                <circle cx="0" cy="10" r="14" fill="{palette['card_sub_bg']}" stroke="{palette['primary']}" stroke-width="2" />
-                <text x="0" y="16" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="16" font-weight="bold" fill="{palette['primary']}">↓</text>
+                <circle cx="0" cy="10" r="16" fill="{palette['card_sub_bg']}" stroke="{palette['primary']}" stroke-width="2" />
+                <text x="0" y="17" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="bold" fill="{palette['primary']}">↓</text>
             </g>
             """
 
@@ -539,18 +539,18 @@ def render_pipeline_steps_card(data: Dict[str, Any], palette: Dict[str, str]) ->
             <rect width="{content_w}" height="{step_h}" rx="18" fill="{palette['card_bg']}" stroke="{palette['border']}" stroke-width="2" />
             
             <!-- Step Badge -->
-            <rect x="36" y="32" width="120" height="36" rx="8" fill="{palette['primary']}" />
-            <text x="96" y="57" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="18" font-weight="900" fill="{palette['badge_fg']}">{_escape_xml(st.get('step', f'STEP 0{i+1}'))}</text>
+            <rect x="36" y="28" width="130" height="42" rx="8" fill="{palette['primary']}" />
+            <text x="101" y="57" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="900" fill="{palette['badge_fg']}">{_escape_xml(st.get('step', f'STEP 0{i+1}'))}</text>
             
             <!-- Title -->
-            <text x="176" y="60" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="30" font-weight="bold" fill="{palette['title']}">{_escape_xml(st.get('title', ''))}</text>
+            <text x="186" y="58" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="bold" fill="{palette['title']}">{_escape_xml(st.get('title', ''))}</text>
             
             <!-- Description -->
-            <text x="36" y="118" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="22" font-weight="500" fill="{palette['text']}">{_escape_xml(st.get('desc', ''))}</text>
+            <text x="36" y="118" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="500" fill="{palette['text']}">{_escape_xml(st.get('desc', ''))}</text>
             
             <!-- Deliverable Pill -->
-            <rect x="36" y="148" width="{content_w - 72}" height="42" rx="8" fill="{palette['card_sub_bg']}" stroke="{palette['border']}" stroke-width="1" />
-            <text x="56" y="175" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="19" font-weight="600" fill="{palette['accent']}">{_escape_xml(st.get('deliverable', ''))}</text>
+            <rect x="36" y="148" width="{content_w - 72}" height="46" rx="8" fill="{palette['card_sub_bg']}" stroke="{palette['border']}" stroke-width="1" />
+            <text x="56" y="180" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="26" font-weight="600" fill="{palette['accent']}">{_escape_xml(st.get('deliverable', ''))}</text>
         </g>
         {arrow_svg}
         """
@@ -562,7 +562,7 @@ def render_pipeline_steps_card(data: Dict[str, Any], palette: Dict[str, str]) ->
     <!-- Header Title -->
     <g transform="translate({margin_x}, 195)">
         <text x="0" y="46" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="44" font-weight="900" fill="{palette['title']}">{_escape_xml(title)}</text>
-        <text x="0" y="96" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="500" fill="{palette['muted']}">{_escape_xml(subtitle)}</text>
+        <text x="0" y="96" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="500" fill="{palette['muted']}">{_escape_xml(subtitle)}</text>
     </g>
 
     <!-- Steps Container -->
@@ -572,9 +572,9 @@ def render_pipeline_steps_card(data: Dict[str, Any], palette: Dict[str, str]) ->
 
     <!-- Bottom Rule Card -->
     <g transform="translate({margin_x}, 1370)">
-        <rect width="{content_w}" height="90" rx="14" fill="{palette['card_bg']}" stroke="{palette['primary']}" stroke-width="1.5" />
-        <text x="36" y="53" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="bold" fill="{palette['primary']}">⚡ 铁律</text>
-        <text x="110" y="53" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="500" fill="{palette['text']}">{_escape_xml(rule_note)}</text>
+        <rect width="{content_w}" height="95" rx="14" fill="{palette['card_bg']}" stroke="{palette['primary']}" stroke-width="1.5" />
+        <text x="36" y="58" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="26" font-weight="bold" fill="{palette['primary']}">⚡ 铁律</text>
+        <text x="120" y="58" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="26" font-weight="500" fill="{palette['text']}">{_escape_xml(rule_note)}</text>
     </g>
 
     {footer_svg}
@@ -599,7 +599,7 @@ def render_summary_cta_card(data: Dict[str, Any], palette: Dict[str, str]) -> st
     takeaways = data.get("takeaways", [
         "微信图片消息享有极高公域推荐权重，是突破私域瓶颈的核心抓手",
         "封面必须坚持双栏复合与 4~8 字认知冲突 Hook，杜绝平铺长标题",
-        "移动端字号严格执行 ≥22px 底线，以 4~8 字短语构建高密度认知卡片",
+        "移动端字号严格执行 ≥28px 底线，以 4~8 字短语构建高密度认知卡片",
         "长文做深度沉淀，卡片做公域破圈，形成双轮驱动的内容矩阵"
     ])
     question = data.get("question", "在你的内容创作或技术传播中，是否尝试过将长文切片为图片消息发布？效果如何？")
@@ -613,7 +613,7 @@ def render_summary_cta_card(data: Dict[str, Any], palette: Dict[str, str]) -> st
     # Render Takeaway Items
     takeaways_svg = ""
     start_y = 330
-    item_h = 130
+    item_h = 135
     item_gap = 20
 
     for i, t in enumerate(takeaways[:4]):
@@ -621,56 +621,56 @@ def render_summary_cta_card(data: Dict[str, Any], palette: Dict[str, str]) -> st
         takeaways_svg += f"""
         <g transform="translate({margin_x}, {box_y})">
             <rect width="{content_w}" height="{item_h}" rx="16" fill="{palette['card_bg']}" stroke="{palette['border']}" stroke-width="1.5" />
-            <circle cx="44" cy="65" r="20" fill="{palette['good_color']}22" stroke="{palette['good_color']}" stroke-width="2" />
-            <text x="44" y="72" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="bold" fill="{palette['good_color']}">✓</text>
+            <circle cx="44" cy="67" r="22" fill="{palette['good_color']}22" stroke="{palette['good_color']}" stroke-width="2" />
+            <text x="44" y="75" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="{palette['good_color']}">✓</text>
             
-            <text x="86" y="55" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="22" font-weight="bold" fill="{palette['primary']}">CHECKLIST 0{i+1}</text>
-            <text x="86" y="94" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="{palette['title']}">{_escape_xml(t)}</text>
+            <text x="86" y="52" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="{palette['primary']}">CHECKLIST 0{i+1}</text>
+            <text x="86" y="98" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="bold" fill="{palette['title']}">{_escape_xml(t)}</text>
         </g>
         """
 
     # Discussion Box
-    disc_y = 960
+    disc_y = 970
     disc_h = 320
     disc_svg = f"""
     <g transform="translate({margin_x}, {disc_y})">
         <rect width="{content_w}" height="{disc_h}" rx="22" fill="{palette['card_bg']}" stroke="{palette['primary']}" stroke-width="2.5" />
         
         <!-- Top Discussion Pill -->
-        <rect x="40" y="36" width="180" height="42" rx="10" fill="{palette['primary']}" />
-        <text x="130" y="64" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="900" fill="{palette['badge_fg']}">💬 互动探讨</text>
+        <rect x="40" y="34" width="200" height="46" rx="10" fill="{palette['primary']}" />
+        <text x="140" y="66" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="900" fill="{palette['badge_fg']}">💬 互动探讨</text>
         
         <!-- Big Question -->
-        <text x="40" y="140" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="30" font-weight="bold" fill="{palette['title']}">{_escape_xml(question[:24])}</text>
-        <text x="40" y="190" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="30" font-weight="bold" fill="{palette['title']}">{_escape_xml(question[24:])}</text>
+        <text x="40" y="145" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="bold" fill="{palette['title']}">{_escape_xml(question[:22])}</text>
+        <text x="40" y="200" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="bold" fill="{palette['title']}">{_escape_xml(question[22:])}</text>
         
         <!-- Callout Subtext -->
-        <text x="40" y="260" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="22" font-weight="500" fill="{palette['muted']}">欢迎在评论区留言交流，分享你的第一手实战体验！</text>
+        <text x="40" y="270" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="26" font-weight="500" fill="{palette['muted']}">欢迎在评论区留言交流，分享你的第一手实战体验！</text>
     </g>
     """
 
     # Interaction Action Banner
-    action_y = 1315
+    action_y = 1320
     action_svg = f"""
     <g transform="translate({margin_x}, {action_y})">
         <rect width="{content_w}" height="140" rx="18" fill="{palette['card_sub_bg']}" stroke="{palette['border']}" stroke-width="1.5" />
         
         <!-- 3 Pillars: Like / Collect / Share -->
         <g transform="translate({content_w * 0.16}, 70)">
-            <text x="0" y="0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">❤️</text>
-            <text x="0" y="38" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="bold" fill="{palette['title']}">点赞支持</text>
+            <text x="0" y="0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="32">❤️</text>
+            <text x="0" y="42" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="26" font-weight="bold" fill="{palette['title']}">点赞支持</text>
         </g>
         <line x1="{content_w * 0.33}" y1="30" x2="{content_w * 0.33}" y2="110" stroke="{palette['border']}" stroke-width="1" />
         
         <g transform="translate({content_w * 0.50}, 70)">
-            <text x="0" y="0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">⭐</text>
-            <text x="0" y="38" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="bold" fill="{palette['title']}">收藏备用</text>
+            <text x="0" y="0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="32">⭐</text>
+            <text x="0" y="42" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="26" font-weight="bold" fill="{palette['title']}">收藏备用</text>
         </g>
         <line x1="{content_w * 0.67}" y1="30" x2="{content_w * 0.67}" y2="110" stroke="{palette['border']}" stroke-width="1" />
         
         <g transform="translate({content_w * 0.84}, 70)">
-            <text x="0" y="0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">↗️</text>
-            <text x="0" y="38" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="bold" fill="{palette['title']}">转发朋友</text>
+            <text x="0" y="0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="32">↗️</text>
+            <text x="0" y="42" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="26" font-weight="bold" fill="{palette['title']}">转发朋友</text>
         </g>
     </g>
     """
@@ -682,7 +682,7 @@ def render_summary_cta_card(data: Dict[str, Any], palette: Dict[str, str]) -> st
     <!-- Header Title -->
     <g transform="translate({margin_x}, 195)">
         <text x="0" y="46" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="44" font-weight="900" fill="{palette['title']}">{_escape_xml(title)}</text>
-        <text x="0" y="96" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="500" fill="{palette['muted']}">{_escape_xml(subtitle)}</text>
+        <text x="0" y="96" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="500" fill="{palette['muted']}">{_escape_xml(subtitle)}</text>
     </g>
 
     <!-- Takeaways Container -->
@@ -750,7 +750,7 @@ def render_svg_to_png(svg_content: str, output_png_path: Path, resample_width: i
         raise RuntimeError(f"Failed to render PNG via sips: {e.stderr}")
 
 
-def generate_photo_deck(deck_spec: Dict[str, Any], output_dir: Path) -> List[Path]:
+def generate_photo_deck(deck_spec: Dict[str, Any], output_dir: Path, resample_width: int = 1200) -> List[Path]:
     """
     Batch generate a complete photo card deck from a spec dictionary.
     Returns list of generated PNG file paths.
@@ -777,7 +777,7 @@ def generate_photo_deck(deck_spec: Dict[str, Any], output_dir: Path) -> List[Pat
         out_png = output_dir / f"{slug}.png"
 
         svg_content = generate_photo_card_svg(card_type, card_data, theme=theme)
-        png_path = render_svg_to_png(svg_content, out_png, resample_width=1200)
+        png_path = render_svg_to_png(svg_content, out_png, resample_width=resample_width)
         generated_paths.append(png_path)
 
     return generated_paths
