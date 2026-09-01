@@ -56,6 +56,62 @@ def latex_to_unicode(latex_str: str) -> str:
     text = text.replace('{', '').replace('}', '')
     return text
 
+def render_markdown_to_clean_text(md: str) -> str:
+    """Converts markdown content into beautifully formatted, human-readable plain text.
+    Suitable for mobile captions, photo message companion copy, and social feeds.
+    Removes raw markdown symbols (###, **, `, ---) while preserving structure, emojis, and lists.
+    """
+    if not md:
+        return ""
+
+    lines = md.splitlines()
+    # Strip top H1 title if present
+    if lines and lines[0].strip().startswith('# '):
+        lines.pop(0)
+
+    out_lines = []
+    for line in lines:
+        stripped = line.strip()
+
+        # Remove horizontal rules (---, ***, ___)
+        if re.match(r'^(?:---|\*\*\*|___)\s*$', stripped):
+            continue
+
+        # Convert headings: ## Title or ### Title -> 【Title】
+        h_match = re.match(r'^#{2,6}\s*(.+)$', stripped)
+        if h_match:
+            h_text = h_match.group(1).strip()
+            h_text = re.sub(r'\*\*(.+?)\*\*', r'\1', h_text)
+            h_text = re.sub(r'`(.+?)`', r'\1', h_text)
+            if not (h_text.startswith('【') and h_text.endswith('】')):
+                out_lines.append(f'\n【{h_text}】')
+            else:
+                out_lines.append(f'\n{h_text}')
+            continue
+
+        # Remove blockquote prefix (> )
+        if stripped.startswith('> '):
+            stripped = stripped[2:].strip()
+
+        # Clean bold, italics, inline code
+        stripped = re.sub(r'\*\*(.+?)\*\*', r'\1', stripped)
+        stripped = re.sub(r'\*(.+?)\*', r'\1', stripped)
+        stripped = re.sub(r'__(.+?)__', r'\1', stripped)
+        stripped = re.sub(r'`(.+?)`', r'\1', stripped)
+
+        # Clean markdown links: [text](url) -> text
+        stripped = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', stripped)
+
+        # Format bullet points: * or - at start of line -> •
+        if re.match(r'^[*-]\s+', stripped):
+            stripped = re.sub(r'^[*-]\s+', '• ', stripped)
+
+        out_lines.append(stripped)
+
+    text = '\n'.join(out_lines)
+    text = re.sub(r'\n{3,}', '\n\n', text).strip()
+    return text
+
 def is_likely_latex(s: str) -> bool:
     s = s.strip()
     if not s:
@@ -149,10 +205,27 @@ def parse_markdown_payload(md_path: Path) -> dict:
         logger.warning(f"Collection '{collection}' in {md_path.name} is not in the allowed list {allowed}. This may cause publishing errors.")
     
     desc = post.metadata.get("desc", "")
+    post_type = str(post.metadata.get("type", "article")).strip().lower()
+    photos_meta = post.metadata.get("photos", [])
     cover_filename = post.metadata.get("cover", "")
     video_filename = post.metadata.get("video", "")
     illustration_filename = post.metadata.get("illustration", "")
     payload_dir = md_path.parent
+
+    # Parse photo paths for photo messages (WeChat 小绿书 / 图片消息)
+    photo_paths = []
+    if photos_meta and isinstance(photos_meta, list):
+        for p in photos_meta:
+            p_path = payload_dir / p
+            if p_path.exists():
+                photo_paths.append(p_path)
+            else:
+                logger.warning(f"Declared photo file not found: {p_path}")
+    elif post_type == "photo":
+        # Fallback: scan payload_dir for ordered 01_*.png, 02_*.png, etc.
+        for p in sorted(payload_dir.glob("*.png")):
+            if p.name.startswith(("01", "02", "03", "04", "05", "06", "07", "08", "09")):
+                photo_paths.append(p)
     
     # Use post content as raw content (for Juejin/CSDN) and ensure lists have blank lines before them
     content = ensure_blank_before_lists(post.content.strip())
@@ -327,7 +400,10 @@ def parse_markdown_payload(md_path: Path) -> dict:
         "author": author,
         "collection": collection,
         "desc": desc,
+        "type": post_type,
+        "photo_paths": photo_paths,
         "content": content,  # Raw markdown (LaTeX intact)
+        "clean_text": render_markdown_to_clean_text(content),  # Human-readable formatted plain text
         "html_content": html_content,  # WeChat HTML (LaTeX converted to PNG/Unicode)
         "cover_path": cover_path,
         "video_path": video_path,

@@ -362,7 +362,8 @@ function run() {{
     def _run_jxa(self, script: str) -> str:
         try:
             result = subprocess.run(
-                ["osascript", "-l", "JavaScript", "-e", script],
+                ["osascript", "-l", "JavaScript"],
+                input=script,
                 check=True,
                 capture_output=True,
                 text=True,

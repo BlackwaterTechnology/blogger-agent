@@ -1,12 +1,14 @@
 ---
 name: publish-article
-description: Use when the user asks to publish or push an article to platforms, or explicitly uses the `/publish-article` slash command. Trigger phrases include "/publish-article", "发布文章", "推送到公众号".
+description: Use when the user asks to publish or push an article or photo message (小绿书/图片消息) to platforms, or explicitly uses the `/publish-article` slash command. Trigger phrases include "/publish-article", "发布文章", "推送到公众号", "发布图片消息", "发布小绿书", "推送到小绿书".
 ---
 
 # Publish Article Skill
 
 ## Overview
 This skill takes a completed, reviewed Markdown payload directory and invokes the `blogger` CLI tool to automatically push the draft to configured platforms (WeChat Official Accounts, Juejin, CSDN, Blogger).
+
+It supports both **Rich Text Articles (普通图文)** and **WeChat Photo Messages (3:4 竖版图片消息 / 微信画册 / 小绿书)** via automatic metadata dispatch (`type: "photo"` in `article.md`).
 
 ## Prerequisites（启动前必查，跳过会报错）
 
@@ -25,7 +27,7 @@ This skill takes a completed, reviewed Markdown payload directory and invokes th
 确认前置条件后，运行发布工具：
 
 ```bash
-blogger --payload ./articles/<文章标题目录> --platform wechat,blogger
+blogger --payload ./articles/<文章目录> --platform wechat
 ```
 
 ### 阶段 2：监控输出与状态汇报
@@ -34,10 +36,10 @@ blogger --payload ./articles/<文章标题目录> --platform wechat,blogger
 - 看输出有无 `WARNING`。
 - **看到 `通过 AppleScript 执行 JavaScript 的功能已关闭`**：说明 Prerequisites #1 没满足。让用户去 Chrome 菜单栏开开关，重跑即可。
 - **看到 `WeChat Official Account tab not found`**：用户没登录公众号后台。让用户在 Chrome 里登录一次。
-- **`Cover Setup` / `Reward Setup` / `Collection Setup` 出现 `Failed to complete within N steps`**：是常态，**正文 + 图片注入通常已经成功**。微信编辑器的弹窗 / 下拉对自动化不够友好，超时不影响主体内容。
 
-**收尾必须给用户一份清单**（即使日志里没有明确的 success summary）：
+**收尾必须给用户一份清单**：
 
+#### 场景 A：普通图文文章 (Rich Text)
 ```
 ✓ / ✗ 标题
 ✓ / ✗ 正文（看 "Filled via paste event"）
@@ -48,4 +50,12 @@ blogger --payload ./articles/<文章标题目录> --platform wechat,blogger
 ✗ 保存为草稿 → 手动点
 ```
 
-把还需手动补的步骤明确告诉用户，比只说一句"已发送"更负责。
+#### 场景 B：图片消息 / 小绿书 (Photo Message, type: "photo")
+```
+✓ / ✗ 标题
+✓ / ✗ N 张 3:4 竖版卡片（看 "Upload card [X/N]" 成功次数）
+✓ 封面（默认选用第 1 张卡片 01_cover.png）
+✓ 伴随文案（已注入至描述输入框）
+✗ 话题与合集 → 在编辑器下方手动勾选确认
+✗ 保存为草稿 → 手动点右下角「保存为草稿」
+```

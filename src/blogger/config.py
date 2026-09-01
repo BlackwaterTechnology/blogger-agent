@@ -31,7 +31,11 @@ def get_all_wechat_collections(account="default"):
     config = load_config()
     try:
         acct_config = config.get("platforms", {}).get("wechat", {}).get("accounts", {}).get(account, {})
-        return acct_config.get("article_collections", []) + acct_config.get("video_collections", [])
+        return (
+            acct_config.get("article_collections", []) +
+            acct_config.get("video_collections", []) +
+            acct_config.get("photo_collections", [])
+        )
     except Exception as e:
         logger.warning(f"Error reading all wechat collections: {e}")
         return []

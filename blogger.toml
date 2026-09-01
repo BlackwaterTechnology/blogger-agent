@@ -16,3 +16,10 @@ video_collections = [
     "程序员",
     "软件教程"
 ]
+photo_collections = [
+    "DevSecOps图文",
+    "AI图文",
+    "agent图文",
+    "Web3图文",
+    "逻辑世界"
+]

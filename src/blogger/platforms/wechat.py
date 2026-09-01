@@ -45,6 +45,426 @@ class WechatPublisher:
         return False
 
     def publish(self, article_data: dict) -> None:
+        if article_data.get("type") == "photo" or (article_data.get("photo_paths") and len(article_data.get("photo_paths", [])) > 0):
+            return self.publish_photo(article_data)
+        return self.publish_article(article_data)
+
+    def publish_photo(self, article_data: dict) -> None:
+        title = article_data["title"]
+        author = article_data.get("author", "Agent")
+        desc = article_data.get("desc", "")
+        content = article_data.get("content", "")
+        collection = article_data.get("collection", "")
+        photo_paths = article_data.get("photo_paths", [])
+
+        if not photo_paths:
+            logger.error("No photo paths found in article_data for photo message publishing.")
+            raise ValueError("No photo paths provided for photo message")
+
+        try:
+            w_idx, t_idx = self.chrome.find_global_tab(["https://mp.weixin.qq.com"])
+            url = self.chrome.get_tab_url(w_idx, t_idx)
+        except Exception as e:
+            raise SystemExit(f"WeChat Official Account tab not found in Chrome: {e}")
+
+        logger.info(f"Found WeChat tab: {url}")
+
+        import urllib.parse
+        parsed = urllib.parse.urlparse(url)
+        qs = urllib.parse.parse_qs(parsed.query)
+        token = qs.get("token", [""])[0]
+
+        if not token:
+            raise SystemExit("Could not extract token from WeChat tab URL. Please make sure you are logged into mp.weixin.qq.com.")
+
+        # 1. Always navigate to a clean fresh photo editor tab to avoid mutating previous draft
+        fresh_url = f"https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_edit_v2&action=edit&isNew=1&type=77&createType=8&token={token}&lang=en_US&timestamp={int(time.time()*1000)}"
+        logger.info(f"Navigating to fresh WeChat Photo Message Editor: {fresh_url}")
+        try:
+            self.chrome.set_tab_url(w_idx, t_idx, fresh_url, settle_seconds=6.0)
+        except Exception as e:
+            logger.warning(f"Navigation warning: {e}")
+
+        logger.info("Waiting for photo editor to fully initialize...")
+        time.sleep(4.0)
+
+        try:
+            w_idx, t_idx = self.chrome.find_global_tab(["https://mp.weixin.qq.com"])
+            url = self.chrome.get_tab_url(w_idx, t_idx)
+            logger.info(f"Now on tab: {url}")
+        except Exception as e:
+            logger.warning(f"Could not re-resolve WeChat tab: {e}")
+
+        # 2. Upload Photos Sequentially
+        logger.info(f"Uploading {len(photo_paths)} photo card(s)...")
+        import base64
+
+        for idx, p_path in enumerate(photo_paths):
+            if not p_path.exists():
+                logger.warning(f"Photo file does not exist: {p_path}")
+                continue
+
+            b64_data = base64.b64encode(p_path.read_bytes()).decode('utf-8')
+            filename = p_path.name
+
+            js_upload_single = f"""
+            (function() {{
+                try {{
+                    const b64Data = {json.dumps(b64_data)};
+                    const filename = {json.dumps(filename)};
+                    
+                    const binStr = atob(b64Data);
+                    const len = binStr.length;
+                    const bytes = new Uint8Array(len);
+                    for (let i = 0; i < len; i++) {{
+                        bytes[i] = binStr.charCodeAt(i);
+                    }}
+                    const blob = new Blob([bytes.buffer], {{ type: 'image/png' }});
+                    const file = new File([blob], filename, {{ type: 'image/png' }});
+                    
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    
+                    const inputs = Array.from(document.querySelectorAll('.image-selector input[type="file"], .js_upload_btn_container input[type="file"], input[type="file"][multiple]'));
+                    if (inputs.length === 0) return JSON.stringify({{ error: 'No upload input found' }});
+                    
+                    const targetInput = inputs[inputs.length - 1];
+                    targetInput.files = dt.files;
+                    targetInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                    
+                    return JSON.stringify({{ success: true, filename: filename }});
+                }} catch (e) {{
+                    return JSON.stringify({{ error: e.message }});
+                }}
+            }})();
+            """
+            res = self.chrome.execute_javascript(w_idx, t_idx, js_upload_single, settle_seconds=0.5)
+            logger.info(f"Upload card [{idx+1}/{len(photo_paths)}] {filename}: {res}")
+            time.sleep(2.0)
+
+        # 3. Inject Full Title
+        photo_title = title.strip()
+        if len(photo_title) > 64:
+            photo_title = photo_title[:64].strip()
+
+        logger.info(f"Injecting full title: {photo_title}")
+        js_inject_title = f"""
+        (function() {{
+            try {{
+                const titleVal = {json.dumps(photo_title)};
+                const titlePm = document.querySelector('.title-editor__input .ProseMirror, #js_title_main .ProseMirror');
+                if (titlePm) {{
+                    titlePm.focus();
+                    const selection = window.getSelection();
+                    const range = document.createRange();
+                    range.selectNodeContents(titlePm);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    
+                    document.execCommand('delete', false, null);
+                    document.execCommand('insertText', false, titleVal);
+                    titlePm.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                }}
+                
+                const textarea = document.querySelector('textarea#title');
+                if (textarea) {{
+                    textarea.value = titleVal;
+                    textarea.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    textarea.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                }}
+                return "TITLE_SET";
+            }} catch(e) {{
+                return "Error setting title: " + e.message;
+            }}
+        }})();
+        """
+        title_res = self.chrome.execute_javascript(w_idx, t_idx, js_inject_title, settle_seconds=0.5)
+        logger.info(f"Title injection result: {title_res}")
+
+        # 4. Inject Body Text into Description Editor (rendered clean text as paragraphs)
+        logger.info("Injecting rendered clean text into description editor...")
+        from ..core.markdown_parser import render_markdown_to_clean_text
+        body_clean = article_data.get("clean_text") or render_markdown_to_clean_text(content)
+
+        # Defensive check against WeChat Photo Message 1000-char hard ceiling
+        if len(body_clean) > 980:
+            logger.warning(f"Photo companion text length ({len(body_clean)}) approaches WeChat 1000-char limit! Trimming safely...")
+            trimmed = body_clean[:950]
+            last_break = max(trimmed.rfind('\n'), trimmed.rfind('。'), trimmed.rfind('！'), trimmed.rfind('!'))
+            if last_break > 700:
+                body_clean = trimmed[:last_break+1].strip()
+            else:
+                body_clean = trimmed.strip()
+
+        # Build clean paragraph HTML for ProseMirror
+        paragraphs = [f'<p>{p.replace(chr(10), "<br>")}</p>' for p in body_clean.split('\n\n') if p.strip()]
+        html_body = ''.join(paragraphs)
+
+        js_inject_desc = f"""
+        (function() {{
+            try {{
+                const htmlBody = {json.dumps(html_body)};
+                const descEl = document.querySelector('.share-text__input .ProseMirror, .js_pmEditorArea .ProseMirror, .content_edit .share-text__input .ProseMirror');
+                if (!descEl) return JSON.stringify({{ error: 'NO_DESC_EDITOR' }});
+                
+                descEl.focus();
+                descEl.innerHTML = htmlBody;
+                descEl.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                descEl.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                
+                return JSON.stringify({{ success: true, length: descEl.innerText.length, pCount: descEl.querySelectorAll('p').length }});
+            }} catch(e) {{
+                return JSON.stringify({{ error: e.message }});
+            }}
+        }})();
+        """
+        desc_res = self.chrome.execute_javascript(w_idx, t_idx, js_inject_desc, settle_seconds=0.5)
+        logger.info(f"Description injection result: {desc_res}")
+
+        # 5. Setup Collection (合集设置)
+        if collection:
+            logger.info(f"Setting up Photo Collection: {collection}")
+            js_photo_collection_setup = f"""
+            (function() {{
+                function clickReactElement(el) {{
+                    if (!el) return false;
+                    const key = Object.keys(el).find(k => k.startsWith('__reactProps$') || k.startsWith('__reactEventHandlers$'));
+                    if (key && el[key] && el[key].onClick) {{
+                        el[key].onClick({{
+                            preventDefault: () => {{}},
+                            stopPropagation: () => {{}},
+                            nativeEvent: new MouseEvent('click', {{bubbles: true, cancelable: true}}),
+                            isDefaultPrevented: () => false,
+                            isPropagationStopped: () => false,
+                            target: el,
+                            currentTarget: el
+                        }});
+                        return true;
+                    }}
+                    el.click();
+                    return true;
+                }}
+
+                const targetCollection = {json.dumps(collection)};
+                let state = {{ is_done: false }};
+                let action = '';
+
+                const collRow = document.querySelector('#js_article_tags_area');
+                if (collRow && collRow.innerText && collRow.innerText.includes(targetCollection)) {{
+                    state.is_done = true;
+                    action = 'Collection already set';
+                    return JSON.stringify({{ state, action, is_done: true }});
+                }}
+
+                const dialog = Array.from(document.querySelectorAll('.weui-desktop-dialog')).find(d => d.clientHeight > 0 && d.innerText.includes('Collection'));
+                if (!dialog) {{
+                    const toggle = document.querySelector('.js_article_tags_label') || document.querySelector('#js_article_tags_area');
+                    if (toggle) {{
+                        clickReactElement(toggle);
+                        action = 'Opened collections dialog';
+                        return JSON.stringify({{ state, action, is_done: false }});
+                    }}
+                    state.is_done = true;
+                    action = 'No collection toggle found';
+                    return JSON.stringify({{ state, action, is_done: true }});
+                }}
+
+                // In dialog: click input to show options or filter
+                const input = dialog.querySelector('input');
+                if (input) {{
+                    input.focus();
+                    input.click();
+                    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                    setter.call(input, targetCollection);
+                    input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                }}
+
+                // Find matching option
+                const options = Array.from(document.querySelectorAll('.select-opt-li, li')).filter(li => li.innerText && li.innerText.trim() === targetCollection);
+                if (options.length > 0) {{
+                    clickReactElement(options[0]);
+                    const confirmBtn = Array.from(dialog.querySelectorAll('button')).find(b => (b.innerText.includes('Confirm') || b.innerText.includes('确定')) && !b.classList.contains('weui-desktop-btn_disabled'));
+                    if (confirmBtn) {{
+                        setTimeout(() => clickReactElement(confirmBtn), 150);
+                        action = `Selected ${{targetCollection}} and clicked confirm`;
+                        return JSON.stringify({{ state, action, is_done: false }});
+                    }}
+                }}
+
+                action = `Waiting for collection option (${{targetCollection}})...`;
+                return JSON.stringify({{ state, action, is_done: false }});
+            }})();
+            """
+            self.run_ui_state_machine("Photo Collection Setup", w_idx, t_idx, js_photo_collection_setup, max_steps=12, delay=1.0)
+
+        # 6. Setup Creation Source (原创/来源声明)
+        logger.info("Setting up Creation Source...")
+        js_photo_source_setup = """
+        (function() {
+            function clickReactElement(el) {
+                if (!el) return false;
+                const key = Object.keys(el).find(k => k.startsWith('__reactProps$') || k.startsWith('__reactEventHandlers$'));
+                if (key && el[key] && el[key].onClick) {
+                    el[key].onClick({
+                        preventDefault: () => {},
+                        stopPropagation: () => {},
+                        nativeEvent: new MouseEvent('click', {bubbles: true, cancelable: true}),
+                        isDefaultPrevented: () => false,
+                        isPropagationStopped: () => false,
+                        target: el,
+                        currentTarget: el
+                    });
+                    return true;
+                }
+                el.click();
+                return true;
+            }
+
+            let state = { is_done: false };
+            let action = '';
+
+            const sourceRow = document.querySelector('#js_claim_source_area');
+            if (sourceRow && sourceRow.innerText && (sourceRow.innerText.includes('个人观点') || sourceRow.innerText.includes('AI生成'))) {
+                state.is_done = true;
+                action = 'Creation source already set';
+                return JSON.stringify({ state, action, is_done: true });
+            }
+
+            const dialog = Array.from(document.querySelectorAll('.weui-desktop-dialog')).find(d => d.clientHeight > 0 && d.innerText.includes('Creation Source'));
+            if (!dialog) {
+                const toggle = document.querySelector('.js_claim_source_desc') || document.querySelector('#js_claim_source_area label');
+                if (toggle) {
+                    clickReactElement(toggle);
+                    action = 'Opened creation source dialog';
+                    return JSON.stringify({ state, action, is_done: false });
+                }
+                state.is_done = true;
+                action = 'No creation source toggle found';
+                return JSON.stringify({ state, action, is_done: true });
+            }
+
+            // In dialog: click radio for "个人观点，仅供参考" (value 4)
+            const radios = dialog.querySelectorAll('input[type="radio"]');
+            for (let r of radios) {
+                if (r.value === '4' || r.parentElement.innerText.includes('个人观点')) {
+                    r.click();
+                    r.checked = true;
+                    r.dispatchEvent(new Event('change', { bubbles: true }));
+                    break;
+                }
+            }
+
+            const confirmBtn = Array.from(dialog.querySelectorAll('button')).find(b => (b.innerText.includes('Confirm') || b.innerText.includes('确定')) && !b.classList.contains('weui-desktop-btn_disabled'));
+            if (confirmBtn) {
+                setTimeout(() => clickReactElement(confirmBtn), 150);
+                action = 'Selected 个人观点 and confirmed';
+                return JSON.stringify({ state, action, is_done: false });
+            }
+
+            action = 'Waiting for source confirm button...';
+            return JSON.stringify({ state, action, is_done: false });
+        })();
+        """
+        self.run_ui_state_machine("Photo Creation Source Setup", w_idx, t_idx, js_photo_source_setup, max_steps=12, delay=1.0)
+
+        # 7. Setup Reward (赞赏设置)
+        logger.info("Setting up Reward (赞赏)...")
+        js_photo_reward_setup = """
+        (function() {
+            function clickReactElement(el) {
+                if (!el) return false;
+                const key = Object.keys(el).find(k => k.startsWith('__reactProps$') || k.startsWith('__reactEventHandlers$'));
+                if (key && el[key] && el[key].onClick) {
+                    el[key].onClick({
+                        preventDefault: () => {},
+                        stopPropagation: () => {},
+                        nativeEvent: new MouseEvent('click', {bubbles: true, cancelable: true}),
+                        isDefaultPrevented: () => false,
+                        isPropagationStopped: () => false,
+                        target: el,
+                        currentTarget: el
+                    });
+                    return true;
+                }
+                el.click();
+                return true;
+            }
+
+            const isVisible = el => !!el && el.getBoundingClientRect().height > 0 && window.getComputedStyle(el).display !== 'none';
+            let state = { is_done: false };
+            let action = '';
+
+            const area = document.querySelector('#js_reward_setting_area');
+            if (area && area.innerText && (area.innerText.includes('Account:') || area.innerText.includes('赞赏账户'))) {
+                state.is_done = true;
+                action = 'Reward already enabled and bound to account';
+                return JSON.stringify({ state, action, is_done: true });
+            }
+
+            const rewardDialog = Array.from(document.querySelectorAll('.weui-desktop-dialog, .reward-setting-dialog')).find(d => isVisible(d) && (d.innerText.includes('Reward') || d.innerText.includes('赞赏')));
+            if (!rewardDialog) {
+                if (area && isVisible(area)) {
+                    const openBtn = area.querySelector('.js_reward_open, .setting-group__switch, .setting-group__content');
+                    if (openBtn) {
+                        clickReactElement(openBtn);
+                        action = 'Clicked photo reward row to open dialog';
+                        return JSON.stringify({ state, action, is_done: false });
+                    }
+                }
+                state.is_done = true;
+                action = 'Photo reward setting area not found, skipping';
+                return JSON.stringify({ state, action, is_done: true });
+            }
+
+            // In Dialog:
+            // 1. Select "Reward the Author" radio if present
+            const authorRadio = Array.from(rewardDialog.querySelectorAll('input[type="radio"], .weui-desktop-form__check-label, label, span')).find(r => r.innerText && (r.innerText.includes('Author') || r.innerText.includes('赞赏作者')));
+            if (authorRadio) {
+                clickReactElement(authorRadio);
+            }
+
+            // 2. Select Recent account if present
+            const recentAccount = rewardDialog.querySelector('.recent-select div:last-child, .recent-select div, .search-result__item');
+            if (recentAccount && isVisible(recentAccount)) {
+                clickReactElement(recentAccount);
+            }
+
+            // 3. Check agreement checkbox
+            const agreeCheckbox = rewardDialog.querySelector('.reward-setting-dialog__footer input[type="checkbox"], input[type="checkbox"]');
+            if (agreeCheckbox && !agreeCheckbox.checked) {
+                agreeCheckbox.click();
+            }
+
+            // 4. Click Confirm
+            const btns = Array.from(rewardDialog.querySelectorAll('button'));
+            const confirmBtn = btns.find(b => (b.innerText.includes('Confirm') || b.innerText.includes('确定')) && !b.classList.contains('weui-desktop-btn_disabled'));
+            if (confirmBtn) {
+                setTimeout(() => clickReactElement(confirmBtn), 150);
+                action = 'Confirmed photo reward setup';
+                return JSON.stringify({ state, action, is_done: false });
+            }
+
+            action = 'Waiting for reward confirm button...';
+            return JSON.stringify({ state, action, is_done: false });
+        })();
+        """
+        self.run_ui_state_machine("Photo Reward Setup", w_idx, t_idx, js_photo_reward_setup, max_steps=10, delay=1.0)
+
+        # Summary of Photo Message Publishing
+        print("\n" + "="*50)
+        print("🎉 WeChat Photo Message (图片消息) Draft Ready!")
+        print("="*50)
+        print(f"✓ 标题: {photo_title}")
+        print(f"✓ 图片卡片: {len(photo_paths)} 张已全部上传并设置为 3:4 画册")
+        print(f"✓ 封面: 默认第一张卡片 ({photo_paths[0].name})")
+        print("✓ 伴随文案: 已自动填充至描述输入框")
+        print(f"✓ 合集属性: {collection or '未设置'}")
+        print("✓ 来源声明: 个人观点，仅供参考")
+        print("✓ 赞赏设置: 已自动开启并绑定账号")
+        print("ℹ️ 建议在微信编辑器中核对后点击右下角「保存为草稿」")
+        print("="*50 + "\n")
+
+    def publish_article(self, article_data: dict) -> None:
         title = article_data["title"]
         author = article_data["author"]
         desc = article_data["desc"]

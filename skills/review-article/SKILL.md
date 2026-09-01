@@ -52,13 +52,19 @@ description: Use when invoked by a main agent to review an article draft, or exp
 8. 摘要长度：`desc` 实际字符数严格落在 60–120 字符范围内。
 9. 0 真实性幻觉：核对文中所有 API 参数、法律判例、历史年份与项目名称，确保 100% 真实准确。
 10. LaTeX 符号过滤：检查正文中是否存在 `$\rightarrow$`、`$\Leftarrow$` 等行内 LaTeX 数学符号。若有，一律自动替换为原生 Unicode 箭头（`→`、`⇒`），防止微信富文本渲染失真。
-11. 微信合集校验 (collection)：检查 Front Matter 中的 collection 字段是否包含在 `blogger.toml` 的 `article_collections` 列表中。若不在列表中，必须修正为 `blogger.toml` 定义的有效合集。
-12. 封面架构与质感审查 (Editorial Cover Audit - CRITICAL)：用 view_file 查看 cover.png 图像。
+11. 微信合集校验 (collection)：
+    - **普通图文文章**：必须包含在 `blogger.toml` 的 `article_collections` 列表中。
+    - **图片消息 (type: "photo")**：必须包含在 `blogger.toml` 的 `photo_collections` 列表中。若不在列表中，必须修正为有效合集。
+12. 封面架构与质感审查 (Editorial Cover Audit - CRITICAL)：用 view_file 查看 cover.png / 01_cover.png 图像。
     - 检查 1：是否平铺了正文 20+ 字的全长技术标题？若有，必须解耦为 4-8 字爆破 Hook 短语。
     - 检查 2：是否具备【双栏复合杂志架构】（左侧爆破 Hook + 右侧高对比度微型信息图/数据对比卡片）？
     - 检查 3：严禁使用 3D 霓虹/发光脑/科幻 HUD/满屏假字等 AI 俗套元素。
-    - 若未满足双栏复合架构或为单调全长标题，必须立即编写 SVG 复合卡片脚本并使用 sips -s format png --resampleWidth 1920 重新渲染封面后替换。
-13. 列表空行与断行检查 (List Blank Line Audit)：检查无序列表 (`*`, `-`) 与有序列表 (`1.`, `2.`) 上方是否包含空行。若列表紧贴上文段落（例如 `段落内容：\n* 列表1`），必须插入空行，防止在 Blogger/微信/CSDN 编辑器中被合并为无换行的平铺段落。
+    - 若未满足双栏复合架构或为单调全长标题，必须立即编写 SVG 复合卡片脚本并重新渲染后替换。
+13. 列表空行与断行检查 (List Blank Line Audit)：检查无序列表 (`*`, `-`) 与有序列表 (`1.`, `2.`) 上方是否包含空行。若列表紧贴上文段落，必须插入空行。
+14. 图片消息伴随文案与卡片专项审计 (Photo Message Special Audit - 当 type 为 photo 时生效)：
+    - **纯文本字数硬顶**：统计 `article.md` 去除 front matter 后的纯文本字符数，**必须 ≤ 900 字符**（微信限制 1000 字，留 100 字余量）。超过 900 字直接判定不合格并主动删减精炼！
+    - **0 Markdown 污染**：正文禁用 `###`、`---`、大面积 `**` 粗体，采用括号小标题（如 `【一、...】`）、`• ` 项目符号与 Emoji 引导。
+    - **卡片尺寸与字号**：所有图片必须为 3:4 竖版（1200x1600），正文字号全部 ≥ 22px。
 ```
 
 ---
