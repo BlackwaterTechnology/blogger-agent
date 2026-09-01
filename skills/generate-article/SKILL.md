@@ -106,19 +106,18 @@ description: Use when the user asks to write a technical article, blog post, or 
    □ 引用或一手资料（带出处）
    ⚠ 不允许全文都是「我们认为」「业界普遍」「值得思考」这类无证据陈述。
 
-4. 视觉建模清单：本文有哪 2-4 个对象值得建模成图？至少打勾 2 类，每类写明"画什么 + 用哪种图"：
-   □ 架构 / 拓扑 / 组件关系 → 原生 SVG 分层架构（字号≥28px）或 PlantUML `component`
-   □ 时序 / 调用链 / 协议交互 → 原生 SVG 垂直流水线（字号≥28px，严禁横向4列）
-   □ 状态机 / 生命周期 → Mermaid `stateDiagram` 或 原生 SVG
-   □ 决策树 / 流程 / 算法步骤 → 原生 SVG 纵向流动或 PlantUML `activity`
-   □ 概念分类 / 思维层级 / 大纲 → PlantUML `mindmap` / `@startwbs` (字号≥24px)
-   □ 时间线 / 演进 / 版本史 → 原生 SVG 纵向里程碑
-   □ 数据分布 / 占比 / 工作量 → matplotlib 饼图 / 条形 / 堆叠
-   □ 维度对比 / 评分 / 二元对抗 → 原生 SVG 双栏对抗矩阵（字号≥28px）
-   □ 类比 / 隐喻 / 场景化封面 → 原生 SVG 双栏复合杂志封面 / AI 绘图
-   □ 真实截图 / 终端输出 / 用户手稿 → 用户素材（§2.0 优先）
+4. 视觉建模清单：本文有哪 2-4 个对象值得建模成图？至少打勾 2 类（提倡具象隐喻与结构拓扑组合），每类写明"画什么 + 用哪种模态"：
+   □ 【模态 1】具象概念隐喻 / 场景对抗 → AI 绘图 `generate_image`（5大去俗套艺术风格，如蒸汽机械vs极简机器人、古代石壁代码）
+   □ 【模态 2】架构 / 拓扑 / 分层关系 → 原生 SVG 分层架构（字号≥28px，支持白底/暗蓝/暖灰）
+   □ 【模态 2】时序 / 调用链 / 协议交互 → 原生 SVG 垂直流水线（字号≥28px，严禁横向4列）
+   □ 【模态 2】状态机 / 决策树 / 生命周期 → 原生 SVG 纵向流动或 PlantUML `activity` (DPI 300+)
+   □ 【模态 2】概念分类 / 思维层级 / 大纲 → PlantUML `mindmap` / `@startwbs` (字号≥24px)
+   □ 【模态 3】维度选型 / 4 象限策略矩阵 → 原生 SVG 2x2 网格（字号≥28px）
+   □ 【模态 3】二元对抗 / 方案对比矩阵 → 原生 SVG 双栏对抗矩阵（字号≥28px）
+   □ 【模态 4】收益走势 / 基差剪刀差 / 分布 → matplotlib 统计曲线 (DPI 300+) 或 原生 SVG 走势
+   □ 【模态 4】真实终端输出 / 代码 Diff / 手稿 → 用户素材 / CLI 终端卡片
    ⚠ "想不到要画什么"通常意味着主张/证据还不具体——回去重新打磨第 1-3 题，别硬凑图。
-   ⚠ 大段文字描述一个能画出来的东西（架构、流程、对比、状态机），是技术写作的最大反模式。
+   ⚠ 拒绝全篇单一深蓝 SVG：提倡在开篇或核心矛盾处引入【模态 1】具象概念隐喻图，激活读者右脑。
 
 5. 文章类型：这是哪种文章？(选一个，决定阶段 3 的结构)
    □ 现象解读 / 新闻评论：hook → 事实 → 我的解读 → 影响
@@ -138,8 +137,10 @@ description: Use when the user asks to write a technical article, blog post, or 
 - 微信合集 collection：必须且只能从配置文件 blogger.toml 的 [platforms.wechat.accounts.default].article_collections 列表中选择（如 AI, Agent, AWS, Web3, DevSecOps, 认知思维, 信息安全, Iac, 云原生）。
 - cover 必填且文件名固定为 cover.png。
 - 正文配图 ≥ 2 张（来自 1A Q4 视觉建模清单），每张图必须在文中被显式引用并解释，不能孤儿。
-- 图表字号与分栏：
-  - 1200px 画布下正文图片所有文字是否严格 ≥ 28px（核心节点 ≥ 32px）？
+- 配图模态与色彩多样性：
+  - 是否避免了全篇 100% 冰冷单一深蓝图？是否合理混配了具象概念隐喻图（模态1）或非单一暗黑主题？
+  - 若包含 AI 绘图，是否严格杜绝了发光蓝脑、机械手、科幻 HUD、乱码假字等 AI 俗套？
+  - 1200px 画布下 SVG 图表所有文字是否严格 ≥ 28px（核心节点 ≥ 32px）？
   - 是否严格遵守横向最多 2 栏（多步骤一律垂直纵向流转）？
   - 单卡片文字是否控制在 2-3 行极简短语内？无长句堆砌？
 ```
@@ -154,20 +155,28 @@ description: Use when the user asks to write a technical article, blog post, or 
 
 #### 2.1 数量与命名
 - **必出 1 张封面**：`cover.png`（16:9 或 1:1）。
-- **正文图 2–4 张起步**，语义化命名（如 `tao-architecture.png`）。
+- **正文图 2–4 张起步**，语义化命名（如 `caveman-metaphor.png`, `tao-architecture.png`, `policy-quadrant.png`）。
 
-#### 2.2 工具选择与移动端极简原则
-| 配图类型 | 推荐工具 | 移动端画布与字号要求 |
-|---|---|---|
-| 角色 / 场景 / 概念封面 | `generate_image` 等 AI 绘图 | N/A |
-| 交互序列图 / 时序流 / 协议交互 | **原生 SVG + sips（强制首选）** | `1200x1000` 垂直流水线，横向 1 栏，字号 ≥ 28px-34px |
-| 二元对抗 / 方案对比矩阵 | **原生 SVG + sips（强制首选）** | `1200x820` 双栏对比，横向 2 栏，字号 ≥ 28px-36px |
-| 四象限 / 四维分类网格 | **原生 SVG + sips（强制首选）** | `1200x860` 2x2 网格，字号 ≥ 28px-34px |
-| 分层架构 / 系统拓扑 | **原生 SVG + sips（强制首选）** | `1200x880` 3 层纵向堆叠，字号 ≥ 28px-36px |
-| 思维导图 / 分类树 | `plantuml.jar` (`@startmindmap`) | 必须配置 `skinparam dpi 300`，字号 ≥ 24px |
+#### 2.2 4 大视觉模态矩阵与黄金混配 SOP (Multi-Modal Visual Strategy)
+
+为打破“全篇全盘深蓝 SVG 蓝图”的视觉疲劳，文章必须根据内容性质，从以下 4 大视觉模态中进行组合：
+
+| 模态标识 | 配图类型 | 推荐工具 | 核心价值与适用场景 | 关键约束与风格 |
+|---|---|---|---|---|
+| **🎨 模态 1** | **具象概念隐喻 / 场景插画** | `generate_image` (AI 绘图) | 开篇破局、现象隐喻、反直觉对比、角色冲突、生活化类比。激活右脑情感与好奇心。 | **5 大去 AI 味艺术风格**（见 §2.6），严禁蓝光脑/机械手/乱码字，强调具体物理实体与场景故事。 |
+| **📐 模态 2** | **结构拓扑 / 垂直时序流** | 原生 SVG / PlantUML | 核心机制拆解、端到端时序流、3 层架构拓扑。提供精密的工程心智模型。 | 1200px 画布，字号 ≥28px-36px，**多主题色板**（暗蓝/极简白/暖陶土/森林绿），垂直纵向流动。 |
+| **📊 模态 3** | **多维决策矩阵 / 二元对抗** | 原生 SVG (2x2 网格 / 双栏对抗) | 新旧对比、4 象限技术选型、8 大策略分类。提供结构化决策清单。 | 2 栏对抗或 2x2 四象限网格，高对比度 Badge，卡片内 2-3 行极简短语。 |
+| **📈 模态 4** | **实证量化图表 / 终端切片** | Matplotlib / 原生 SVG / 终端 Mockup | 收益率走势、基差价差剪刀差、实测 Benchmark、CLI 终端输出。提供无可辩驳的硬核证据。 | DPI 300+，专业金融终端/科研期刊排版质感。 |
+
+##### 黄金混配比例（The Golden Mix SOP）
+对于一篇包含 3~4 张图的深度长文，**推荐采用“感性隐喻 ➔ 严密拓扑 ➔ 决策落地”的节奏编排**：
+- **封面 (Cover)**：双栏复合杂志封面（模式 1）或 概念场景插图叠加 Hook（模式 3）。
+- **配图 1（引入/矛盾/破局）**：**【模态 1】具象概念隐喻图**（如用蒸汽机械 vs 折纸天鹅比喻框架笨重与模型轻量，或山顶洞人石壁代码）。
+- **配图 2（核心机制/流转拆解）**：**【模态 2】原生大字号 SVG 架构/时序拓扑**（垂直流水线或 3 层架构，提供严谨工程认知）。
+- **配图 3（选型/对比/实证）**：**【模态 3 或 4】2x2 四象限矩阵 / 双栏对抗 / Matplotlib 收益曲线**（给出终局落地依据）。
 
 ##### 2.2.1 原生 SVG 优先与防小字防截断铁律（CRITICAL）
-- 正文插图一律优先使用**原生 SVG 矢量图编写**，画布推荐使用 `viewBox="0 0 1200 H"`。
+- 结构类插图优先使用**原生 SVG 矢量图编写**，画布推荐使用 `viewBox="0 0 1200 H"`。
 - **严禁在 1600px 画布中使用低于 36px 的文字，严禁在 1200px 画布中使用低于 28px 的文字**。
 - 若使用 PlantUML 渲染后出现字号偏小、文字裁切或质感发灰，**必须立即重写为原生 SVG 模板并重新渲染**。
 
@@ -451,8 +460,124 @@ description: Use when the user asks to write a technical article, blog post, or 
       <text x="105" y="51" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="22" font-weight="800" text-anchor="middle">LAYER 03 · 终审</text>
       <text x="210" y="52" fill="#F8FAFC" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="800">Checklist 机器终审与发布管道</text>
       <text x="25" y="110" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 移动端字号机检 (≥28px) · 消除 AI 腔 · 一键发布至多平台</text>
-      <text x="25" y="148" fill="#34D399" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="700">核心产出：100% 合规与高完读率的技术爆款资产</text>
     </g>
+  </g>
+</svg>
+```
+
+---
+
+#### 2.6 去除“AI味”的 5 大艺术风格 Prompt 范式 (5 High-Taste Editorial AI Styles)
+
+使用 `generate_image` 生成具象概念隐喻图（模态 1）时，**必须坚决杜绝 4 大廉价 AI 俗套**：
+- ❌ **严禁蓝光/紫色发光大脑 (Glowing Brains)**
+- ❌ **严禁机器人与人类手指相触/机械手握手 (Cybernetic Hands Shaking)**
+- ❌ **严禁科幻全息 HUD 悬浮面板与满屏代码雨 (Hologram Matrix HUD)**
+- ❌ **严禁画面中出现 AI 生成的无意义扭曲乱码英文字符 (Garbled Pseudo-Text)**
+
+必须直接采用国际顶级杂志（*The New Yorker*, *The Economist*, *Wired*, *Monocle*）的 **5 大高审美艺术流派**：
+
+##### 风格 1：现代杂志社论扁平插画 (Modern Editorial Flat Vector)
+- **适用场景**：商业逻辑、组织分工、认知偏差、产品理念。
+- **Prompt 模板**：
+  `Modern editorial vector illustration, flat 2D graphic design, elegant bold silhouettes, clean textured geometry, contemporary magazine style, subtle paper texture, cohesive sophisticated color palette of slate gray, warm amber, and deep navy, high contrast, award-winning editorial art. Scene depicting [具体场景/具象动作，如 an architect assembling modular puzzle blocks while discarding bloated blueprints]. No text, no words, no 3D glossy render.`
+
+##### 风格 2：实体机械/物理隐喻对比 (Physical Mechanical Metaphor)
+- **适用场景**：重型框架 vs 轻量内核、传统低效 vs 现代极速、山顶洞人极简 Token 压缩。
+- **Prompt 模板**：
+  `Conceptual physical metaphor illustration, vintage intricate mechanism contrasting with sleek modern minimalist artifact, rich tactile textures, warm atmospheric cinematic lighting, clear visual contrast, editorial storytelling art. Scene showing [具体物理对比，如 an enormous heavy steampunk cast-iron engine overflowing with gears and smoke pipes compared side by side with an ultra-lightweight geometric origami crane floating effortlessly]. High visual density, crisp detail, no text, no glowing sci-fi clichés.`
+
+##### 风格 3：复古清晰线稿与版画 (Vintage Ligne Claire / Moebius & Woodcut)
+- **适用场景**：认知哲学、博弈论、系统脆弱性、历史反思。
+- **Prompt 模板**：
+  `Ligne claire illustration style, Moebius inspired ink line art with subtle watercolor wash, delicate hatched shading, intellectual graphic novel aesthetic, matte muted earth tones (terracotta, olive green, cream paper). Scene showing [具体画面，如 an ancient scholar and a futuristic automaton playing a game of chess on an intricate labyrinth board]. High aesthetic, literary tone, clean composition, zero text.`
+
+##### 风格 4：等轴测微缩黏土模型 (Isometric Clay & Papercraft Diorama)
+- **适用场景**：数据孤岛、跨链套利流水线、分布式集群、安全防火墙。
+- **Prompt 模板**：
+  `Isometric stylized miniature diorama, handcrafted matte clay and folded paper aesthetic, soft tactile studio lighting, pastel and architectural color harmony of mint green, soft slate, and cream, clean focal composition. Scene showing [微缩系统场景，如 a miniature financial fortress with tiny vaults connected by clean optical pipelines, protected from storm clouds]. Studio photography feel, tactile materials, no garbled text, no neon glows.`
+
+##### 风格 5：包豪斯构成主义与瑞士印画 (Bauhaus Constructivism & Swiss Screenprint)
+- **适用场景**：第一性原理、架构解耦、去中心化平衡、极致极简主义。
+- **Prompt 模板**：
+  `Bauhaus constructivist graphic art, Swiss international typographic style, bold abstract geometric forms, diagonal dynamic balance, matte screen print texture, primary red, deep navy, and raw cream paper background. Concept representing [抽象物理力学平衡，如 a minimalist fulcrum balancing a giant boulder with a single delicate feather]. High tension, graphic poster art, no random AI noise.`
+
+---
+
+#### 2.7 SVG 多主题色板系统与明色/暖色范式 (Multi-Theme Palette System)
+
+原生 SVG 插图不再局限于单一深蓝底色！必须根据文章领域与情绪基调自由选用以下 **4 款杂志级主题色板**：
+
+| 色板名称 | 背景色 (Canvas) | 卡片底色 (Card) | 主强调色 (Primary) | 辅助色 (Accent) | 适用领域 |
+|---|---|---|---|---|---|
+| **`slate_navy`** (深曜黑蓝) | `#0F172A` | `#141B2D` / `#1E293B` | `#F59E0B` (琥珀金) | `#38BDF8` (青蓝) / `#10B981` (翠绿) | 硬核系统、AI 底层、金融量化 |
+| **`swiss_white`** (瑞士白底) | `#F8F9FA` | `#FFFFFF` | `#E63946` (瑞士红) | `#1D3557` (深海蓝) / `#059669` (祖母绿) | 商业评论、认知哲学、极简社论 |
+| **`terracotta_warm`** (暖陶米纸) | `#FAF5EF` | `#FFFFFF` / `#F5EBE1` | `#EA580C` (陶土橙) | `#65A30D` (橄榄绿) / `#78350F` (深褐) | 职场方法、认知成长、教育人生 |
+| **`forest_emerald`** (深林薄荷) | `#022C22` | `#064E3B` | `#10B981` (薄荷绿) | `#34D399` (嫩绿) / `#F0FDF4` (象牙白) | 工程效能、开源治理、增长模型 |
+
+##### 范式 E：明色/白底瑞士社论对抗矩阵 (Swiss White 2-Column VS)
+```xml
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 820" width="1200" height="820">
+  <!-- Clean Off-White Background -->
+  <rect width="1200" height="820" fill="#F8F9FA" />
+
+  <!-- Header Section -->
+  <g transform="translate(60, 50)">
+    <rect x="0" y="0" width="180" height="36" rx="18" fill="#E5E7EB" />
+    <text x="90" y="24" fill="#374151" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="700" text-anchor="middle">认知思维模型</text>
+    <text x="0" y="80" fill="#111827" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="46" font-weight="900">廉价信号 vs 硬核背书模型</text>
+  </g>
+
+  <!-- 2-Column Container -->
+  <g transform="translate(60, 180)">
+    <!-- Left Column: Cheap Signaling (525px) -->
+    <g transform="translate(0, 0)">
+      <rect width="525" height="440" rx="16" fill="#FFFFFF" stroke="#EF4444" stroke-width="2" />
+      <rect width="525" height="60" rx="16" fill="#FEE2E2" />
+      <rect y="40" width="525" height="20" fill="#FEE2E2" />
+      <text x="30" y="42" fill="#B91C1C" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="30" font-weight="800">❌ 廉价信号：低成本表态</text>
+
+      <g transform="translate(30, 95)">
+        <text x="0" y="25" fill="#DC2626" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="700">口头承诺 · 无抵押品</text>
+        <text x="0" y="70" fill="#4B5563" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 伪造边际成本接近 0</text>
+        
+        <line x1="0" y1="110" x2="465" y2="110" stroke="#E5E7EB" stroke-width="1.5" />
+
+        <text x="0" y="155" fill="#DC2626" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="700">短期投机 · 零违约惩罚</text>
+        <text x="0" y="200" fill="#4B5563" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 败露后无实际资产损失</text>
+
+        <rect y="240" width="465" height="70" rx="10" fill="#FEF2F2" stroke="#FCA5A5" stroke-width="1" />
+        <text x="20" y="284" fill="#991B1B" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="700">⚠️ 结果：沦为博弈论中的柠檬劣币</text>
+      </g>
+    </g>
+
+    <!-- Right Column: Hard Proof (525px) -->
+    <g transform="translate(555, 0)">
+      <rect width="525" height="440" rx="16" fill="#FFFFFF" stroke="#059669" stroke-width="2" />
+      <rect width="525" height="60" rx="16" fill="#D1FAE5" />
+      <rect y="40" width="525" height="20" fill="#D1FAE5" />
+      <text x="30" y="42" fill="#065F46" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="30" font-weight="800">✅ 硬核信号：非对称代价</text>
+
+      <g transform="translate(30, 95)">
+        <text x="0" y="25" fill="#059669" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="700">真实沉淀 · 锁定质押</text>
+        <text x="0" y="70" fill="#4B5563" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 需要支付不可逆的时间或资本</text>
+        
+        <line x1="0" y1="110" x2="465" y2="110" stroke="#E5E7EB" stroke-width="1.5" />
+
+        <text x="0" y="155" fill="#059669" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="700">长期博弈 · 声誉连带责任</text>
+        <text x="0" y="200" fill="#4B5563" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 建立不可伪造的极高信任壁垒</text>
+
+        <rect y="240" width="465" height="70" rx="10" fill="#ECFDF5" stroke="#6EE7B7" stroke-width="1" />
+        <text x="20" y="284" fill="#065F46" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="700">💡 结果：沉淀为长期垄断社交资产</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Bottom Takeaway Banner -->
+  <g transform="translate(60, 650)">
+    <rect width="1080" height="110" rx="14" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1.5" />
+    <text x="35" y="46" fill="#1E40AF" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="30" font-weight="800">💡 第一性原理洞察</text>
+    <text x="35" y="86" fill="#374151" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">只有承受了不可逆沉没成本的信号，才能穿透噪音建立真实共识。</text>
   </g>
 </svg>
 ```

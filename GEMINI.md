@@ -153,18 +153,28 @@ if (cb && !cb.checked) {
 
 ### 图片生成与渲染质量标准
 
-1. **清晰度与分辨率分工**：
-   - **PlantUML / Mermaid 图表引擎**：必须保持 **DPI 300+**（PlantUML 设置 `skinparam dpi 300` 或 `360`，Mermaid 使用 `-s 3` 3x 采样），保障复杂节点与文字线条达到最高精密清晰度。
-   - **正文 SVG 画布标准**：正文配图推荐采用 **`1200px` 宽度**（如 `viewBox="0 0 1200 800"` 3:2、`1200 900` 4:3、`1200 1000` 纵向流），缩放比达 0.30，移动端张力极佳。封面保持 16:9（`1920 1080` 或 `1200 675`）。
-2. **移动端字号硬底线与防拥挤铁律 (CRITICAL)**：
+1. **4 大配图模态矩阵与黄金混配 (Multi-Modal Visual Strategy)**：
+   - **模态 1：具象概念隐喻 / 场景插画**：使用 `generate_image`（AI 绘图）在文章开篇或矛盾处生成**具象场景与物理实体隐喻**（如蒸汽机械 vs 折纸天鹅、石壁发光代码），激活右脑好奇心。
+   - **模态 2：结构拓扑 / 垂直流水线**：原生 SVG / PlantUML 负责核心机制与端到端时序流（1200px 宽度，字号 ≥28px）。
+   - **模态 3：多维决策矩阵 / 二元对抗**：原生 SVG (2x2 网格 / 双栏对抗) 给出技术选型与策略落地。
+   - **模态 4：实证量化图表 / 终端切片**：Matplotlib (DPI 300+) 给出收益曲线与基差剪刀差，CLI 终端卡片展示真实命令输出。
+   - **黄金混配 SOP**：深度长文推荐采用“感性隐喻 ➔ 严密拓扑 ➔ 决策落地”的节奏编排，**严禁全篇 100% 堆砌单一深蓝框图**。
+2. **去除 AI 味的 5 大杂志社论艺术风格 (5 High-Taste Editorial AI Styles)**：
+   - 使用 `generate_image` 时，**坚决杜绝 4 大廉价 AI 俗套**（发光蓝脑、机械手握手、科幻全息 HUD、乱码假字）。
+   - 统一采用国际顶级社论风格：① 现代杂志社论扁平插画 (Modern Editorial Flat Vector)；② 实体机械/物理隐喻对比 (Physical Mechanical Metaphor)；③ 复古清晰线稿与版画 (Vintage Ligne Claire / Woodcut)；④ 等轴测微缩黏土模型 (Isometric Clay & Diorama)；⑤ 包豪斯几何构成主义 (Bauhaus Constructivism & Swiss Print)。
+3. **SVG 多主题色板系统 (Multi-Theme Palette System)**：
+   - 支持 4 款主题色板：① `slate_navy`（深曜黑蓝，适合底层系统与量化）；② `swiss_white`（瑞士白底明色，适合商业社论与认知反思）；③ `terracotta_warm`（暖陶米纸，适合职场与教育）；④ `forest_emerald`（深林薄荷，适合工程效能与开源）。
+4. **清晰度与画布标准**：
+   - **正文 SVG 画布标准**：正文配图推荐采用 **`1200px` 宽度**（如 `viewBox="0 0 1200 800"` 3:2、`1200 900` 4:3、`1200 1000` 纵向流），缩放比达 0.30。封面保持 16:9（`1920 1080` 或 `1200 675`）。
+   - **PlantUML / Mermaid 图表引擎**：必须保持 **DPI 300+**（PlantUML 设置 `skinparam dpi 300` 或 `360`，Mermaid 使用 `-s 3` 3x 采样）。
+5. **移动端字号硬底线与防拥挤铁律 (CRITICAL)**：
    - **字号绝对底线**：在 1200px 画布中，**全图文字绝对禁止低于 28px**（核心大标题 `44px~52px`，卡片标题 `36px~42px`，正文节点 `32px~36px`，次要说明 `28px~30px`）。若使用 1600px 画布，底线必须提升至 `≥ 36px`。
    - **横向分栏上限（最多 2 栏）**：**严禁横向并排 3 栏或 4 栏小卡片**！多步骤时序流转必须采用**垂直纵向流动（Top-to-Bottom Stacked Pipeline）**或 **2x2 四象限网格**。
    - **卡片极简短语化**：每个节点/卡片严格限制在 2~3 行文字以内（每行 8~14 字），严禁在图内填入整句长句或段落，详细逻辑留给正文。
-3. **SVG 高画质转换命令**：`sips` 转换 SVG 为 PNG 时**必须强制包含 `--resampleWidth 1920`** (例如 `sips -s format png --resampleWidth 1920 input.svg --out output.png`)，防止 `sips` 默认 1x 低分辨率栅格化导致 Retina 屏下发虚。
-4. **PlantUML / Mermaid 高画质**：PlantUML 统一使用 `skinparam dpi 300` (最高画质可设为 `360`) 结合 `pageWidth 2400`；严禁使用已废弃指令（例如 `skinparam handwritten false`），防止新版 PlantUML 引擎在生成的图片顶部打印黄色 Warning 提示条。Mermaid 编译时显式附加 `-s 3` 参数。
-5. **Matplotlib**：Python 导出图表必须显式声明 `plt.savefig(..., dpi=300, bbox_inches='tight')`。
-6. **文章封面设计与 Hook 解耦规范**：文章封面**绝对禁止**直接平铺正文全长标题。封面大标题必须提炼为 **4 ~ 8 字冲突短语/爆破钩子**（如 `11% 的谎言？`），字号保持 `64px~76px`，并采用“左侧 Hook + 右侧微型数据对比/信息图卡片（字号 `28px~34px`）”的双栏复合杂志架构，确保移动端卡片具备高认知密度与视觉吸引力。所有 Review 流程必须主动使用 `view_file` 检查 `cover.png`，非双栏复合卡片结构的封面一律判定为品控未通过并自动重绘。
-7. **原生 SVG 矢量图优先原则 (Native SVG First)**：对于正文中的**交互时序图/序列图、多维度对比卡片矩阵、复杂系统拓扑图**，**强制优先使用原生 SVG 代码配合 `sips -s format png --resampleWidth 1920` 渲染**。原生 SVG 具备极致的杂志级排版质感、现代深色/浅色配色、高对比度卡片与精准内边距，能彻底消除 PlantUML 默认渲染造成的右侧节点截断（Truncation）、字体发虚和样式僵硬问题。PlantUML 仅作为简单基础流程图/树状导图的备选工具。
+6. **SVG 高画质转换命令**：`sips` 转换 SVG 为 PNG 时**必须强制包含 `--resampleWidth 1920`** (例如 `sips -s format png --resampleWidth 1920 input.svg --out output.png`)。
+7. **Matplotlib**：Python 导出图表必须显式声明 `plt.savefig(..., dpi=300, bbox_inches='tight')`。
+8. **文章封面设计与 Hook 解耦规范**：文章封面大标题必须提炼为 **4 ~ 8 字冲突短语/爆破钩子**（如 `11% 的谎言？`），字号保持 `64px~76px`，并采用“左侧 Hook + 右侧微型数据对比/信息图卡片（字号 `28px~34px`）”的双栏复合杂志架构。
+9. **原生 SVG 矢量图优先原则 (Native SVG First)**：对于正文中的**交互时序图/序列图、多维度对比卡片矩阵、复杂系统拓扑图**，**强制优先使用原生 SVG 代码配合 `sips -s format png --resampleWidth 1920` 渲染**。消除 PlantUML 默认渲染造成的节点截断与样式僵硬问题。
 
 
 ### 文章 Markdown 文本与符号渲染规范
