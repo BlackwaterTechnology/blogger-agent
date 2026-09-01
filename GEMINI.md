@@ -155,12 +155,16 @@ if (cb && !cb.checked) {
 
 1. **清晰度与分辨率分工**：
    - **PlantUML / Mermaid 图表引擎**：必须保持 **DPI 300+**（PlantUML 设置 `skinparam dpi 300` 或 `360`，Mermaid 使用 `-s 3` 3x 采样），保障复杂节点与文字线条达到最高精密清晰度。
-   - **SVG / PNG 画布**：分辨率采用 **1080p ~ 2K 标准**（图片宽度控制在 **1200px – 1920px** 之间），兼顾移动端 3x Retina 高分屏锐利显示与加载速度。
-2. **SVG 高画质转换命令**：`sips` 转换 SVG 为 PNG 时**必须强制包含 `--resampleWidth 1920`** (例如 `sips -s format png --resampleWidth 1920 input.svg --out output.png`)，防止 `sips` 默认 1x 低分辨率栅格化导致 Retina 屏下发虚。SVG 源码采用 `viewBox="0 0 1200 675"` 至 `viewBox="0 0 1920 1080"` 尺寸。
-3. **PlantUML / Mermaid 高画质**：PlantUML 统一使用 `skinparam dpi 300` (最高画质可设为 `360`) 结合 `pageWidth 2400`；严禁使用已废弃指令（例如 `skinparam handwritten false`），防止新版 PlantUML 引擎在生成的图片顶部打印黄色 Warning 提示条。Mermaid 编译时显式附加 `-s 3` 参数。
-4. **Matplotlib**：Python 导出图表必须显式声明 `plt.savefig(..., dpi=300, bbox_inches='tight')`。
-5. **文章封面设计与 Hook 解耦规范**：文章封面**绝对禁止**直接平铺正文全长标题。封面大标题必须提炼为 **4 ~ 8 字冲突短语/爆破钩子**（如 `11% 的谎言？`），并采用“左侧 Hook + 右侧微型数据对比/信息图卡片”的双栏复合杂志架构，确保移动端卡片具备高认知密度与视觉吸引力。所有 Review 流程必须主动使用 `view_file` 检查 `cover.png`，非双栏复合卡片结构的封面一律判定为品控未通过并自动重绘。
-6. **原生 SVG 矢量图优先原则 (Native SVG First)**：对于正文中的**交互时序图/序列图、多维度对比卡片矩阵、复杂系统拓扑图**，**优先使用原生 SVG 代码（`viewBox="0 0 1600 900"` / `1920 1080`）配合 `sips -s format png --resampleWidth 1920` 渲染**。原生 SVG 具备极致的杂志级排版质感、现代深色/浅色配色、高对比度卡片与精准内边距，能彻底消除 PlantUML 默认渲染造成的右侧节点截断（Truncation）、字体发虚和样式僵硬问题。PlantUML 仅作为简单基础流程图/树状导图的备选工具。
+   - **正文 SVG 画布标准**：正文配图推荐采用 **`1200px` 宽度**（如 `viewBox="0 0 1200 800"` 3:2、`1200 900` 4:3、`1200 1000` 纵向流），缩放比达 0.30，移动端张力极佳。封面保持 16:9（`1920 1080` 或 `1200 675`）。
+2. **移动端字号硬底线与防拥挤铁律 (CRITICAL)**：
+   - **字号绝对底线**：在 1200px 画布中，**全图文字绝对禁止低于 28px**（核心大标题 `44px~52px`，卡片标题 `36px~42px`，正文节点 `32px~36px`，次要说明 `28px~30px`）。若使用 1600px 画布，底线必须提升至 `≥ 36px`。
+   - **横向分栏上限（最多 2 栏）**：**严禁横向并排 3 栏或 4 栏小卡片**！多步骤时序流转必须采用**垂直纵向流动（Top-to-Bottom Stacked Pipeline）**或 **2x2 四象限网格**。
+   - **卡片极简短语化**：每个节点/卡片严格限制在 2~3 行文字以内（每行 8~14 字），严禁在图内填入整句长句或段落，详细逻辑留给正文。
+3. **SVG 高画质转换命令**：`sips` 转换 SVG 为 PNG 时**必须强制包含 `--resampleWidth 1920`** (例如 `sips -s format png --resampleWidth 1920 input.svg --out output.png`)，防止 `sips` 默认 1x 低分辨率栅格化导致 Retina 屏下发虚。
+4. **PlantUML / Mermaid 高画质**：PlantUML 统一使用 `skinparam dpi 300` (最高画质可设为 `360`) 结合 `pageWidth 2400`；严禁使用已废弃指令（例如 `skinparam handwritten false`），防止新版 PlantUML 引擎在生成的图片顶部打印黄色 Warning 提示条。Mermaid 编译时显式附加 `-s 3` 参数。
+5. **Matplotlib**：Python 导出图表必须显式声明 `plt.savefig(..., dpi=300, bbox_inches='tight')`。
+6. **文章封面设计与 Hook 解耦规范**：文章封面**绝对禁止**直接平铺正文全长标题。封面大标题必须提炼为 **4 ~ 8 字冲突短语/爆破钩子**（如 `11% 的谎言？`），字号保持 `64px~76px`，并采用“左侧 Hook + 右侧微型数据对比/信息图卡片（字号 `28px~34px`）”的双栏复合杂志架构，确保移动端卡片具备高认知密度与视觉吸引力。所有 Review 流程必须主动使用 `view_file` 检查 `cover.png`，非双栏复合卡片结构的封面一律判定为品控未通过并自动重绘。
+7. **原生 SVG 矢量图优先原则 (Native SVG First)**：对于正文中的**交互时序图/序列图、多维度对比卡片矩阵、复杂系统拓扑图**，**强制优先使用原生 SVG 代码配合 `sips -s format png --resampleWidth 1920` 渲染**。原生 SVG 具备极致的杂志级排版质感、现代深色/浅色配色、高对比度卡片与精准内边距，能彻底消除 PlantUML 默认渲染造成的右侧节点截断（Truncation）、字体发虚和样式僵硬问题。PlantUML 仅作为简单基础流程图/树状导图的备选工具。
 
 
 ### 文章 Markdown 文本与符号渲染规范
