@@ -85,11 +85,16 @@ description: Use when the user asks to create, design, or publish a WeChat Photo
   4. **等轴测微缩黏土模型**：`Isometric stylized miniature diorama, 3:4 vertical composition, handcrafted matte clay and folded paper aesthetic, soft tactile studio lighting, mint green and cream harmony. Scene showing [微缩系统场景]. No text.`
   5. **包豪斯构成主义**：`Bauhaus constructivist graphic art, 3:4 vertical poster, Swiss typographic style, bold abstract geometric forms, diagonal dynamic balance, matte screen print texture. Concept representing [抽象力学平衡]. No text.`
 
+### 模式 C：NotebookLM 便当网格与深度信息卡片 (`generate-infographic` 技能)
+- **适用**：多模块全景架构、高信息密度知识卡片、切片核心机制长图。
+- **生成方式**：调用 `generate-infographic` 技能（`uv run notebooklm generate infographic --style bento-grid --orientation portrait --detail detailed "Prompt" --json` 或 `uv run blogger infographic`），将长文/切片直接提炼为 3:4 竖版便当网格（Bento Grid）或社论长图，作为 Deck 的核心深度卡片（如 `02_infographic.png`）。
+
 ---
 
 ## 🛠️ Required Tools
 
-- **卡片渲染引擎**：`tools/generate_photo_cards.py`（支持单张或通过 JSON/YAML 配置批量生成）。
+- **高维知识长图引擎**：`generate-infographic` 技能（基于 Google NotebookLM `uv run notebooklm generate infographic`，生成 3:4 竖版 Bento-grid/Editorial 高密信息图）。
+- **原生卡片渲染引擎**：`tools/generate_photo_cards.py`（支持单张或通过 JSON/YAML 配置批量生成）。
 - **底座模块**：`src/blogger/core/photo_card_generator.py`（内置 5 大布局模板与 4 款杂志级主题配色）。
 - **AI 绘图工具**：`generate_image`（支持 3:4 竖版具象概念隐喻封面生成）。
 - **转换工具**：macOS 原生 `sips`（配合 `--resampleWidth 1200` 实现 Retina 级别清晰度，零锯齿与发虚）。
@@ -97,15 +102,17 @@ description: Use when the user asks to create, design, or publish a WeChat Photo
 
 ---
 
-## 5 大经典卡片模板矩阵
+## 6 大经典卡片模板矩阵
 
 | 模板标识 | 适用场景 | 关键视觉要素 |
 |---|---|---|
 | **`cover`** | 首图 Hook / 封面 | 分类 Badge + 4~8 字爆破短语 (68px) + 副标题 (32px) + 3 行微型数据/认知对比卡 (36px/28px) + 滑动提示 |
+| **`bento_infographic`** | 全景知识便当图 / 核心机制长图 | **通过 `generate-infographic` 生成**：便当盒模块化网格、高信息密度提炼、3:4 竖版大图 |
 | **`vs_comparison`** | 二元对抗 / 新旧对比 | 双栏对比矩阵（左侧 ❌ 传统旧模式 vs 右侧 ✅ 现代新范式） + 底部核心结论条 (28px) |
 | **`bullet_points`** | 核心支柱 / 模块清单 | 3~4 个独立圆角卡片，含序号 Pill、加粗要点 (36px)、短语描述 (28px) 与底部标签组 (24px) |
 | **`pipeline_steps`** | 步骤流转 / 工程链路 | 垂直连线流转卡片（Step 01 → Step 02 → Step 03） + 阶段交付物 (26px) + 底部铁律栏 (26px) |
 | **`summary_cta`** | 复盘清单 / 互动引流 | 3~4 项核心 Checklist (28px) + 突出的大号互动探讨卡片（💬 提问 34px） + 点赞/收藏/转发栏 (26px) |
+
 
 ---
 
@@ -133,11 +140,11 @@ description: Use when the user asks to create, design, or publish a WeChat Photo
 【图片消息内容质量自检】
 1. 爆破 Hook（4-8字）：封面想击穿读者哪个固有偏见？（如：0.99刀的真相？/ 穿仓的必然性）
 2. 社交货币命名实体：本文提炼了哪 1 个具备传播力的概念/方法论？（如：1.111B Class / 动态 Delta 引擎）
-3. 3~7 张卡片规划清单：
+3. 3~7 张卡片规划清单（支持 SVG 卡片与 NotebookLM 便当网格混编）：
    - 卡片 01 (cover)：爆破 Hook + 核心冲突数据（或 AI 具象概念隐喻封面）
-   - 卡片 02 (vs_comparison / points)：旧模式痛点 vs 新范式解法
-   - 卡片 03 (bullet_points / pipeline)：三大支柱 / 关键机制
-   - 卡片 04 (pipeline_steps / points)：四步实操落地链路
+   - 卡片 02 (bento_infographic / vs_comparison)：全景知识便当图（由 generate-infographic 生成）或新旧范式对比
+   - 卡片 03 (bullet_points / pipeline)：三大支柱 / 关键机制拆解
+   - 卡片 04 (pipeline_steps / points)：四步实操落地链路 / 避坑 SOP
    - 卡片 05 (summary_cta)：Checklist 闭环 + 1 个评论区争议互动问题
 ```
 
@@ -158,26 +165,33 @@ description: Use when the user asks to create, design, or publish a WeChat Photo
 
 ---
 
-### 阶段 2：3:4 高清认知卡片集生成
+### 阶段 2：3:4 高清认知卡片集生成 (Multi-Modal Card Generation)
 
 1. **创建 Payload 目录**：
    `articles/YYYY-MM-DD-photo-<slug>/`（如 `articles/2026-09-01-photo-domain-pricing-xyz`）。
 
-2. **编写卡片配置或脚本**：
-   在 Payload 目录下创建 `deck_spec.json`（或 `generate_deck.py`），使用 `tools/generate_photo_cards.py` 批处理生成高清卡片：
-
-```bash
-# 批量渲染整套卡片
-python tools/generate_photo_cards.py --config articles/YYYY-MM-DD-photo-<slug>/deck_spec.json --output-dir articles/YYYY-MM-DD-photo-<slug>/
-```
+2. **多模态卡片生成与混编**：
+   - **核心便当网格 / 架构长图（可选/强烈推荐）**：使用 `generate-infographic` 技能生成高信息密度 3:4 竖版知识卡片：
+     ```bash
+     uv run blogger infographic \
+       --prompt "提炼全景机制：顶部呈现痛点，中部 3 栏核心机制，底部 3 个避坑 Checklist" \
+       --style bento-grid \
+       --orientation portrait \
+       --output articles/YYYY-MM-DD-photo-<slug>/02_infographic.png
+     ```
+   - **原生卡片渲染**：在 Payload 目录下创建 `deck_spec.json`，使用 `tools/generate_photo_cards.py` 批处理渲染其余卡片：
+     ```bash
+     python tools/generate_photo_cards.py --config articles/YYYY-MM-DD-photo-<slug>/deck_spec.json --output-dir articles/YYYY-MM-DD-photo-<slug>/
+     ```
 
 3. **产物检查**：
-   确保生成的图片命名规范：
-   - `01_cover.png`
-   - `02_vs_comparison.png`
-   - `03_bullet_points.png`
-   - `04_pipeline_steps.png`
-   - `05_summary_cta.png`
+   确保生成的图片命名规范且按顺序列入 `photos`：
+   - `01_cover.png` (封面 Hook)
+   - `02_infographic.png` (NotebookLM 便当网格知识卡片，可选)
+   - `03_vs_comparison.png` (二元对抗)
+   - `04_bullet_points.png` (核心支柱)
+   - `05_pipeline_steps.png` (实操步骤 / 避坑 SOP)
+   - `06_summary_cta.png` (复盘与互动)
 
 ---
 

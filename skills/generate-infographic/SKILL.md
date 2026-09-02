@@ -149,16 +149,39 @@ SOP:
 
 ---
 
-### 5. 文章嵌入与后处理 (Post-Processing & Embedding)
+---
+
+### 5. 图片消息与文章嵌入 (Embedding into Photo Message / Articles)
 
 下载完成后，将生成的信息图优雅地集成到目标产物中：
 
-1. **Markdown 正文嵌入**：
+1. **用于 `generate-photo-message`（微信图片消息 / 小绿书 Deck）**：
+   - 作为小绿书卡片画册的核心深度卡片（如 `02_infographic.png`）。
+   - 在 `article.md` 的 `photos` 列表中直接挂载：
+     ```yaml
+     photos:
+       - "01_cover.png"
+       - "02_infographic.png"  # NotebookLM 3:4 竖版便当网格知识卡片
+       - "03_vs_comparison.png"
+       - "04_bullet_points.png"
+       - "05_summary_cta.png"
+     ```
+2. **用于长文 Markdown 正文嵌入**：
    ```markdown
-   ![T-A-O 认知协作架构全景信息图](./infographic_bento.png)
+   ![全景架构与机制便当图](./infographic_bento.png)
    ```
-2. **移动端宽度检查**：确认图片在手机端排版清晰。
 3. **用于视频或公众号封面**：若生成的是 `--orientation landscape` 封面，可配合 `python tools/fit_wechat_cover.py` 进行标准比例 Letterbox 处理。
+
+---
+
+## 🔗 与 generate-photo-message 技能的联动模式
+
+`generate-infographic` 是 **`generate-photo-message`（小绿书图文卡片）的核心上游引擎**。
+
+在小绿书/微信图片消息的 3~7 张卡片规划中，二者的分工与联动为：
+- **`01_cover.png`**：由 `generate_image` 或 SVG 生成 4~8 字强冲击爆破封面；
+- **`02_infographic.png`**：**由本技能（`generate-infographic`）生成 3:4 竖版 Bento-grid / Editorial 高密全景卡片**，承载 80% 的系统架构与知识干货；
+- **`03 ~ 06 卡片`**：由 `generate_photo_cards.py` 生成二元对抗（VS）、步骤流转（Pipeline）与复盘 CTA 卡片。
 
 ---
 
