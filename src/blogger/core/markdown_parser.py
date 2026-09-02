@@ -60,6 +60,7 @@ def render_markdown_to_clean_text(md: str) -> str:
     """Converts markdown content into beautifully formatted, human-readable plain text.
     Suitable for mobile captions, photo message companion copy, and social feeds.
     Removes raw markdown symbols (###, **, `, ---) while preserving structure, emojis, and lists.
+    Guarantees clean line breaks between section titles, callouts, and list items.
     """
     if not md:
         return ""
@@ -77,6 +78,10 @@ def render_markdown_to_clean_text(md: str) -> str:
         if re.match(r'^(?:---|\*\*\*|___)\s*$', stripped):
             continue
 
+        # Remove standalone hashtag lines (e.g. #标签1 #标签2)
+        if re.match(r'^(?:#[\w\u4e00-\u9fa5\-]+\s*)+$', stripped):
+            continue
+
         # Convert headings: ## Title or ### Title -> 【Title】
         h_match = re.match(r'^#{2,6}\s*(.+)$', stripped)
         if h_match:
@@ -84,10 +89,26 @@ def render_markdown_to_clean_text(md: str) -> str:
             h_text = re.sub(r'\*\*(.+?)\*\*', r'\1', h_text)
             h_text = re.sub(r'`(.+?)`', r'\1', h_text)
             if not (h_text.startswith('【') and h_text.endswith('】')):
-                out_lines.append(f'\n【{h_text}】')
+                formatted_h = f'【{h_text}】'
             else:
-                out_lines.append(f'\n{h_text}')
+                formatted_h = h_text
+            # Ensure blank line before section heading if previous line was non-empty
+            if out_lines and out_lines[-1] != "":
+                out_lines.append("")
+            out_lines.append(formatted_h)
             continue
+
+        # Section brackets 【Title】 written directly: ensure blank line before it
+        if stripped.startswith('【') and stripped.endswith('】'):
+            if out_lines and out_lines[-1] != "":
+                out_lines.append("")
+            out_lines.append(stripped)
+            continue
+
+        # Callout/interactive blocks (💡 核心洞察, 💬 互动探讨, 📌 核心要点): ensure blank line before it
+        if re.match(r'^(?:💡|💬|📌|⚡|🔥)\s*', stripped):
+            if out_lines and out_lines[-1] != "":
+                out_lines.append("")
 
         # Remove blockquote prefix (> )
         if stripped.startswith('> '):
@@ -206,6 +227,11 @@ def parse_markdown_payload(md_path: Path) -> dict:
     
     desc = post.metadata.get("desc", "")
     post_type = str(post.metadata.get("type", "article")).strip().lower()
+    if post_type == "photo":
+        if len(title) > 20:
+            logger.warning(f"Photo message title '{title}' length ({len(title)}) exceeds WeChat 20-character limit! Consider shortening.")
+        if any(sep in title for sep in [" ｜ ", " | ", " —— ", " - "]):
+            logger.warning(f"Photo message title '{title}' contains spaced separators (｜/——/-). Use clean colon '：' without spaces instead.")
     photos_meta = post.metadata.get("photos", [])
     cover_filename = post.metadata.get("cover", "")
     video_filename = post.metadata.get("video", "")

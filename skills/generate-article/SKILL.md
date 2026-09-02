@@ -17,7 +17,7 @@ description: Use when the user asks to write a technical article, blog post, or 
 
 每一篇文章的创作与视觉建模，均必须建立在以下 4 个可被数据验证的业务假设之上：
 
-1. **【极化主张假设】(Click Dissonance)**：标题必须具备反直觉张力与明确立场（CTR > 8%）。拒绝平铺直叙的话题陈述。
+1. **【极化主张假设】(Click Dissonance)**：标题必须具备反直觉张力与明确立场（CTR > 8%）。拒绝平铺直叙的话题陈述。**严禁在标题中使用 ` ｜ `、` —— `、` - ` 及两侧空格**，前 18~22 字符必须具备独立且完整的认知爆破力，标点统一使用中文冒号 `：`、问号 `？` 或自然标点。
 2. **【图文认知密度假设】(Visual Density)**：人脑处理图形比文本快 60,000 倍。用结构图表（PlantUML / SVG）替代冗长文字，将完读率提升至 50%+。
 3. **【社交货币假设】(Social Currency)**：微信朋友圈转发的本质是“自我人设塑造”。文章必须提炼至少 **1 个命名实体或方法论框架**（如 T-A-O 架构、审核权倒置悖论），转发率 > 5%。
 4. **【T-A-O 人机协同假设】(Orchestration)**：人类负责 Context Framing（问题高维定义）与 Checklist 终审背书；AI 负责 80% 的资料检索与文本草稿编译。
@@ -132,6 +132,7 @@ description: Use when the user asks to write a technical article, blog post, or 
 
 ```text
 【形式自检】
+- 标题排版：前 18~22 字符必须包含完整认知钩子，0 ` ｜ ` / ` —— ` / 空格污染，标点统一使用全角中文标点。
 - 人称：全文使用「我们/大家」，严格不用「你/你的」（带说教感）。
 - 摘要 desc 长度严格 60–120 字符。
 - 微信合集 collection：必须且只能从配置文件 blogger.toml 的 [platforms.wechat.accounts.default].article_collections 列表中选择（如 AI, Agent, AWS, Web3, DevSecOps, 认知思维, 信息安全, Iac, 云原生）。

@@ -444,6 +444,19 @@ def render_bullet_points_card(data: Dict[str, Any], palette: Dict[str, str]) -> 
             """
             tag_x += t_w + 16
 
+        # Point Description (supports 1 or 2 lines)
+        desc_text = p.get('desc', '')
+        if "\n" in desc_text:
+            lines = desc_text.split("\n", 1)
+            desc_svg = f"""
+            <text x="40" y="182" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="500" fill="{palette['text']}">{_escape_xml(lines[0])}</text>
+            <text x="40" y="222" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="500" fill="{palette['text']}">{_escape_xml(lines[1])}</text>
+            """
+        else:
+            desc_svg = f"""
+            <text x="40" y="195" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="500" fill="{palette['text']}">{_escape_xml(desc_text)}</text>
+            """
+
         cards_svg += f"""
         <g transform="translate({margin_x}, {box_y})">
             <rect width="{content_w}" height="{card_h}" rx="22" fill="{palette['card_bg']}" stroke="{palette['border']}" stroke-width="2" />
@@ -459,7 +472,7 @@ def render_bullet_points_card(data: Dict[str, Any], palette: Dict[str, str]) -> 
             <text x="40" y="136" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="36" font-weight="bold" fill="{palette['title']}">{_escape_xml(p.get('title', ''))}</text>
             
             <!-- Point Description -->
-            <text x="40" y="195" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="500" fill="{palette['text']}">{_escape_xml(p.get('desc', ''))}</text>
+            {desc_svg}
             
             <!-- Tags Row -->
             {tags_svg}
@@ -574,7 +587,7 @@ def render_pipeline_steps_card(data: Dict[str, Any], palette: Dict[str, str]) ->
     <g transform="translate({margin_x}, 1370)">
         <rect width="{content_w}" height="95" rx="14" fill="{palette['card_bg']}" stroke="{palette['primary']}" stroke-width="1.5" />
         <text x="36" y="58" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="26" font-weight="bold" fill="{palette['primary']}">⚡ 铁律</text>
-        <text x="120" y="58" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="26" font-weight="500" fill="{palette['text']}">{_escape_xml(rule_note)}</text>
+        <text x="150" y="58" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="26" font-weight="500" fill="{palette['text']}">{_escape_xml(rule_note)}</text>
     </g>
 
     {footer_svg}
@@ -632,6 +645,14 @@ def render_summary_cta_card(data: Dict[str, Any], palette: Dict[str, str]) -> st
     # Discussion Box
     disc_y = 970
     disc_h = 320
+    if "\n" in question:
+        q_lines = question.split("\n", 1)
+        q_line1 = q_lines[0]
+        q_line2 = q_lines[1]
+    else:
+        q_line1 = question[:22]
+        q_line2 = question[22:]
+
     disc_svg = f"""
     <g transform="translate({margin_x}, {disc_y})">
         <rect width="{content_w}" height="{disc_h}" rx="22" fill="{palette['card_bg']}" stroke="{palette['primary']}" stroke-width="2.5" />
@@ -641,8 +662,8 @@ def render_summary_cta_card(data: Dict[str, Any], palette: Dict[str, str]) -> st
         <text x="140" y="66" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="900" fill="{palette['badge_fg']}">💬 互动探讨</text>
         
         <!-- Big Question -->
-        <text x="40" y="145" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="bold" fill="{palette['title']}">{_escape_xml(question[:22])}</text>
-        <text x="40" y="200" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="bold" fill="{palette['title']}">{_escape_xml(question[22:])}</text>
+        <text x="40" y="145" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="bold" fill="{palette['title']}">{_escape_xml(q_line1)}</text>
+        <text x="40" y="200" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="bold" fill="{palette['title']}">{_escape_xml(q_line2)}</text>
         
         <!-- Callout Subtext -->
         <text x="40" y="270" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="26" font-weight="500" fill="{palette['muted']}">欢迎在评论区留言交流，分享你的第一手实战体验！</text>

@@ -1,3 +1,4 @@
+import re
 import time
 import json
 import subprocess
@@ -142,10 +143,16 @@ class WechatPublisher:
             logger.info(f"Upload card [{idx+1}/{len(photo_paths)}] {filename}: {res}")
             time.sleep(2.0)
 
-        # 3. Inject Full Title
+        # 3. Inject Full Title (WeChat Photo Message hard limit: 20 chars)
         photo_title = title.strip()
-        if len(photo_title) > 64:
-            photo_title = photo_title[:64].strip()
+        # If separator follows punctuation (？, ！, ：, ，), clean up separator without duplicate punctuation
+        photo_title = re.sub(r'([？!！:：,，])\s*(\uff5c|\||\u2014\u2014|\u2014|-)\s*', r'\1', photo_title)
+        # Otherwise replace remaining spaced separators with clean Chinese colon '：'
+        photo_title = re.sub(r'\s*(\uff5c|\||\u2014\u2014|\u2014|-)\s*', '：', photo_title)
+        photo_title = re.sub(r'\s+', '', photo_title)  # Remove residual spaces
+        if len(photo_title) > 20:
+            logger.warning(f"Photo message title '{photo_title}' exceeds WeChat 20-character limit ({len(photo_title)} chars)! Truncating safely to 20 chars.")
+            photo_title = photo_title[:20].rstrip('：，？！')
 
         logger.info(f"Injecting full title: {photo_title}")
         js_inject_title = f"""
@@ -196,23 +203,47 @@ class WechatPublisher:
             else:
                 body_clean = trimmed.strip()
 
-        # Build clean paragraph HTML for ProseMirror
-        paragraphs = [f'<p>{p.replace(chr(10), "<br>")}</p>' for p in body_clean.split('\n\n') if p.strip()]
-        html_body = ''.join(paragraphs)
+        # Build clean HTML for WeChat Photo Message ProseMirror editor
+        # ProseMirror schema for .share-text__input defines description as a single
+        # block containing inline nodes and hard breaks (<br>). Multiple <p> tags
+        # are unwrapped by ProseMirror DOMParser, which drops inter-paragraph breaks.
+        # Converting all newlines (\n) to <br> within a single <p> preserves both
+        # single line breaks and double blank-line paragraph breaks (<br><br>).
+        clean_html_text = body_clean.replace('\n', '<br>')
+        html_body = f'<p>{clean_html_text}</p>'
 
         js_inject_desc = f"""
         (function() {{
             try {{
                 const htmlBody = {json.dumps(html_body)};
+                const textVal = {json.dumps(body_clean)};
                 const descEl = document.querySelector('.share-text__input .ProseMirror, .js_pmEditorArea .ProseMirror, .content_edit .share-text__input .ProseMirror');
                 if (!descEl) return JSON.stringify({{ error: 'NO_DESC_EDITOR' }});
                 
                 descEl.focus();
+                
+                // Clear any pre-existing content safely
+                const selection = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(descEl);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                document.execCommand('delete', false, null);
+
+                // Inject full HTML with <br> preserved
                 descEl.innerHTML = htmlBody;
                 descEl.dispatchEvent(new Event('input', {{ bubbles: true }}));
                 descEl.dispatchEvent(new Event('change', {{ bubbles: true }}));
                 
-                return JSON.stringify({{ success: true, length: descEl.innerText.length, pCount: descEl.querySelectorAll('p').length }});
+                // Also update any fallback textarea if present
+                const textarea = document.querySelector('textarea#js_description, textarea.share-text__input');
+                if (textarea) {{
+                    textarea.value = textVal;
+                    textarea.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    textarea.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                }}
+                
+                return JSON.stringify({{ success: true, length: descEl.innerText.length, brCount: descEl.querySelectorAll('br').length }});
             }} catch(e) {{
                 return JSON.stringify({{ error: e.message }});
             }}
