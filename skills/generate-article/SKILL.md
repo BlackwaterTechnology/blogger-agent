@@ -71,6 +71,7 @@ description: Use when the user asks to write a technical article, blog post, or 
   - **结构化图表（架构 / 流程 / 拓扑 / 思维导图 / 对比网格）**：本地离线渲染优先：
     - `~/bin/plantuml.jar`（PlantUML，**基础流程/思维导图备选**。排版精密，可控性强，支持高 DPI。配合 `!pragma layout smetana` 无需 Graphviz）
     - `~/bin/mmdc`（官方 `@mermaid-js/mermaid-cli`，Puppeteer + Dagre 布局，**备选/极简图表引擎**）
+  - **高维结构化知识长图 / 便当网格信息图 (NotebookLM Infographic)**：使用 `generate-infographic` 技能（`uv run notebooklm generate infographic`），将全文 Markdown 作为 Source 摄取，生成 `bento-grid` 便当网格、`editorial` 杂志社论等高密度长图。
   - **最后兜底**：`blogger generate-diagram --type mermaid|plantuml --input x --output x.png`（kroki.io，受公网限制，仅本地工具不可用时使用）
 - **封面 letterbox 工具**：`tools/fit_wechat_cover.py`——把任意比例的封面 letterbox 到目标比例（默认 16:9，可选 1:1），支持 `--bg white|black|auto|#RRGGBB` 与 `-o/--output` alias。详见 §2.3。
 

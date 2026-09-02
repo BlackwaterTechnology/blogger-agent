@@ -153,12 +153,13 @@ if (cb && !cb.checked) {
 
 ### 图片生成与渲染质量标准
 
-1. **4 大配图模态矩阵与黄金混配 (Multi-Modal Visual Strategy)**：
+1. **5 大配图模态矩阵与黄金混配 (Multi-Modal Visual Strategy)**：
    - **模态 1：具象概念隐喻 / 场景插画**：使用 `generate_image`（AI 绘图）在文章开篇或矛盾处生成**具象场景与物理实体隐喻**（如蒸汽机械 vs 折纸天鹅、石壁发光代码），激活右脑好奇心。
    - **模态 2：结构拓扑 / 垂直流水线**：原生 SVG / PlantUML 负责核心机制与端到端时序流（1200px 宽度，字号 ≥28px）。
    - **模态 3：多维决策矩阵 / 二元对抗**：原生 SVG (2x2 网格 / 双栏对抗) 给出技术选型与策略落地。
    - **模态 4：实证量化图表 / 终端切片**：Matplotlib (DPI 300+) 给出收益曲线与基差剪刀差，CLI 终端卡片展示真实命令输出。
-   - **黄金混配 SOP**：深度长文推荐采用“感性隐喻 ➔ 严密拓扑 ➔ 决策落地”的节奏编排，**严禁全篇 100% 堆砌单一深蓝框图**。
+   - **模态 5：高维知识长图 / 便当网格信息图**：使用 Google NotebookLM (`notebooklm generate infographic`) 摄取全文 Markdown 或参考研报，生成 `bento-grid`、`editorial`、`professional` 等高审美质感、高信息密度的竖版长图（`portrait`）或全景架构总览，作为文章知识卡片或封面。
+   - **黄金混配 SOP**：深度长文推荐采用“感性隐喻 ➔ 严密拓扑 ➔ 决策落地 ➔ 知识长图总览”的节奏编排，**严禁全篇 100% 堆砌单一深蓝框图**。
 2. **去除 AI 味的 5 大杂志社论艺术风格 (5 High-Taste Editorial AI Styles)**：
    - 使用 `generate_image` 时，**坚决杜绝 4 大廉价 AI 俗套**（发光蓝脑、机械手握手、科幻全息 HUD、乱码假字）。
    - 统一采用国际顶级社论风格：① 现代杂志社论扁平插画 (Modern Editorial Flat Vector)；② 实体机械/物理隐喻对比 (Physical Mechanical Metaphor)；③ 复古清晰线稿与版画 (Vintage Ligne Claire / Woodcut)；④ 等轴测微缩黏土模型 (Isometric Clay & Diorama)；⑤ 包豪斯几何构成主义 (Bauhaus Constructivism & Swiss Print)。
@@ -175,6 +176,9 @@ if (cb && !cb.checked) {
 7. **Matplotlib**：Python 导出图表必须显式声明 `plt.savefig(..., dpi=300, bbox_inches='tight')`。
 8. **文章封面设计与 Hook 解耦规范**：文章封面大标题必须提炼为 **4 ~ 8 字冲突短语/爆破钩子**（如 `11% 的谎言？`），字号保持 `64px~76px`，并采用“左侧 Hook + 右侧微型数据对比/信息图卡片（字号 `28px~34px`）”的双栏复合杂志架构。
 9. **原生 SVG 矢量图优先原则 (Native SVG First)**：对于正文中的**交互时序图/序列图、多维度对比卡片矩阵、复杂系统拓扑图**，**强制优先使用原生 SVG 代码配合 `sips -s format png --resampleWidth 1920` 渲染**。消除 PlantUML 默认渲染造成的节点截断与样式僵硬问题。
+10. **图文与信息图竖版优先铁律 (Mobile Portrait Orientation Standard)**：
+    - 面向微信公众号正文、小红书图文卡片及手机端阅读的所有信息图与知识长图，**必须强制采用 Portrait（竖版，如 `--orientation portrait`）**。
+    - **核心原因**：手机屏幕为 9:16 / 3:4 竖屏，竖版长图在移动端宽度撑满时文字映射字号最大、视线向下流转最自然；若误用横版（Landscape），在手机端会被等比缩放至极小尺寸，导致读者无法看清文字。横版仅限于桌面端展示或视频 16:9 封面。
 
 
 ### 文章 Markdown 文本与符号渲染规范

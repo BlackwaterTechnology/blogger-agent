@@ -34,6 +34,15 @@ def main():
     diagram_parser.add_argument("--input", required=True, help="Path to the text file containing diagram code")
     diagram_parser.add_argument("--output", required=True, help="Path to save the generated image (e.g. cover.png)")
 
+    # Infographic command
+    infographic_parser = subparsers.add_parser("infographic", help="Generate a customized infographic via notebooklm")
+    infographic_parser.add_argument("--payload", default="articles/test_data", help="Directory containing article markdown files or path to markdown file")
+    infographic_parser.add_argument("--prompt", help="Custom prompt / instructions for the infographic")
+    infographic_parser.add_argument("--style", default="bento-grid", choices=["bento-grid", "editorial", "professional", "instructional", "scientific", "sketch-note", "clay", "bricks", "anime", "kawaii", "auto"], help="Visual style")
+    infographic_parser.add_argument("--orientation", default="portrait", choices=["portrait", "landscape", "square"], help="Orientation")
+    infographic_parser.add_argument("--detail", default="detailed", choices=["concise", "standard", "detailed"], help="Level of detail")
+    infographic_parser.add_argument("--output", help="Output path for downloaded infographic image")
+
     # Video command
     video_parser = subparsers.add_parser("video", help="Generate a cinematic video and publish to platforms")
     video_parser.add_argument("--payload", default="articles/test_data", help="Directory containing the article markdown files for metadata")
@@ -44,6 +53,7 @@ def main():
         action="store_true",
         help="Fill the publish dialog but stop before clicking the final submit button.",
     )
+
 
 
     args = parser.parse_args()
@@ -91,12 +101,18 @@ def main():
         if args.command == "video":
             handle_video(args, md_path)
             return
+        elif args.command == "infographic":
+            handle_infographic(args, md_path)
+            return
 
         article_data = parse_markdown_payload(md_path)
         article_data["payload_path"] = md_path
     else:
         if args.command == "video":
             logger.error(f"Command 'video' currently requires a Markdown payload for metadata. Not found in {payload_path}")
+            return
+        elif args.command == "infographic":
+            handle_infographic(args, None, payload_path)
             return
             
         article_data = {"payload_path": payload_path}
@@ -245,6 +261,56 @@ def handle_video(args, md_path):
                 else:
                     logger.warning(f"Platform '{platform}' is currently not implemented or unknown for video command.")
 
+        except json.JSONDecodeError:
+            logger.error(f"Failed to parse notebooklm output: {result.stdout}")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"notebooklm command failed: {e.stderr}")
+
+
+def handle_infographic(args, md_path=None, payload_path=None):
+    import subprocess
+    import json
+
+    prompt = args.prompt
+    if not prompt and md_path:
+        article_data = parse_markdown_payload(md_path)
+        prompt = f"Title: {article_data.get('title', '')}\nDescription: {article_data.get('desc', '')}"
+    elif not prompt:
+        prompt = "Synthesize key insights and architecture into a high-density infographic"
+
+    output_path = args.output
+    if not output_path:
+        target_dir = md_path.parent if md_path else (payload_path if payload_path else Path("."))
+        output_path = str(target_dir / f"infographic_{args.style}.png")
+
+    logger.info(f"Generating infographic ({args.style}, {args.orientation}) via notebooklm-py...")
+    cmd = [
+        "uv", "run", "notebooklm", "generate", "infographic",
+        prompt,
+        "--style", args.style,
+        "--orientation", args.orientation,
+        "--detail", args.detail,
+        "--language", "zh_Hans",
+        "--wait",
+        "--json",
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        try:
+            data = json.loads(result.stdout)
+            if data.get("error"):
+                logger.error(f"Infographic generation error: {data.get('message')}")
+                return
+            
+            logger.info(f"Infographic generated successfully. Downloading to {output_path}...")
+            dl_result = subprocess.run(
+                ["uv", "run", "notebooklm", "download", "infographic", output_path, "--latest"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            logger.info(f"Infographic downloaded to: {output_path}")
         except json.JSONDecodeError:
             logger.error(f"Failed to parse notebooklm output: {result.stdout}")
     except subprocess.CalledProcessError as e:
