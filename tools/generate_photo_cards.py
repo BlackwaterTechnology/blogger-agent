@@ -63,7 +63,7 @@ def main():
     parser.add_argument("--hook-accent", type=str, default="", help="Second line accent hook text")
     parser.add_argument("--subtitle", type=str, default="", help="Card subtitle")
     parser.add_argument("--category", type=str, default="AI ARCHITECTURE", help="Category badge text")
-    parser.add_argument("--author", type=str, default="Agent", help="Author/brand text")
+    parser.add_argument("--author", type=str, default=None, help="Author/brand text (optional)")
     parser.add_argument("--page-idx", type=str, default="01 / 05", help="Page index (e.g. 01 / 05)")
     parser.add_argument("--output", "-o", type=str, default="photo_card.png", help="Output PNG file path for single card")
     parser.add_argument("--resample-width", type=int, default=1200, help="Output PNG pixel width (default 1200, 3:4 ratio gives 1200x1600)")

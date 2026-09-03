@@ -155,6 +155,7 @@ description: Use when the user asks to create, design, or publish a WeChat Photo
 - 画布比例：严格 3:4 竖版（1200 x 1600 px）。
 - 字号底线：大标题 56-72px，卡片标题 ≥ 34px，正文节点严格 ≥ 28px（标签/辅助 ≥ 24px），无整段长句堆砌。
 - 配色主题：统一从 navy_gold / swiss_red / emerald / slate_lime 中选取 1 种。
+- 0 工具固定水印与样板词：卡片头部 0 默认 AGENT，底部 0 BLOGGER AGENT 水印，保持纯净排版。
 - 0 AI 俗套审查：若使用 AI 绘图生成封面，绝无发光蓝脑、机械手、科幻 HUD、乱码假字。
 - 微信合集 collection：必须且只能从 blogger.toml 的 photo_collections 列表中选择。
 - 伴随文案字数：严格控制在 350 ~ 700 字符（上限绝对 ≤ 900 字符），0 Markdown 语法污染。
@@ -251,6 +252,7 @@ photos:
 - 伴随文案排版：小标题【...】、💡洞察、💬互动探讨是否各占独立行并正确换行，列表项是否逐行独立，无段落粘连？
 - 0 #话题标签：正文文末是否 0 # 标签堆砌？
 - 卡片是否为严格 3:4 比例（1200x1600 px）？
+- 卡片中是否 0 默认 AGENT 标记与 0 BLOGGER AGENT 固定水印？
 - 移动端字号是否全部严格 ≥ 28px（核心节点 ≥ 34px，标签/辅助 ≥ 24px）且无文字边缘截断/溢出？
 - 封面是否有 4~8 字爆破 Hook 与 3 行高对比微型认知卡？
 - 若首图为 AI 生成，是否 100% 杜绝了发光蓝脑、机械手、科幻 HUD、乱码假字？

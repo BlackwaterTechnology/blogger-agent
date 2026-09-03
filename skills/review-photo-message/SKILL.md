@@ -81,11 +81,11 @@ description: Use when invoked by a main agent to review a WeChat Photo Message (
    - 严禁在封面平铺 20+ 字的全长长句。
    - 下方必须配备 3 行高对比度微型认知冲突卡片（bad/warning/good 或核心数据对比）。
 
-7. 卡片尺寸与比例校验：
+9. 卡片尺寸与比例校验：
    - 运行 `sips -g pixelWidth -g pixelHeight *.png` 校验，所有卡片必须为严格 3:4 比例（1200 x 1600 px）。
    - 严禁出现 16:9 横屏图或尺寸不一致的卡片。
 
-8. 移动端字号硬底线与防溢出排查 (Typography & Clipping Audit - CRITICAL)：
+10. 移动端字号硬底线与防溢出排查 (Typography & Clipping Audit - CRITICAL)：
    - 大标题 / Hook：`56px ~ 72px`
    - 模块标题 / 核心节点：`34px ~ 42px`
    - 正文要点 / 节点说明 / 标签：严格禁止低于 `28px`（标签与辅助说明 ≥ `24px`）。
@@ -95,11 +95,16 @@ description: Use when invoked by a main agent to review a WeChat Photo Message (
      - 在 `pipeline_steps` 卡片中，Step 标题与交付物文字必须留有 24px+ 右侧安全边距。
      - 在 `summary_cta` 卡片中，互动提问过长时必须显式拆为两行。
 
-9. AI 绘图 0 俗套审查（若首图为 AI 生成）：
+11. 0 工具固定水印与样板词审查 (Zero Boilerplate Watermark Audit)：
+   - 卡片头部徽章旁绝对禁止出现未配置时的默认 `AGENT` 或 `@AGENT`。
+   - 卡片底部左侧绝对禁止出现 `BLOGGER AGENT` 工具水印与硬编码固定文字。
+   - 确保卡片呈现 100% 干净专业的原生阅读视觉。
+
+12. AI 绘图 0 俗套审查（若首图为 AI 生成）：
    - 画面 100% 杜绝发光蓝脑、机械手、科幻 HUD、乱码假字。
    - 严格遵循 5 大杂志社论艺术风格（扁平插画 / 实体机械隐喻 / 清晰线稿 / 等轴黏土 / 包豪斯）。
 
-10. 互动探讨 CTA (Discussion Trigger)：
+13. 互动探讨 CTA (Discussion Trigger)：
    - 文末及卡片最后一张（`summary_cta`）必须包含面向读者的启发性争议提问（`💬 互动探讨：`），以引导评论区互动提升公域推荐权重。
 ```
 

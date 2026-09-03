@@ -76,6 +76,25 @@ class TestPhotoCardGenerator(unittest.TestCase):
                 self.assertTrue(p.exists())
                 self.assertEqual(p.suffix, ".png")
 
+    def test_clean_branding_defaults(self):
+        """Test that default SVG generation produces 0 'AGENT' header brand and 0 'BLOGGER AGENT' footer watermark."""
+        for card_type in CARD_RENDERERS.keys():
+            # Test with no author
+            svg_no_author = generate_photo_card_svg(card_type, {"title": "Test Title", "hook": "Test Hook"})
+            self.assertNotIn("BLOGGER AGENT", svg_no_author)
+            self.assertNotIn(">AGENT<", svg_no_author)
+            self.assertNotIn(">@AGENT<", svg_no_author)
+
+            # Test with author="Agent" (case insensitive default)
+            svg_agent_author = generate_photo_card_svg(card_type, {"title": "Test Title", "hook": "Test Hook", "author": "Agent"})
+            self.assertNotIn("BLOGGER AGENT", svg_agent_author)
+            self.assertNotIn(">AGENT<", svg_agent_author)
+            self.assertNotIn(">@AGENT<", svg_agent_author)
+
+            # Test with custom author
+            svg_custom = generate_photo_card_svg(card_type, {"title": "Test Title", "hook": "Test Hook", "author": "MyBrand"})
+            self.assertIn("MYBRAND", svg_custom)
+
 
 if __name__ == "__main__":
     unittest.main()

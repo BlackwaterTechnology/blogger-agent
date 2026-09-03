@@ -108,12 +108,19 @@ def _render_header_svg(
     margin_x: int = 70,
     curr_y: int = 80
 ) -> str:
-    """Render top header bar with category badge, page index, and author brand."""
-    author_text = _escape_xml(author.upper() if author else "@AGENT")
+    """Render top header bar with category badge, page index, and optional author brand."""
     cat_text = _escape_xml(category.upper())
     idx_text = _escape_xml(page_idx)
 
     badge_w = max(140, len(cat_text) * 24 + 48)
+
+    author_svg = ""
+    if author and str(author).strip().upper() not in ["", "AGENT", "@AGENT"]:
+        author_text = _escape_xml(str(author).strip().upper())
+        author_svg = f"""
+        <!-- Author / Brand -->
+        <text x="{margin_x + badge_w + 24}" y="{curr_y + 32}" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="600" fill="{palette['muted']}">{author_text}</text>
+        """
 
     return f"""
     <!-- Top Header Bar -->
@@ -121,10 +128,7 @@ def _render_header_svg(
         <!-- Category Badge -->
         <rect x="{margin_x}" y="{curr_y}" width="{badge_w}" height="48" rx="10" fill="{palette['badge_bg']}" />
         <text x="{margin_x + badge_w / 2}" y="{curr_y + 32}" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="{palette['badge_fg']}">{cat_text}</text>
-        
-        <!-- Author / Brand -->
-        <text x="{margin_x + badge_w + 24}" y="{curr_y + 32}" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="600" fill="{palette['muted']}">{author_text}</text>
-        
+        {author_svg}
         <!-- Page Indicator -->
         <rect x="{1200 - margin_x - 130}" y="{curr_y}" width="130" height="48" rx="10" fill="{palette['card_sub_bg']}" stroke="{palette['border']}" stroke-width="1.5" />
         <text x="{1200 - margin_x - 65}" y="{curr_y + 32}" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="bold" fill="{palette['primary']}">{idx_text}</text>
@@ -138,16 +142,20 @@ def _render_header_svg(
 def _render_footer_svg(
     palette: Dict[str, str],
     footer_text: str = "SWIPE TO READ ➔",
+    footer_left: Optional[str] = None,
     margin_x: int = 70,
     y: int = 1510
 ) -> str:
-    """Render footer indicator bar."""
-    date_str = datetime.now().strftime("%Y.%m.%d")
+    """Render footer indicator bar without tool watermarks."""
+    left_svg = ""
+    if footer_left:
+        left_svg = f"""<text x="{margin_x}" y="{y + 18}" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="500" fill="{palette['muted']}">{_escape_xml(footer_left)}</text>"""
+
     return f"""
     <!-- Footer -->
     <g id="footer">
         <line x1="{margin_x}" y1="{y - 20}" x2="{1200 - margin_x}" y2="{y - 20}" stroke="{palette['border']}" stroke-width="1.5" />
-        <text x="{margin_x}" y="{y + 18}" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="24" font-weight="500" fill="{palette['muted']}">BLOGGER AGENT // {date_str}</text>
+        {left_svg}
         <text x="{1200 - margin_x}" y="{y + 18}" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="26" font-weight="bold" fill="{palette['primary']}">{_escape_xml(footer_text)}</text>
     </g>
     """
@@ -167,14 +175,15 @@ def render_cover_card(data: Dict[str, Any], palette: Dict[str, str]) -> str:
     subtitle = data.get("subtitle", "移动端精炼深度拆解与行动洞察")
     category = data.get("category", "AI ARCHITECTURE")
     page_idx = data.get("page_idx", "01 / 05")
-    author = data.get("author", "Agent")
+    author = data.get("author", None)
+    footer_left = data.get("footer_left", None)
     stats = data.get("stats", [])
 
     margin_x = 70
     content_w = 1200 - 2 * margin_x
 
     header_svg = _render_header_svg(category, page_idx, author, palette, margin_x=margin_x, curr_y=75)
-    footer_svg = _render_footer_svg(palette, footer_text="滑动查看核心拆解 ➔", margin_x=margin_x, y=1515)
+    footer_svg = _render_footer_svg(palette, footer_text="滑动查看核心拆解 ➔", footer_left=footer_left, margin_x=margin_x, y=1515)
 
     hook_escaped = _escape_xml(hook)
     subtitle_escaped = _escape_xml(subtitle)
@@ -273,7 +282,8 @@ def render_vs_comparison_card(data: Dict[str, Any], palette: Dict[str, str]) -> 
     subtitle = data.get("subtitle", "为什么传统方法在复杂场景中必然失效？")
     category = data.get("category", "PARADIGM SHIFT")
     page_idx = data.get("page_idx", "02 / 05")
-    author = data.get("author", "Agent")
+    author = data.get("author", None)
+    footer_left = data.get("footer_left", None)
     left_col = data.get("left_col", {})
     right_col = data.get("right_col", {})
     takeaway = data.get("bottom_takeaway", "底层逻辑改变：不再靠人工堆叠，而是由系统自适应闭环驱动。")
@@ -286,7 +296,7 @@ def render_vs_comparison_card(data: Dict[str, Any], palette: Dict[str, str]) -> 
     card_h = 920
 
     header_svg = _render_header_svg(category, page_idx, author, palette, margin_x=margin_x, curr_y=75)
-    footer_svg = _render_footer_svg(palette, footer_text="滑动查看架构拆解 ➔", margin_x=margin_x, y=1515)
+    footer_svg = _render_footer_svg(palette, footer_text="滑动查看架构拆解 ➔", footer_left=footer_left, margin_x=margin_x, y=1515)
 
     # Render Left Column Items (Bad/Old)
     left_items_svg = ""
@@ -392,14 +402,15 @@ def render_bullet_points_card(data: Dict[str, Any], palette: Dict[str, str]) -> 
     subtitle = data.get("subtitle", "从顶层设计到底层执行的完整落地框架")
     category = data.get("category", "KEY PILLARS")
     page_idx = data.get("page_idx", "03 / 05")
-    author = data.get("author", "Agent")
+    author = data.get("author", None)
+    footer_left = data.get("footer_left", None)
     points = data.get("points", [])
 
     margin_x = 70
     content_w = 1200 - 2 * margin_x
 
     header_svg = _render_header_svg(category, page_idx, author, palette, margin_x=margin_x, curr_y=75)
-    footer_svg = _render_footer_svg(palette, footer_text="滑动查看实操链路 ➔", margin_x=margin_x, y=1515)
+    footer_svg = _render_footer_svg(palette, footer_text="滑动查看实操链路 ➔", footer_left=footer_left, margin_x=margin_x, y=1515)
 
     if not points:
         points = [
@@ -512,7 +523,8 @@ def render_pipeline_steps_card(data: Dict[str, Any], palette: Dict[str, str]) ->
     subtitle = data.get("subtitle", "从输入到交付的确定性工程流水线")
     category = data.get("category", "WORKFLOW PIPELINE")
     page_idx = data.get("page_idx", "04 / 05")
-    author = data.get("author", "Agent")
+    author = data.get("author", None)
+    footer_left = data.get("footer_left", None)
     steps = data.get("steps", [])
     rule_note = data.get("rule_note", "工程硬原则：上游阶段产物未完成 Checklist 验收，绝对禁止流转至下一阶段。")
 
@@ -520,7 +532,7 @@ def render_pipeline_steps_card(data: Dict[str, Any], palette: Dict[str, str]) ->
     content_w = 1200 - 2 * margin_x
 
     header_svg = _render_header_svg(category, page_idx, author, palette, margin_x=margin_x, curr_y=75)
-    footer_svg = _render_footer_svg(palette, footer_text="滑动查看行动总结 ➔", margin_x=margin_x, y=1515)
+    footer_svg = _render_footer_svg(palette, footer_text="滑动查看行动总结 ➔", footer_left=footer_left, margin_x=margin_x, y=1515)
 
     if not steps:
         steps = [
@@ -608,7 +620,8 @@ def render_summary_cta_card(data: Dict[str, Any], palette: Dict[str, str]) -> st
     subtitle = data.get("subtitle", "认知落地与实践反思")
     category = data.get("category", "KEY TAKEAWAYS")
     page_idx = data.get("page_idx", "05 / 05")
-    author = data.get("author", "Agent")
+    author = data.get("author", None)
+    footer_left = data.get("footer_left", None)
     takeaways = data.get("takeaways", [
         "微信图片消息享有极高公域推荐权重，是突破私域瓶颈的核心抓手",
         "封面必须坚持双栏复合与 4~8 字认知冲突 Hook，杜绝平铺长标题",
@@ -621,7 +634,7 @@ def render_summary_cta_card(data: Dict[str, Any], palette: Dict[str, str]) -> st
     content_w = 1200 - 2 * margin_x
 
     header_svg = _render_header_svg(category, page_idx, author, palette, margin_x=margin_x, curr_y=75)
-    footer_svg = _render_footer_svg(palette, footer_text="THANK YOU FOR READING", margin_x=margin_x, y=1515)
+    footer_svg = _render_footer_svg(palette, footer_text="THANK YOU FOR READING", footer_left=footer_left, margin_x=margin_x, y=1515)
 
     # Render Takeaway Items
     takeaways_svg = ""
