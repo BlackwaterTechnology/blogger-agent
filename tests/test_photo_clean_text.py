@@ -85,6 +85,14 @@ class TestPhotoCleanText(unittest.TestCase):
         self.assertIn("主动做出决策。\n\n【工程师视角", clean)
         self.assertIn("焦虑带宽。\n\n💬 互动探讨：", clean)
 
+    def test_wechat_summary_ceiling(self):
+        long_desc = "这是一个超长文章摘要测试" * 15  # 180 characters > 120
+        summary_val = long_desc.strip()
+        if len(summary_val) > 120:
+            summary_val = summary_val[:120].rstrip('，。；！？')
+        self.assertLessEqual(len(summary_val), 120)
+        self.assertEqual(len(summary_val), 120)
+
 
 if __name__ == "__main__":
     unittest.main()

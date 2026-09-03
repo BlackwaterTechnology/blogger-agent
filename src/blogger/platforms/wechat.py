@@ -212,11 +212,20 @@ class WechatPublisher:
         clean_html_text = body_clean.replace('\n', '<br>')
         html_body = f'<p>{clean_html_text}</p>'
 
+        # Prepare summary / digest (WeChat hard ceiling: 120 Chinese characters, ret 64703 if exceeded)
+        # Note: textarea#js_description is the article summary/digest (摘要), NOT the photo companion text!
+        summary_val = (desc or "").strip()
+        if len(summary_val) > 120:
+            logger.warning(f"Photo message summary/desc length ({len(summary_val)}) exceeds WeChat 120-char limit! Truncating to 120 chars.")
+            summary_val = summary_val[:120].rstrip('，。；！？')
+
         js_inject_desc = f"""
         (function() {{
             try {{
                 const htmlBody = {json.dumps(html_body)};
                 const textVal = {json.dumps(body_clean)};
+                const summaryVal = {json.dumps(summary_val)};
+
                 const descEl = document.querySelector('.share-text__input .ProseMirror, .js_pmEditorArea .ProseMirror, .content_edit .share-text__input .ProseMirror');
                 if (!descEl) return JSON.stringify({{ error: 'NO_DESC_EDITOR' }});
                 
@@ -235,15 +244,36 @@ class WechatPublisher:
                 descEl.dispatchEvent(new Event('input', {{ bubbles: true }}));
                 descEl.dispatchEvent(new Event('change', {{ bubbles: true }}));
                 
-                // Also update any fallback textarea if present
-                const textarea = document.querySelector('textarea#js_description, textarea.share-text__input');
-                if (textarea) {{
-                    textarea.value = textVal;
-                    textarea.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                    textarea.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                // Only update fallback textarea for caption if it is strictly .share-text__input
+                const captionTextarea = document.querySelector('textarea.share-text__input');
+                if (captionTextarea) {{
+                    captionTextarea.value = textVal;
+                    captionTextarea.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    captionTextarea.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                }}
+
+                // Inject summary / digest into textarea#js_description (WeChat max 120 chars)
+                const summaryEl = document.querySelector('textarea#js_description');
+                if (summaryEl) {{
+                    summaryEl.focus();
+                    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+                    if (nativeSetter) {{
+                        nativeSetter.call(summaryEl, summaryVal);
+                    }} else {{
+                        summaryEl.value = summaryVal;
+                    }}
+                    summaryEl.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    summaryEl.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                    summaryEl.dispatchEvent(new KeyboardEvent('keyup', {{ bubbles: true }}));
+                    summaryEl.blur();
                 }}
                 
-                return JSON.stringify({{ success: true, length: descEl.innerText.length, brCount: descEl.querySelectorAll('br').length }});
+                return JSON.stringify({{ 
+                    success: true, 
+                    length: descEl.innerText.length, 
+                    brCount: descEl.querySelectorAll('br').length,
+                    summaryLength: summaryVal.length
+                }});
             }} catch(e) {{
                 return JSON.stringify({{ error: e.message }});
             }}
@@ -498,7 +528,10 @@ class WechatPublisher:
     def publish_article(self, article_data: dict) -> None:
         title = article_data["title"]
         author = article_data["author"]
-        desc = article_data["desc"]
+        desc = (article_data.get("desc", "") or "").strip()
+        if len(desc) > 120:
+            logger.warning(f"Article desc/summary exceeds WeChat 120-char limit ({len(desc)} chars). Trimming to 120 chars.")
+            desc = desc[:120].rstrip('，。；！？')
         content = article_data["content"]
         html_content = article_data["html_content"]
         collection = article_data["collection"]

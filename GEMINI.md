@@ -199,5 +199,10 @@ if (cb && !cb.checked) {
    - **核心坑点**：微信图片消息的描述输入框（`.share-text__input .ProseMirror`）底层 Schema 将伴随文案设计为单个段落流，不支持多 `<p>` 块。若将文案按 `\n\n` 拆为多个 `<p>` 注入，ProseMirror 的 DOMParser 会在解析时剥离 `<p>` 标签并平铺合并其子节点，导致**段落间换行全部丢失、小标题与正文粘连**。
    - **黄金方案**：严禁用多 `<p>` 分段。文案必须统一包裹在单一 `<p>` 节点内，并将所有换行符 `\n` 显式转换为 `<br>`（两个连续换行 `\n\n` 转换为 `<br><br>`）。ProseMirror 会将 `<br>` 精确映射为 `hard_break` 节点，完美保留单行换行与段落间空行。
    - **伴随文案排版铁律**：`💡 核心洞察：`、`【模块标题】`、`💬 互动探讨：` 必须各自独占一行且上方保留空行；列表项（`• ` 或 `1. `）必须逐行独立换行，严禁标题与正文首行挤在同一行。
-
-
+6. **微信摘要 120 字符上限与图片消息字段解耦 (Summary 120-Char Ceiling & Field Decoupling - CRITICAL)**：
+   - **核心坑点**：微信后台保存/草稿接口（`operate_appmsg`）对摘要输入框（`textarea#js_description`，DOM 属性 `name="digest"`）设有 **120 个中文字符的绝对上限**。一旦内容超出 120 字，微信服务器直接抛出错误并拒绝保存：`{"err_msg": "Summary has exceeded the maximum of 120 Chinese characters", "ret": 64703}`。
+   - **字段混淆致命伤**：图片消息（小绿书）的伴随描述文案（上限 1000 字符）对应的是 `.share-text__input .ProseMirror`，**严禁将伴随正文灌入底部的 `textarea#js_description`**（原自动化误将其作为 fallback 导致几百字伴随正文塞满摘要框而触发 64703 错误）。
+   - **黄金处理标准**：
+     - `textarea#js_description` 专属于文章摘要（Summary / Digest）。
+     - 注入时读取 frontmatter 中的 `desc`，必须严格执行截断守卫：`desc[:120].rstrip('，。；！？')`。
+     - 注入方式必须调用 `HTMLTextAreaElement.prototype` 的原生 setter，并依次触发 `input`、`change`、`keyup`，确保 Vue 响应式状态同步及 `em.frm_counter`（如 `83/120`）正确渲染。
