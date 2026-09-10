@@ -212,3 +212,8 @@ if (cb && !cb.checked) {
      - `textarea#js_description` 专属于文章摘要（Summary / Digest）。
      - 注入时读取 frontmatter 中的 `desc`，必须严格执行截断守卫：`desc[:120].rstrip('，。；！？')`。
      - 注入方式必须调用 `HTMLTextAreaElement.prototype` 的原生 setter，并依次触发 `input`、`change`、`keyup`，确保 Vue 响应式状态同步及 `em.frm_counter`（如 `83/120`）正确渲染。
+7. **禁绝 ASCII/Unicode 字符画伪装图表 (Zero ASCII Diagrams - CRITICAL)**：
+   - **核心坑点**：严禁在 Markdown 正文中用 `┌─┐`、`│`、`└─┘`、`+---+` 等字符画、文本方框代码块替代真实图表。
+   - **移动端崩溃致命伤**：移动端（微信、掘金、知乎等）屏幕宽度极窄（~360px），且各平台 Monospace 字体兼容性不一。字符框图在手机上 100% 发生折行错位、排版撕裂，彻底沦为不可读的乱码线框。
+   - **交付铁律**：所有系统架构拓扑、时序因果管道、状态机流转回路、二元决策矩阵、终端切片与示范卡片，**必须且只能以真实高分辨率图片交付**（生成原生 2D SVG 并经 `sips -s format png --resampleWidth 1920` 导出 PNG），正文中使用标准 `![caption](image.png)` 语法嵌入。
+   - **脚本动态寻址**：文章目录下的生成脚本必须使用 `Path(__file__).parent.resolve()` 动态获取路径，严禁写死绝对目录。

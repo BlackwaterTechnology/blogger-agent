@@ -127,16 +127,41 @@ description: Use when the user asks to create, design, or publish a WeChat Photo
 
 ---
 
-## 6 大经典卡片模板矩阵
+## 🎨 6 大专业表现模式与全景卡片选型矩阵 (6 Professional Visual Modes)
 
-| 模板标识 | 适用场景 | 关键视觉要素 |
-|---|---|---|
-| **`cover`** | 首图 Hook / 封面 | 分类 Badge + 4~8 字爆破短语 (68px) + 副标题 (32px) + 3 行微型数据/认知对比卡 (36px/28px) + 滑动提示 |
-| **`bento_infographic`** | 全景知识便当图 / 核心机制长图 | **通过 `generate-infographic` 生成**：便当盒模块化网格、高信息密度提炼、3:4 竖版大图 |
-| **`vs_comparison`** | 二元对抗 / 新旧对比 | 双栏对比矩阵（左侧 ❌ 传统旧模式 vs 右侧 ✅ 现代新范式） + 底部核心结论条 (28px) |
-| **`bullet_points`** | 核心支柱 / 模块清单 | 3~4 个独立圆角卡片，含序号 Pill、加粗要点 (36px)、短语描述 (28px) 与底部标签组 (24px) |
-| **`pipeline_steps`** | 步骤流转 / 工程链路 | 垂直连线流转卡片（Step 01 → Step 02 → Step 03） + 阶段交付物 (26px) + 底部铁律栏 (26px) |
-| **`summary_cta`** | 复盘清单 / 互动引流 | 3~4 项核心 Checklist (28px) + 突出的大号互动探讨卡片（💬 提问 34px） + 点赞/收藏/转发栏 (26px) |
+将软件工程系统建模（UML 核心思想）与移动端信息架构（IA）深度结合。**严禁全套 Deck 从头到尾清一色全是带背景色的纯文字方块（如连续多张纯文字 bullet_points）**！
+
+在分镜规划时，必须根据待传达的技术关系本质，充分分析并从以下 6 大模式中匹配最优表达形态：
+
+| 表现模式 | UML 映射 | 核心认知价值 | 适用技术场景与特征 | 优先生产路径 |
+|---|---|---|---|---|
+| **1. 便当盒网格<br>(Bento Spec)** | 类图 /<br>对象规约 | 模块化解耦，比对静态多维参数 | 实体规格、多维能力总览、参数配比表。特征：紧凑网格、Pill 胶囊标签、Key-Value 对 | 默认 `cover` 模板 / `bento_infographic` (NotebookLM) / 3:4 原生 Bento SVG |
+| **2. 垂直时序管道<br>(Causal Pipeline)** | 活动图 /<br>顺序图 | 动态因果链条推演，拒绝平铺叙事 | 故障扩散链路、端到端请求时序、实施步骤。特征：1➔2➔3➔4 递进、阶段状态色阶、触发点箭头 | 默认 `pipeline_steps` 模板 / 3:4 原生 Pipeline SVG |
+| **3. 二元对抗/四象限<br>(Trade-off Matrix)** | 决策分支 /<br>ATAM 权衡 | 破解选型纠结，直击反模式代价 | 新旧范式对抗（❌旧模式 vs ✅新模式）、2x2 成本/复杂度四象限。特征：红绿双栏、决策分水岭 | 默认 `vs_comparison` 模板 / 3:4 原生 2x2 象限 SVG |
+| **4. 系统拓扑边界<br>(Topology Map)** | 部署图 /<br>组件图 | 呈现空间与容器边界，打破割裂 | 架构全景、网络组网、容器包含（VPC > Node > Pod）。特征：嵌套虚线容器、总线连接线、实体节点 | **3:4 原生 SVG (1200x1600)**，经 `sips` 导出 PNG |
+| **5. 状态机闭环<br>(State Machine)** | 状态机图<br>(Statechart) | 刻画生命周期变迁，理清自愈逻辑 | 控制循环（Reconcile）、健康检测、退避重试回路。特征：圆角状态节点、守卫条件 [Guard] 箭头、异常闭环 | **3:4 原生 SVG (1200x1600)**，经 `sips` 导出 PNG |
+| **6. 实证量化/终端切片<br>(Trace & Benchmark)** | 性能画像 /<br>执行跟踪 | 给出不可辩驳的实操与评测证据 | 真实终端报错还原、CLI 命令切片、压测剪刀差折线图。特征：拟真终端三色窗口、Monospace 代码高亮 | **3:4 原生 CLI 终端 SVG** / Matplotlib 脚本导出 |
+
+*辅助增强模态：具象概念隐喻 (Conceptual Metaphor)*：用于首图 Hook 破冰或抽象概念降维（如天平倾斜表达失衡）。通过 `generate_image`（3:4 比例）生成去 AI 味的高审美社论插画。
+
+---
+
+### 📐 3:4 原生复杂 SVG 规范（针对拓扑图、状态机、四象限与终端切片）
+
+当分镜需要表达系统拓扑（微服务/容器包含）、状态机闭环（探测/重试状态变迁）、复杂四象限或终端切片时，**采用 3:4 原生 SVG 代码直接绘制并经 `sips` 导出 PNG**，绝不能削足适履硬塞进简陋的纯文字列表中！
+
+- **画布尺寸标准**：严格统一为 `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1600" width="1200" height="1600">`。
+- **视觉层级架构**：
+  1. **顶部 Header 区**（y=0~220）：包含分类 Badge 胶囊（字号 20~24px）、大标题（42~52px，加粗）、副标题（26~30px）。
+  2. **中部 Body 核心视觉区**（y=240~1400）：
+     - **拓扑图**：使用带虚线或圆角的外层 `<rect>` 作为边界容器（如 `VPC/Node`），内部放置子组件实体；连接线标注协议（`gRPC/HTTP`）。
+     - **状态机**：使用高对比圆角矩形作为状态（`Pending/Running/Failed`），使用 `<path>` 或 `<line>` 搭配 `<marker id="arrow">`，并在连线上方清晰标注事件与守卫条件 `[retry < 3]`。
+     - **终端切片**：绘制 macOS 拟真终端卡片（左上角带有红 `#EF4444` 黄 `#F59E0B` 绿 `#10B981` 三色控制圆点），内部使用 JetBrains Mono 或 SF Mono 等宽字体展示真实命令行交互。
+  3. **底部 Footer / Takeaway 结论区**（y=1420~1560）：统一横条（h=100~120px），以 28~32px 加粗字号输出核心架构定论或工程铁律。
+- **高画质导出命令**：
+  ```bash
+  sips -s format png --resampleWidth 1200 card.svg --out card.png
+  ```
 
 
 ---
@@ -334,17 +359,19 @@ description: Use when the user asks to create, design, or publish a WeChat Photo
 【图片消息内容质量自检】
 1. 爆破 Hook（4-8字）：封面击穿读者哪个固有偏见？（如：0.99刀的真相？/ 穿仓的必然性）
 2. 社交货币命名实体：本文提炼了哪 1 个具备传播力的概念/方法论？（如：1.111B Class / 动态自愈路由）
-3. 3~6 张卡片分镜规划（支持 SVG 卡片与 NotebookLM 便当网格混编）：
-   - 卡片 01 (cover)：爆破 Hook + 核心冲突数据（或 AI 具象概念隐喻封面）
-   - 卡片 02 (vs_comparison / bento_infographic)：新旧范式二元对抗或全景架构长图
-   - 卡片 03 (bullet_points)：三大支柱 / 关键越级机制拆解
-   - 卡片 04 (pipeline_steps)：四步落地实施链路 / 避坑 SOP
-   - 卡片 05 (summary_cta)：Checklist 闭环 + 1 个评论区强争议互动问题
+3. 3~6 张卡片分镜规划与表现模式匹配（严禁全套 Deck 全为纯文字色块）：
+   - 卡片 01：[模式：具象隐喻封面 / Bento 规约卡] 爆破 Hook + 核心冲突
+   - 卡片 02：[模式：实证终端切片 / 性能基准图表 / 全景便当图] 生产现场还原或全景架构
+   - 卡片 03：[模式：系统拓扑边界 / 状态机闭环 / 因果管道] 核心机制空间拓扑、时序因果或自愈状态流转
+   - 卡片 04：[模式：二元对抗矩阵 / 2x2 权衡象限] 选型决策对比、优劣分水岭
+   - 卡片 05：[模式：Checklist SOP / 终端实操] 行动清单与生产闭环
+   - 卡片 06 (可选)：[模式：CTA 互动卡片] 评论区强争议互动问题
 ```
 
 #### B. 形式与安全自检
 ```text
 【形式自检】
+- 表现模式多样性：整套 Deck 中纯文字色块卡片（无拓扑、无状态转移、无量化图表的方块）严格 ≤ 2 张，核心技术机制必须匹配对应的空间拓扑、状态机或因果时序。
 - 标题长度：严格 ≤ 20 字符（推荐 12 ~ 18 字符），严禁包含 ` ｜ `、` —— `、` - ` 及两侧空格。
 - 摘要长度 (desc)：严格 60 ~ 120 字符，绝对禁止超过 120 字符（防止微信 64703 错误）。
 - 画布比例：严格 3:4 竖版（1200 x 1600 px）。
@@ -356,6 +383,8 @@ description: Use when the user asks to create, design, or publish a WeChat Photo
 - 伴随文案字数：严格控制在 350 ~ 700 字符（上限绝对 ≤ 900 字符），0 Markdown 语法污染。
 - 伴随文案排版：小标题【...】与引导语独立成行且上方留空行，列表项逐行独立，0 内容粘连。
 - 0 #话题标签：严禁在文末堆砌 # 话题标签，文末以 💬 互动探讨 优雅收尾。
+- 0 ASCII 伪图表：伴随文案与卡片中 100% 杜绝任何字符框图（如 `┌─┐`、`│`），所有图示必须落盘为 1200x1600 Retina 真实卡片。
+- 脚本动态寻址：辅助绘图脚本严禁硬编码绝对路径，必须使用 `Path(__file__).parent.resolve()` 动态获取当前目录。
 - 符号规范：100% 使用原生 Unicode 符号，0 LaTeX 行内公式。
 ```
 
@@ -366,8 +395,9 @@ description: Use when the user asks to create, design, or publish a WeChat Photo
 1. **创建 Payload 目录**：
    `articles/YYYY-MM-DD-photo-<slug>/`（如 `articles/2026-09-03-photo-gemini-3-8-flash`）。
 
-2. **撰写卡片配置 `deck_spec.json`**：
-   参考上文的标准模板字典，在目标目录下创建 `deck_spec.json`，确保数据与分镜一致。
+2. **撰写卡片配置 `deck_spec.json` 与原生 SVG**：
+   - 对于标准文字卡片（`cover`, `vs_comparison`, `bullet_points`, `pipeline_steps`, `summary_cta`），在目标目录下创建 `deck_spec.json`；
+   - 对于**系统拓扑图 (Topology)**、**状态机回路 (State Machine)**、**终端切片 (Terminal)**，直接在目录下编写独立的 3:4 原生 SVG 文件（如 `03_topology.svg`）。
 
 3. **撰写伴随文案 `article.md`**：
 
@@ -410,14 +440,21 @@ photos:
 
 ---
 
-### 阶段 3：批处理卡片渲染与多模态整合
+### 阶段 3：多轨卡片渲染与整合
 
-1. **批处理生成卡片**：
+1. **基础模板卡片批量生成**：
+   若使用 `deck_spec.json`，运行：
    ```bash
    uv run python tools/generate_photo_cards.py --config articles/YYYY-MM-DD-photo-<slug>/deck_spec.json --output-dir articles/YYYY-MM-DD-photo-<slug>/
    ```
 
-2. **（可选）NotebookLM 便当长图合成**：
+2. **原生 3:4 SVG 高画质渲染（拓扑图/状态机/终端切片）**：
+   针对自定义 3:4 原生 SVG，强制包含 `--resampleWidth 1200` 导出 PNG：
+   ```bash
+   sips -s format png --resampleWidth 1200 articles/YYYY-MM-DD-photo-<slug>/03_topology.svg --out articles/YYYY-MM-DD-photo-<slug>/03_topology.png
+   ```
+
+3. **（可选）NotebookLM 便当长图合成**：
    若包含全景架构图，调用 `generate-infographic` 技能生成 3:4 竖版便当图覆盖对应卡片：
    ```bash
    uv run blogger infographic \
@@ -427,7 +464,7 @@ photos:
      --output articles/YYYY-MM-DD-photo-<slug>/02_infographic.png
    ```
 
-3. **尺寸与分辨率极验**：
+4. **尺寸与分辨率极验**：
    ```bash
    sips -g pixelWidth -g pixelHeight articles/YYYY-MM-DD-photo-<slug>/*.png
    ```
@@ -444,6 +481,8 @@ photos:
 - 伴随文案纯文本字符数是否严格在 **350 ~ 700 字符** 且 **≤ 900 字符**？
 - 伴随文案排版：小标题【...】、💡洞察、💬互动探讨是否各占独立行并正确换行，列表项是否逐行独立，无段落粘连？
 - 0 #话题标签：正文文末是否 0 # 标签堆砌？
+- 0 ASCII 伪图表：伴随文案与正文中是否 100% 杜绝了任何字符框图（`┌─┐`、`│`、`+--+`）？所有图示是否落盘为真实卡片？
+- 表现模式匹配度：卡片是否针对技术机制匹配了拓扑、状态机、时序管道、选型矩阵或实证切片？是否杜绝了整套 Deck 仅为纯文字色块堆砌（纯文字卡片 ≤ 2 张）？
 - 卡片是否为严格 3:4 比例（1200x1600 px）？
 - 卡片中是否 0 默认 AGENT 标记与 0 BLOGGER AGENT 固定水印？
 - 移动端字号是否全部严格 ≥ 28px（核心节点 ≥ 34px，标签/辅助 ≥ 24px）且无文字边缘截断/溢出？
@@ -453,5 +492,6 @@ photos:
 - `collection` 是否严格属于 `AI图文 / agent图文 / DevSecOps图文 / Web3图文 / 逻辑世界`？
 
 审查通过后，即可提示用户使用 `/publish-article` 进行推送！
+
 
 
