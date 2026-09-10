@@ -38,6 +38,12 @@ from typing import Any
 
 import websocket  # websocket-client
 
+# Ensure local CDP WebSocket / HTTP calls bypass local proxies
+if "no_proxy" not in os.environ:
+    os.environ["no_proxy"] = "localhost,127.0.0.1,::1"
+if "NO_PROXY" not in os.environ:
+    os.environ["NO_PROXY"] = "localhost,127.0.0.1,::1"
+
 
 class CdpChromeUnavailable(RuntimeError):
     """The Chrome remote-debug port is unreachable. The user almost
@@ -77,7 +83,8 @@ class CdpChromeController:
     def _list_targets(self) -> list[dict[str, Any]]:
         url = f"http://127.0.0.1:{self.port}/json"
         try:
-            with urllib.request.urlopen(url, timeout=self.timeout) as resp:
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            with opener.open(url, timeout=self.timeout) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except (urllib.error.URLError, ConnectionError, TimeoutError) as exc:
             raise CdpChromeUnavailable(
