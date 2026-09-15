@@ -390,8 +390,28 @@ def parse_markdown_payload(md_path: Path) -> dict:
     cover_path = payload_dir / cover_filename if cover_filename and (payload_dir / cover_filename).exists() else None
     video_path = payload_dir / video_filename if video_filename and (payload_dir / video_filename).exists() else None
 
+    # Auto-detect video file if not explicitly specified
+    if not video_path:
+        clean_mp4s = list(payload_dir.glob("*_clean.mp4"))
+        if clean_mp4s:
+            video_path = clean_mp4s[0]
+        else:
+            mp4s = list(payload_dir.glob("*.mp4"))
+            if mp4s:
+                video_path = mp4s[0]
+
+    # Auto-detect cover image if not explicitly specified
+    if not cover_path:
+        for cname in ["cover.png", "cover.jpg", "cover.jpeg"]:
+            potential_cover = payload_dir / cname
+            if potential_cover.exists():
+                cover_path = potential_cover
+                break
+
     if video_path:
         logger.info(f"Found video: {video_path.name}")
+    if cover_path:
+        logger.info(f"Found cover: {cover_path.name}")
     
     # We still keep the original illustration check for backwards compatibility if no inline images exist
     illustration_path = payload_dir / illustration_filename if illustration_filename and (payload_dir / illustration_filename).exists() else None

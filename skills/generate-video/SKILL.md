@@ -1,12 +1,12 @@
 ---
 name: generate-video
-description: Use when the user requests to generate, create, or render a video from documents, URLs, text, or research topics, or explicitly invokes /generate-video
+description: Generate cinematic narrative videos from documents, URLs, markdown articles, or research topics using Google NotebookLM (15-45 min asynchronous cloud generation with subagent polling). Use when the user requests cinematic video generation, long-form documentary/storytelling videos, or explicitly invokes /generate-video. For local lightweight dual-subtitle educational/listening videos, use dual-subtitle-video instead.
 ---
 
-# Video Generation
+# Cinematic Video Generation (Google NotebookLM)
 
 ## Overview
-Generates cinematic videos from provided sources using Google NotebookLM programmatic access.
+Generates cinematic narrative videos from provided sources using Google NotebookLM programmatic access.
 
 ## Core Workflow
 
@@ -46,17 +46,35 @@ Generates cinematic videos from provided sources using Google NotebookLM program
    - **Cover Image:** Generate an infographic for the video cover:
      `notebooklm generate infographic --style professional --json`
      Wait for completion, then download and save as `cover.png` in the video's directory.
-   - **Metadata:** Ask the notebook to generate a summary for publishing:
+   - **Payload & Metadata:** Ask the notebook to generate publishing copy and format into `payload.md` in the video directory:
      ```bash
      notebooklm ask "为该视频写一段摘要和发布简介。要求：
-     1. 必须严格使用以下Markdown结构输出（方便自动化脚本解析）：
-     ### 标题：[纯文本标题]
-     #### 【发布简介/文案】
-     [正文...]
-     
-     2. 视频标题（Title）必须为纯文本，绝不能包含任何Emoji表情或特殊字符（如 🇯🇵、🎯 等）。"
+     1. 标题（Title）：纯文本，绝不能包含任何Emoji表情或特殊字符（如 🇯🇵、🎯 等）。
+     2. 摘要（Summary/desc）：控制在 60 到 120 字符之间。
+     3. 正文文案：结构清晰，重点突出。"
      ```
-     Save the output to `metadata.txt` in the video's directory. For WeChat publishing, match the metadata with collections defined in `blogger.toml`.
+     Create `payload.md` in the video's directory with standard YAML frontmatter:
+     ```yaml
+     ---
+     title: "[纯文本标题]"
+     author: "Gemini CLI"
+     desc: "[60~120字摘要]"
+     collection: "agent" # 必须匹配 blogger.toml 中的 video_collections
+     cover: "cover.png"
+     video: "video_clean.mp4"
+     ---
+
+     [完整发布文案/正文]
+     ```
+
+6. **Publishing (Next Step)**
+   Once the payload is assembled, hand off to the `publish-video` skill to publish to target platforms:
+   ```bash
+   python3 -m src.blogger.cli publish \
+     --payload videos/[topic]/payload.md \
+     --platform wechat_video
+   ```
+   Or publish across multiple platforms (`wechat_video,wechat_channels,bilibili`).
 
 ## Quick Reference
 

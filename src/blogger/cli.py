@@ -19,7 +19,7 @@ def main():
     # Publish command
     publish_parser = subparsers.add_parser("publish", help="Publish an article payload")
     publish_parser.add_argument("--payload", default="articles/test_data", help="Directory containing the article markdown files")
-    publish_parser.add_argument("--platform", default="wechat", help="Target platform(s) to publish to, comma-separated (e.g. wechat,juejin,csdn,blogger,medium)")
+    publish_parser.add_argument("--platform", default="wechat", help="Target platform(s) to publish to, comma-separated (e.g. wechat,juejin,csdn,blogger,medium,wechat_video,wechat_channels,bilibili)")
     publish_parser.add_argument(
         "--no-publish",
         action="store_true",
@@ -70,7 +70,11 @@ def main():
             sys.exit(1)
         return
 
-    # Fallback/Default to publish
+    if args.command == "video":
+        handle_video(args, args.payload)
+        return
+
+    # Fallback/Default to publish or infographic
     payload_path = Path(args.payload)
     md_path = None
     
@@ -86,11 +90,13 @@ def main():
             else:
                 logger.info(f"No Markdown files found, but found video files in {payload_path}. Operating in video-only mode.")
         else:
-            # Prioritize the default name if it exists, otherwise pick the first one
-            default_path = payload_path / "ARC-AGI-文章.md"
-            if default_path in md_files:
-                md_path = default_path
-            else:
+            # Prioritize payload.md, article.md, or default name if they exist
+            for candidate in ["payload.md", "article.md", "ARC-AGI-文章.md"]:
+                candidate_path = payload_path / candidate
+                if candidate_path in md_files:
+                    md_path = candidate_path
+                    break
+            if not md_path:
                 md_path = md_files[0]
                 if len(md_files) > 1:
                     logger.warning(f"Multiple Markdown files found. Using {md_path.name}")
@@ -98,20 +104,14 @@ def main():
     if md_path:
         logger.info(f"Parsing payload from: {md_path}")
         
-        if args.command == "video":
-            handle_video(args, md_path)
-            return
-        elif args.command == "infographic":
+        if args.command == "infographic":
             handle_infographic(args, md_path)
             return
 
         article_data = parse_markdown_payload(md_path)
         article_data["payload_path"] = md_path
     else:
-        if args.command == "video":
-            logger.error(f"Command 'video' currently requires a Markdown payload for metadata. Not found in {payload_path}")
-            return
-        elif args.command == "infographic":
+        if args.command == "infographic":
             handle_infographic(args, None, payload_path)
             return
             
@@ -263,6 +263,8 @@ def handle_video(args, md_path):
 
         except json.JSONDecodeError:
             logger.error(f"Failed to parse notebooklm output: {result.stdout}")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"notebooklm command failed: {e.stderr}")
     except subprocess.CalledProcessError as e:
         logger.error(f"notebooklm command failed: {e.stderr}")
 
