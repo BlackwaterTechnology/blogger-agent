@@ -158,10 +158,14 @@ def render_video(
             draw = ImageDraw.Draw(img)
 
             # 1. Top Header Bar
-            draw.rounded_rectangle([100, 60, 480, 102], radius=8, fill="#1E293B", outline="#3B82F6", width=2)
+            badge_bbox = draw.textbbox((0, 0), tag, font=font_header)
+            badge_w = badge_bbox[2] - badge_bbox[0]
+            badge_right = max(420, 100 + 20 + badge_w + 20)
+            draw.rounded_rectangle([100, 60, badge_right, 102], radius=8, fill="#1E293B", outline="#3B82F6", width=2)
             draw.text((120, 70), tag, font=font_header, fill="#60A5FA")
 
-            draw.text((510, 70), title, font=font_title, fill="#F8FAFC")
+            title_x = badge_right + 30
+            draw.text((title_x, 70), title, font=font_title, fill="#F8FAFC")
             progress_str = f"{idx + 1:02d} / {total_cues:02d}"
             draw.text((width - 240, 70), progress_str, font=font_header, fill="#94A3B8")
             draw.line([(100, 125), (width - 100, 125)], fill="#334155", width=2)
@@ -194,20 +198,20 @@ def render_video(
 
             ctx_y = 825
             if idx > 0:
-                prev_text = "◀ " + cues[idx - 1]["text"]
-                prev_lines = wrap_text(prev_text, font_context_dim, 1650, draw)
-                draw.text((130, ctx_y), prev_lines[0] if prev_lines else "", font=font_context_dim, fill="#64748B")
+                draw.polygon([(130, ctx_y + 13), (140, ctx_y + 7), (140, ctx_y + 19)], fill="#64748B")
+                prev_lines = wrap_text(cues[idx - 1]["text"], font_context_dim, 1630, draw)
+                draw.text((155, ctx_y), prev_lines[0] if prev_lines else "", font=font_context_dim, fill="#64748B")
                 ctx_y += 38
 
-            curr_ctx = "▶ " + cue["text"]
-            curr_ctx_lines = wrap_text(curr_ctx, font_context, 1650, draw)
-            draw.text((130, ctx_y), curr_ctx_lines[0] if curr_ctx_lines else "", font=font_context, fill="#38BDF8")
+            draw.polygon([(130, ctx_y + 7), (130, ctx_y + 21), (142, ctx_y + 14)], fill="#38BDF8")
+            curr_ctx_lines = wrap_text(cue["text"], font_context, 1630, draw)
+            draw.text((155, ctx_y), curr_ctx_lines[0] if curr_ctx_lines else "", font=font_context, fill="#38BDF8")
             ctx_y += 42
 
             if idx + 1 < total_cues:
-                next_text = "… " + cues[idx + 1]["text"]
-                next_lines = wrap_text(next_text, font_context_dim, 1650, draw)
-                draw.text((130, ctx_y), next_lines[0] if next_lines else "", font=font_context_dim, fill="#64748B")
+                draw.text((130, ctx_y), "…", font=font_context_dim, fill="#64748B")
+                next_lines = wrap_text(cues[idx + 1]["text"], font_context_dim, 1630, draw)
+                draw.text((155, ctx_y), next_lines[0] if next_lines else "", font=font_context_dim, fill="#64748B")
 
             frame_file = os.path.join(temp_dir, f"frame_{idx:04d}.png")
             img.save(frame_file)
@@ -392,15 +396,19 @@ def generate_video_cover(
 
     # Subtitle with cyan bullet
     sub_y = start_y + 40
-    draw.text((card_x1 + 80, sub_y), f"✦  {subtitle}", font=font_sub, fill="#94A3B8")
+    bullet_size = 8
+    bx = card_x1 + 80
+    by = sub_y + 20
+    draw.polygon([(bx, by - bullet_size), (bx + bullet_size, by), (bx, by + bullet_size), (bx - bullet_size, by)], fill="#38BDF8")
+    draw.text((bx + 24, sub_y), subtitle, font=font_sub, fill="#94A3B8")
 
     # Subtle divider line inside card
     div_y = card_y2 - 100
     draw.line([(card_x1 + 80, div_y), (card_x2 - 80, div_y)], fill="#334155", width=2)
 
     # Card footer info
-    draw.text((card_x1 + 80, div_y + 30), "1080P FULL HD • DUAL-SUBTITLE STREAM", font=font_footer, fill="#64748B")
-    draw.text((card_x2 - 440, div_y + 30), "FOCUS STREAM • CONTEXT HISTORY", font=font_footer, fill="#64748B")
+    draw.text((card_x1 + 80, div_y + 30), "1080P FULL HD | DUAL-SUBTITLE STREAM", font=font_footer, fill="#64748B")
+    draw.text((card_x2 - 440, div_y + 30), "FOCUS STREAM | CONTEXT HISTORY", font=font_footer, fill="#64748B")
 
     img.save(str(out_p), "PNG")
     logger.info(f"Video cover generated at: {out_p}")

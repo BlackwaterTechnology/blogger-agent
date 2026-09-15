@@ -206,7 +206,8 @@ def ensure_blank_before_lists(md: str) -> str:
         out_lines.append(line)
     return '\n'.join(out_lines)
 
-def parse_markdown_payload(md_path: Path) -> dict:
+def parse_markdown_payload(md_path: Path | str) -> dict:
+    md_path = Path(md_path)
     if not md_path.exists():
         raise FileNotFoundError(f"Markdown file not found: {md_path}")
         
