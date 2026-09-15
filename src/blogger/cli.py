@@ -44,8 +44,14 @@ def main():
     infographic_parser.add_argument("--output", help="Output path for downloaded infographic image")
 
     # Video command
-    video_parser = subparsers.add_parser("video", help="Generate a cinematic video and publish to platforms")
-    video_parser.add_argument("--payload", default="articles/test_data", help="Directory containing the article markdown files for metadata")
+    video_parser = subparsers.add_parser("video", help="Generate a video (cinematic or dual-subtitle) and publish to platforms")
+    video_parser.add_argument(
+        "--type",
+        choices=["cinematic", "dual-subtitle"],
+        default="cinematic",
+        help="Type of video: 'cinematic' (NotebookLM AI video) or 'dual-subtitle' (Edge-TTS + Pillow card video)",
+    )
+    video_parser.add_argument("--payload", default="articles/test_data", help="Directory or file containing the article or text input")
     video_parser.add_argument("--prompt", help="Prompt for video generation. If not provided, the article content is used.")
     video_parser.add_argument("--platform", default="bilibili,wechat_channels,wechat_video", help="Target platform(s) to publish to, comma-separated (e.g. bilibili,wechat_channels,wechat_video)")
     video_parser.add_argument(
@@ -53,6 +59,14 @@ def main():
         action="store_true",
         help="Fill the publish dialog but stop before clicking the final submit button.",
     )
+    video_parser.add_argument("--voice", default="en-US-JennyNeural", help="Edge-TTS voice for dual-subtitle video")
+    video_parser.add_argument("--rate", default="-6%", help="Speech rate for dual-subtitle video")
+    video_parser.add_argument("--pitch", default="+2Hz", help="Speech pitch for dual-subtitle video")
+    video_parser.add_argument("--title", help="Header title for dual-subtitle video")
+    video_parser.add_argument("--tag", help="Header badge tag for dual-subtitle video")
+    video_parser.add_argument("--desc", help="Summary / description for dual-subtitle video payload (60-120 chars)")
+    video_parser.add_argument("--collection", default="软件教程", help="Collection for video matching blogger.toml (e.g. 软件教程, 程序员, agent)")
+    video_parser.add_argument("--output", help="Output MP4 path for generated video")
 
 
 
@@ -194,34 +208,189 @@ def main():
         else:
             logger.warning(f"Platform '{platform}' is currently not implemented or unknown for publish command.")
 
-def handle_video(args, md_path):
+def handle_video(args, payload_path):
     import subprocess
     import json
     import tempfile
     import urllib.request
 
-    logger.info(f"Parsing payload from: {md_path}")
-    article_data = parse_markdown_payload(md_path)
-    
-    prompt = args.prompt if args.prompt else f"Title: {article_data['title']}\nDescription: {article_data['desc']}"
-    
-    logger.info("Generating cinematic video via notebooklm-py...")
-    try:
-        result = subprocess.run(
-            ["uv", "run", "notebooklm", "generate", "cinematic-video", prompt, "--language", "zh_Hans", "--wait", "--json"],
-            capture_output=True,
-            text=True,
-            check=True
+    payload_path = Path(payload_path)
+    video_type = getattr(args, "type", "cinematic")
+    article_data = {}
+
+    if video_type == "dual-subtitle":
+        from .core.dual_sub_video import (
+            generate_dual_subtitle_video,
+            generate_video_cover,
+            generate_video_payload_md,
+            clean_video_title,
+            clean_video_desc,
         )
+
+        input_file = None
+        payload_dir = None
+        existing_md = None
+
+        if payload_path.is_file():
+            if payload_path.suffix == ".md":
+                existing_md = payload_path
+                payload_dir = payload_path.parent
+                candidate_txt = payload_dir / "sentences.txt"
+                if candidate_txt.exists():
+                    input_file = candidate_txt
+            else:
+                input_file = payload_path
+                payload_dir = payload_path.parent
+        elif payload_path.is_dir():
+            payload_dir = payload_path
+            for candidate in ["payload.md", "article.md"]:
+                c_md = payload_dir / candidate
+                if c_md.exists():
+                    existing_md = c_md
+                    break
+            for c_txt in [payload_dir / "sentences.txt", payload_dir / "input.txt"]:
+                if c_txt.exists():
+                    input_file = c_txt
+                    break
+            if not input_file:
+                txts = list(payload_dir.glob("*.txt"))
+                if txts:
+                    input_file = txts[0]
+
+        if not input_file and existing_md:
+            input_file = existing_md
+
+        if not input_file or not input_file.exists():
+            logger.error(f"Could not find input text or sentence file for dual-subtitle video in: {payload_path}")
+            return
+
+        if not payload_dir:
+            payload_dir = input_file.parent
+
+        # 1. Resolve metadata from arguments or existing payload.md
+        title = getattr(args, "title", None)
+        desc = getattr(args, "desc", None)
+        collection = getattr(args, "collection", None) or "软件教程"
+        tag = getattr(args, "tag", None) or "LISTENING PRACTICE"
+
+        if existing_md and existing_md.exists():
+            try:
+                article_data = parse_markdown_payload(existing_md)
+                if not title and article_data.get("title"):
+                    title = article_data["title"]
+                if not desc and article_data.get("desc"):
+                    desc = article_data["desc"]
+                if not collection and article_data.get("collection"):
+                    collection = article_data["collection"]
+            except Exception as e:
+                logger.debug(f"Failed to parse existing payload.md: {e}")
+
+        if not title:
+            title = input_file.stem.replace("-", " ").replace("_", " ").title()
+        if not desc:
+            desc = f"本视频为《{title}》英文听力与对话跟读自测，采用双层字幕焦点视窗与上下文流，适合沉浸式学习。"
+
+        title = clean_video_title(title)
+        desc = clean_video_desc(desc, title)
+
+        # 2. Determine output paths
+        if getattr(args, "output", None):
+            out_mp4 = Path(args.output)
+        else:
+            out_mp4 = payload_dir / "video.mp4"
+
+        cover_path = payload_dir / "cover.png"
+        payload_md_path = payload_dir / "payload.md"
+
+        # 3. Generate dual-subtitle video
+        logger.info(f"Generating dual-subtitle video from {input_file} to {out_mp4}...")
         try:
+            generate_dual_subtitle_video(
+                input_path=input_file,
+                output_mp4=out_mp4,
+                voice=args.voice,
+                rate=args.rate,
+                pitch=args.pitch,
+                title=title,
+                tag=tag,
+            )
+        except Exception as e:
+            logger.error(f"Failed to generate dual-subtitle video: {e}")
+            return
+
+        # 4. Generate cover.png if missing
+        if not cover_path.exists():
+            logger.info(f"Generating standard 16:9 video cover to {cover_path}...")
+            generate_video_cover(
+                output_path=cover_path,
+                title=title,
+                tag=tag,
+            )
+
+        # 5. Generate payload.md if missing
+        if not payload_md_path.exists():
+            logger.info(f"Scaffolding payload.md at {payload_md_path}...")
+            generate_video_payload_md(
+                payload_dir=payload_dir,
+                title=title,
+                desc=desc,
+                collection=collection,
+                video_filename=out_mp4.name,
+                cover_filename=cover_path.name,
+                sentences_path=input_file if input_file.suffix == ".txt" else None,
+            )
+
+        # 6. Parse payload.md to construct complete article_data for publishing
+        if payload_md_path.exists():
+            article_data = parse_markdown_payload(payload_md_path)
+        else:
+            article_data["title"] = title
+            article_data["desc"] = desc
+            article_data["collection"] = collection
+            article_data["video_path"] = out_mp4
+            article_data["cover_path"] = cover_path
+
+        article_data["video_path"] = out_mp4
+        article_data["cover_path"] = cover_path
+
+    else:
+        # Cinematic video via NotebookLM
+        md_path = None
+        if payload_path.is_file() and payload_path.suffix == ".md":
+            md_path = payload_path
+        elif payload_path.is_dir():
+            default_path = payload_path / "ARC-AGI-文章.md"
+            md_files = list(payload_path.glob("*.md"))
+            if default_path in md_files:
+                md_path = default_path
+            elif md_files:
+                md_path = md_files[0]
+
+        if not md_path:
+            logger.error(f"Command 'video' (cinematic) requires a Markdown payload for metadata. Not found in {payload_path}")
+            return
+
+        logger.info(f"Parsing payload from: {md_path}")
+        article_data = parse_markdown_payload(md_path)
+
+        prompt = args.prompt if args.prompt else f"Title: {article_data['title']}\nDescription: {article_data['desc']}"
+
+        logger.info("Generating cinematic video via notebooklm-py...")
+        try:
+            result = subprocess.run(
+                ["uv", "run", "notebooklm", "generate", "cinematic-video", prompt, "--language", "zh_Hans", "--wait", "--json"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
             data = json.loads(result.stdout)
             if data.get("error"):
                 logger.error(f"Video generation error: {data.get('message')}")
                 return
-            
+
             video_url = data.get("url")
             video_path = data.get("file_path")
-            
+
             if not video_path and video_url:
                 logger.info(f"Downloading generated video from {video_url}...")
                 fd, video_path = tempfile.mkstemp(suffix=".mp4")
@@ -232,41 +401,40 @@ def handle_video(args, md_path):
                 return
             else:
                 logger.info(f"Video generated at {video_path}")
-                
+
             article_data["video_path"] = video_path
-            
-            platforms = [p.strip().lower() for p in args.platform.split(",") if p.strip()]
-            dry_run = bool(getattr(args, "no_publish", False))
-            if dry_run:
-                logger.info("--no-publish set: will skip the final submit click on Bilibili.")
-
-            for platform in platforms:
-                if platform == "bilibili":
-                    from .platforms.bilibili import BilibiliPublisher
-                    logger.info("Initiating Bilibili publishing flow...")
-                    publisher = BilibiliPublisher()
-                    publisher.publish(article_data, dry_run=dry_run)
-                elif platform == "wechat_channels":
-                    from .platforms.wechat_channels import WechatChannelsPublisher
-                    logger.info("Initiating WeChat Channels publishing flow...")
-                    publisher = WechatChannelsPublisher()
-                    publisher.publish(article_data)
-                elif platform == "wechat_video":
-                    from .platforms.wechat_video import WechatVideoPublisher
-                    logger.info("Initiating WeChat Official Account Video publishing flow...")
-                    publisher = WechatVideoPublisher()
-                    publisher.publish(article_data)
-                elif platform == "none":
-                    logger.info("Platform is none, skipping publishing.")
-                else:
-                    logger.warning(f"Platform '{platform}' is currently not implemented or unknown for video command.")
-
         except json.JSONDecodeError:
             logger.error(f"Failed to parse notebooklm output: {result.stdout}")
+            return
         except subprocess.CalledProcessError as e:
             logger.error(f"notebooklm command failed: {e.stderr}")
-    except subprocess.CalledProcessError as e:
-        logger.error(f"notebooklm command failed: {e.stderr}")
+            return
+
+    platforms = [p.strip().lower() for p in args.platform.split(",") if p.strip()]
+    dry_run = bool(getattr(args, "no_publish", False))
+    if dry_run:
+        logger.info("--no-publish set: will skip the final submit click on Bilibili.")
+
+    for platform in platforms:
+        if platform == "bilibili":
+            from .platforms.bilibili import BilibiliPublisher
+            logger.info("Initiating Bilibili publishing flow...")
+            publisher = BilibiliPublisher()
+            publisher.publish(article_data, dry_run=dry_run)
+        elif platform == "wechat_channels":
+            from .platforms.wechat_channels import WechatChannelsPublisher
+            logger.info("Initiating WeChat Channels publishing flow...")
+            publisher = WechatChannelsPublisher()
+            publisher.publish(article_data)
+        elif platform == "wechat_video":
+            from .platforms.wechat_video import WechatVideoPublisher
+            logger.info("Initiating WeChat Official Account Video publishing flow...")
+            publisher = WechatVideoPublisher()
+            publisher.publish(article_data)
+        elif platform == "none":
+            logger.info("Platform is none, skipping publishing.")
+        else:
+            logger.warning(f"Platform '{platform}' is currently not implemented or unknown for video command.")
 
 
 def handle_infographic(args, md_path=None, payload_path=None):
