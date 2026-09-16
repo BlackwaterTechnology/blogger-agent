@@ -49,7 +49,7 @@ def main():
     parser.add_argument("--pitch", default="+2Hz", help="Edge-TTS speech pitch (default: +2Hz).")
     parser.add_argument("--title", default="English Listening Practice", help="Title displayed on top header and metadata.")
     parser.add_argument("--tag", default="LISTENING PRACTICE", help="Badge tag on top left.")
-    parser.add_argument("--subtitle", default="双字幕沉浸式跟读与听力自测", help="Subtitle on cover image.")
+    parser.add_argument("--subtitle", default="Dual-Subtitle Immersion & Shadowing Drill", help="Subtitle on cover image.")
     parser.add_argument("--desc", help="Description / summary for payload.md (strictly 60-120 characters).")
     parser.add_argument("--collection", default="软件教程", help="Collection matching blogger.toml (default: '软件教程').")
     parser.add_argument("--author", default="Blogger Agent", help="Author name in payload.md.")
@@ -71,7 +71,7 @@ def main():
         sys.exit(1)
 
     try:
-        desc_text = args.desc or f"本视频为《{args.title}》双语听力与对话跟读自测，采用双层字幕焦点视窗与上下文流，适合沉浸式学习。"
+        desc_text = args.desc or f"Master English listening with {args.title}, featuring dual-tier subtitles and context stream."
 
         if args.payload_dir:
             payload_p = Path(args.payload_dir).resolve()

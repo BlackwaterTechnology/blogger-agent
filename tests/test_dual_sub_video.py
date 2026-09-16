@@ -71,33 +71,39 @@ This is the second practice sentence.
         self.assertEqual(reconstructed, long_text)
 
     def test_clean_video_title(self):
-        dirty = "🎯【爆款】DevOps 工程师日常站会英文听力！🇯🇵🔥💡"
+        dirty = "🎯【Daily Drill】DevOps Daily Standup English Practice! 🇯🇵🔥💡"
         clean = clean_video_title(dirty)
         self.assertNotIn("🎯", clean)
         self.assertNotIn("🇯🇵", clean)
         self.assertNotIn("🔥", clean)
         self.assertNotIn("💡", clean)
-        self.assertIn("DevOps 工程师日常站会英文听力", clean)
+        self.assertIn("DevOps Daily Standup English Practice", clean)
 
     def test_clean_video_desc_length_bounds(self):
-        # 1. Short desc gets padded to >= 60 chars
-        short_desc = "短描述文本测试。"
+        # 1. Short desc gets padded to >= 60 chars in English
+        short_desc = "Daily standup drill."
         padded = clean_video_desc(short_desc)
         self.assertTrue(60 <= len(padded) <= 120, f"Padded desc length {len(padded)} not in [60, 120]")
+        self.assertIn("Featuring dual-tier subtitles", padded)
 
-        # 2. Long desc gets truncated to <= 120 chars
-        long_desc = "这是一段非常冗长的视频描述文本，用于测试当用户输入的描述文字超过了一百二十个字符的上限时，我们的自动清洗函数能否准确将其裁剪到合规的区间内，同时保留语义完整性与句尾标点符号，确保在微信公众号视频和各大视频平台上传时不会触发参数校验失败的错误。"
+        # 2. Empty desc with default_title gets generated in English
+        gen_desc = clean_video_desc("", default_title="DevOps Standup")
+        self.assertTrue(60 <= len(gen_desc) <= 120, f"Generated desc length {len(gen_desc)} not in [60, 120]")
+        self.assertIn("Master English listening with DevOps Standup", gen_desc)
+
+        # 3. Long desc gets truncated to <= 120 chars
+        long_desc = "This is an exceptionally long and verbose video description written in English to thoroughly test that our video description sanitizer properly truncates text to satisfy platform limits without errors."
         truncated = clean_video_desc(long_desc)
         self.assertTrue(60 <= len(truncated) <= 120, f"Truncated desc length {len(truncated)} not in [60, 120]")
+        self.assertTrue(truncated.endswith("."))
 
     def test_generate_video_cover(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             cover_file = Path(tmpdir) / "cover.png"
             res = generate_video_cover(
                 output_path=cover_file,
-                title="DevOps Engineer Daily Standup",
-                tag="ASSESSMENT",
-                subtitle="双字幕精听与自测",
+                title="DevOps Daily Standup English Listening Practice",
+                tag="LISTENING PRACTICE",
             )
             self.assertTrue(res.exists())
             with Image.open(res) as img:
@@ -122,8 +128,8 @@ This is the second practice sentence.
 
             payload_md = generate_video_payload_md(
                 payload_dir=tmp_path,
-                title="DevOps 工程师日常站会听力精练",
-                desc="精选运维工程师日常站会英文高频对话，采用双层字幕焦点视窗与上下文流，适合沉浸式听力跟读与词汇自测。",
+                title="DevOps Daily Standup English Listening Practice",
+                desc="Practice daily DevOps standup English with dual-tier subtitles and live context stream for immersive listening.",
                 collection="软件教程",
                 video_filename="video.mp4",
                 cover_filename="cover.png",
@@ -131,10 +137,13 @@ This is the second practice sentence.
             )
 
             self.assertTrue(payload_md.exists())
+            md_content = payload_md.read_text(encoding="utf-8")
+            self.assertIn("## Overview & Learning Objectives", md_content)
+            self.assertIn("## Sentence-by-Sentence Transcript", md_content)
 
             # Parse via standard markdown parser used by publish-video
             data = parse_markdown_payload(payload_md)
-            self.assertEqual(data["title"], "DevOps 工程师日常站会听力精练")
+            self.assertEqual(data["title"], "DevOps Daily Standup English Listening Practice")
             self.assertEqual(data["author"], "Blogger Agent")
             self.assertEqual(data["collection"], "软件教程")
             self.assertTrue(60 <= len(data["desc"]) <= 120)

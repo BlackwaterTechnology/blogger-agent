@@ -288,7 +288,7 @@ def handle_video(args, payload_path):
         if not title:
             title = input_file.stem.replace("-", " ").replace("_", " ").title()
         if not desc:
-            desc = f"本视频为《{title}》英文听力与对话跟读自测，采用双层字幕焦点视窗与上下文流，适合沉浸式学习。"
+            desc = f"Master English listening with {title}, featuring dual-tier subtitles and context stream."
 
         title = clean_video_title(title)
         desc = clean_video_desc(desc, title)

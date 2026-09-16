@@ -332,18 +332,18 @@ def clean_video_title(title: str) -> str:
 
 
 def clean_video_desc(desc: str, default_title: str = "") -> str:
-    """Ensure description length is strictly between 60 and 120 characters."""
+    """Ensure description length is strictly between 60 and 120 characters in English."""
     desc = desc.strip()
     if len(desc) < 60:
         if default_title and len(desc) < 20:
-            desc = f"本视频为《{default_title}》双语听力与对话精练，精选高频实用交流场景，采用双层字幕视窗设计，适合沉浸式跟读自测。"
+            desc = f"Master English listening with {default_title}, featuring dual-tier subtitles and live context stream."
         else:
-            padding = " 本视频精选日常高频交流与工作场景对话，采用双层字幕焦点视窗与上下文流设计，适合沉浸式跟读与自测。"
+            padding = " Featuring dual-tier subtitles and live context stream for immersive English listening practice."
             desc = (desc + padding).strip()
             if len(desc) < 60:
-                desc = (desc + " 欢迎反复练习磨耳朵，全面提升语感。").strip()
+                desc = (desc + " Ideal for daily shadowing drills.").strip()
     if len(desc) > 120:
-        desc = desc[:118].rstrip("，。；！？,.!?; ") + "。"
+        desc = desc[:118].rstrip("，。；！？,.!?; ") + "."
     return desc
 
 
@@ -351,7 +351,7 @@ def generate_video_cover(
     output_path: str | Path,
     title: str,
     tag: str = "LISTENING PRACTICE",
-    subtitle: str = "双字幕沉浸式跟读与听力自测",
+    subtitle: str = "Dual-Subtitle Immersion & Shadowing Drill",
     width: int = 1920,
     height: int = 1080,
 ) -> Path:
@@ -470,7 +470,7 @@ def generate_video_payload_md(
         "",
         f"# {clean_t}",
         "",
-        "## 课程简介与学习目标",
+        "## Overview & Learning Objectives",
         "",
         clean_d,
         "",
@@ -478,7 +478,7 @@ def generate_video_payload_md(
 
     if notes:
         md_lines.extend([
-            "## 核心知识点与语法短语",
+            "## Key Vocabulary & Notes",
             "",
             notes.strip(),
             "",
@@ -486,7 +486,7 @@ def generate_video_payload_md(
 
     if transcript_lines:
         md_lines.extend([
-            "## 对话逐句精析（Transcript）",
+            "## Sentence-by-Sentence Transcript",
             "",
         ])
         for idx, sentence in enumerate(transcript_lines, start=1):
@@ -509,7 +509,7 @@ def create_dual_sub_payload(
     rate: str = "-6%",
     pitch: str = "+2Hz",
     tag: str = "LISTENING PRACTICE",
-    subtitle: str = "双字幕沉浸式跟读与听力自测",
+    subtitle: str = "Dual-Subtitle Immersion & Shadowing Drill",
     author: str = "Blogger Agent",
     notes: Optional[str] = None,
 ) -> Dict[str, Any]:

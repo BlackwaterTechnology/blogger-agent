@@ -42,21 +42,21 @@ videos/<topic>/
 
 ```yaml
 ---
-title: "DevOps 运维工程师日常站会英文听力与对话精练"
+title: "DevOps Daily Standup English Listening Practice"
 author: "Blogger Agent"
-desc: "精选 DevOps 运维工程师日常站会与部署排错高频对话，采用双层字幕焦点视窗与上下文流，适合沉浸式英语跟读与自测。"
+desc: "Practice daily DevOps standup English with dual-tier subtitles and live context stream for immersive listening."
 collection: "软件教程"
 cover: "cover.png"
 video: "video.mp4"
 ---
 
-# DevOps 运维工程师日常站会英文听力与对话精练
+# DevOps Daily Standup English Listening Practice
 
-## 课程简介与学习目标
+## Overview & Learning Objectives
 
-本期精选 DevOps 运维工程师日常站会与部署排错高频对话，采用双层字幕焦点视窗与上下文流，适合沉浸式英语跟读与自测。
+Master essential DevOps daily standup and deployment troubleshooting conversations with dual-tier subtitles and context streaming.
 
-## 对话逐句精析（Transcript）
+## Sentence-by-Sentence Transcript
 
 1. Good morning team, let's start our daily standup.
 2. Yesterday, I deployed the new microservice to the staging cluster.
@@ -64,10 +64,11 @@ video: "video.mp4"
 ```
 
 > [!IMPORTANT]
-> **发布元数据硬性规范（微信后台与视频号校验）：**
-> 1. `title`：**必须为纯文本，严禁包含任何 Emoji 或特殊符号**（如 🇯🇵、🎯、💡 等）。长度建议 ≤ 30 字以内。
-> 2. `desc`：长度**严格限制在 60 到 120 字符之间**。过短或过长将导致发布脚本校验失败或被平台拒收。
-> 3. `collection`：必须匹配 `blogger.toml` 中配置的 `video_collections`（如 `"软件教程"`, `"程序员"`, `"agent"`）。
+> **发布元数据硬性规范（全英文标准与平台校验）：**
+> 1. `title`：**必须为纯英文文本（Title Case），严禁包含任何 Emoji 或特殊符号**（如 🇯🇵、🎯、💡 等）。长度建议在 30 ~ 60 字符以内。
+> 2. `desc`：**必须为纯英文**，长度**严格限制在 60 到 120 字符之间**。过短或过长将导致发布脚本校验失败或被平台拒收。
+> 3. `cover`：封面主标题、副标题（默认 `Dual-Subtitle Immersion & Shadowing Drill`）与 Badge 必须全部采用英文。
+> 4. `collection`：必须匹配 `blogger.toml` 中配置的 `video_collections`（如 `"软件教程"`, `"程序员"`, `"agent"`）。
 
 ---
 
@@ -116,10 +117,11 @@ The generation pipeline relies on decoupled, deterministic stages:
 python3 skills/dual-subtitle-video/scripts/dual_sub_video.py \
   --input videos/devops_standup/sentences.txt \
   --payload-dir videos/devops_standup/ \
-  --title "DevOps 运维工程师日常站会英文听力精练" \
-  --desc "精选 DevOps 运维工程师日常站会与部署排错高频对话，采用双层字幕焦点视窗与上下文流，适合沉浸式英语跟读与自测。" \
+  --title "DevOps Daily Standup English Listening Practice" \
+  --desc "Practice daily DevOps standup English with dual-tier subtitles and live context stream for immersive listening." \
   --collection "软件教程" \
-  --tag "DEVOPS ENGLISH"
+  --tag "DEVOPS ENGLISH" \
+  --subtitle "Dual-Subtitle Immersion & Shadowing Drill"
 ```
 
 #### 步骤 2：使用 `publish-video` 发布到指定平台
@@ -161,8 +163,8 @@ python3 -m src.blogger.cli video \
   --type dual-subtitle \
   --payload videos/devops_standup/ \
   --platform wechat_video,wechat_channels,bilibili \
-  --title "DevOps 运维工程师日常站会英文听力精练" \
-  --desc "精选 DevOps 运维工程师日常站会与部署排错高频对话，采用双层字幕焦点视窗与上下文流，适合沉浸式英语跟读与自测。" \
+  --title "DevOps Daily Standup English Listening Practice" \
+  --desc "Practice daily DevOps standup English with dual-tier subtitles and live context stream for immersive listening." \
   --collection "软件教程"
 ```
 
@@ -174,29 +176,40 @@ python3 -m src.blogger.cli video \
 
 | 参数 | 必选 | 默认值 | 说明 |
 |---|---|---|---|
-| `-i, --input` | 是 | - | 输入句子文本文件路径（每行一句） |
+| `-i, --input` | 是 | - | 输入句子文本文件路径（每行一句英文） |
 | `-o, --output` | 否 | - | 单独输出 MP4 文件路径 |
 | `--payload-dir` | 否 | - | 输出完整标准视频 Payload 目录（自动生成 `video.mp4`, `cover.png`, `payload.md`） |
 | `--cover` | 否 | - | 自定义生成 16:9 封面路径 |
-| `--title` | 否 | `English Listening Practice` | 视频标题（纯文本，无 Emoji） |
-| `--desc` | 否 | - | 视频简介/摘要（严格 60 ~ 120 字符） |
+| `--title` | 否 | `English Listening Practice` | 英文视频标题（纯英文文本，Title Case，无 Emoji） |
+| `--desc` | 否 | 自动生成英文摘要 | 英文视频简介/摘要（严格 60 ~ 120 字符） |
 | `--collection` | 否 | `软件教程` | 平台合集（匹配 `blogger.toml`） |
 | `--voice` | 否 | `en-US-JennyNeural` | Edge-TTS 语音音色 |
 | `--rate` | 否 | `-6%` | 语速微调（如 `-6%`, `+0%`） |
 | `--pitch` | 否 | `+2Hz` | 语调微调 |
-| `--tag` | 否 | `LISTENING PRACTICE` | 视频左上角主题 Badge |
-| `--subtitle` | 否 | `双字幕沉浸式跟读与听力自测` | 封面上展示的副标题 |
+| `--tag` | 否 | `LISTENING PRACTICE` | 视频左上角英文主题 Badge |
+| `--subtitle` | 否 | `Dual-Subtitle Immersion & Shadowing Drill` | 封面上展示的英文副标题 |
 | `--platform` | 否 | - | 生成后直接发布的平台（如 `wechat_video,bilibili`） |
 | `--no-publish`| 否 | False | 预览模式（跳过最终发布点击） |
 
 ---
 
-## Gotchas and Best Practices
+## English-First Quality Standard (Title, Cover, Description)
 
-1. **标点与断句**：输入文本的句号、问号和感叹号决定 Edge-TTS 的时间戳切分。确保句子标点规范，避免单行过长（建议每句 8~20 词）。
-2. **中文字符字体渲染**：系统已配置 macOS CJK 字体后备（`Hiragino Sans GB` / `STHeiti`），中文标题与副标题均能高清平滑渲染。
-3. **发布前自检清单**：
-   - [ ] `payload.md` 中的 `desc` 字符数是否在 60 ~ 120 之间。
-   - [ ] `title` 是否已剔除所有 Emoji 和特殊字符。
+1. **专长定位与语言一致性**：`dual-subtitle-video` 专门服务于英语学习与听力自测场景，因此所有对外展现的元数据（标题、封面卡片文案、简介摘要、Payload 正文目录）必须统一采用**纯英文**。
+2. **标题规范（Title）**：
+   - 必须采用英文 Title Case，如 `DevOps Daily Standup English Listening Practice`。
+   - 严禁包含任何 Emoji 或特殊装饰符号（避免平台接口拒绝）。
+   - 长度建议在 30 ~ 60 字符以内。
+3. **封面卡片规范（Cover Art）**：
+   - 主标题：居中大卡片展示英文标题。
+   - 副标题：默认英文 `Dual-Subtitle Immersion & Shadowing Drill`（或自定义英文说明）。
+   - 顶部 Badge：纯英文全大写（如 `LISTENING PRACTICE`, `TECH TALK`）。
+   - 底部元信息：已内置 `1080P FULL HD | DUAL-SUBTITLE STREAM`。
+4. **简介摘要规范（Description）**：
+   - 必须为纯英文，且字符数严格控制在 **60 ~ 120 字符** 之间。
+   - 自动补全机制已内置英文描述模版，杜绝中文文本混入英文视频元数据。
+5. **发布前自检清单**：
+   - [ ] `title` 是否为纯英文 Title Case，无 Emoji 与特殊字符。
+   - [ ] `cover.png` 上的标题与副标题是否全部为英文。
+   - [ ] `payload.md` 中的 `desc` 是否为英文且字符数在 60 ~ 120 之间。
    - [ ] `collection` 是否存在于 `blogger.toml` 中的 `video_collections`。
-   - [ ] `cover.png` 是否存在且为 1920x1080 高清图。
