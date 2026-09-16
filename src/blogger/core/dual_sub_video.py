@@ -184,9 +184,9 @@ def prepare_ambient_background(
     width: int = 1920,
     height: int = 1080,
     bg_image_path: Optional[str | Path] = None,
-    blur_radius: int = 35,
+    blur_radius: int = 12,
     overlay_color: str = "#0B132B",
-    overlay_alpha: float = 0.75,
+    overlay_alpha: float = 0.45,
 ) -> Image.Image:
     """Prepare an ambient background image with aspect-fill cropping, Gaussian blur, and dark scrim.
 
@@ -219,6 +219,22 @@ def prepare_ambient_background(
                 logger.warning(f"Failed to process ambient background image from {p}: {e}. Falling back to gradient.")
 
     return create_gradient_bg(width, height)
+
+
+def apply_top_scrim(
+    img: Image.Image,
+    height: int = 140,
+    start_alpha: float = 0.65,
+    overlay_color: tuple[int, int, int] = (11, 19, 43),
+) -> Image.Image:
+    """Apply a subtle top dark-gradient scrim to guarantee header text contrast against light backgrounds."""
+    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    draw_ov = ImageDraw.Draw(overlay)
+    r, g, b = overlay_color
+    for y in range(height):
+        alpha = int(255 * start_alpha * (1.0 - (y / height) ** 1.5))
+        draw_ov.line([(0, y), (img.width, y)], fill=(r, g, b, alpha))
+    return Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
 
 
 def generate_ambient_svg(
@@ -292,6 +308,8 @@ def render_video(
     title: str = "English Listening Practice",
     tag: str = "LISTENING PRACTICE",
     bg_image_path: Optional[str | Path] = None,
+    bg_blur: Optional[int] = None,
+    bg_alpha: Optional[float] = None,
 ) -> str:
     """Render frame cards and mux with audio into an MP4 file using FFmpeg."""
     width, height = 1920, 1080
@@ -305,7 +323,12 @@ def render_video(
         font_context = _get_font(25, bold=False)
         font_context_dim = _get_font(23, bold=False)
 
-        base_bg = prepare_ambient_background(width, height, bg_image_path=bg_image_path)
+        blur_val = bg_blur if bg_blur is not None else 12
+        alpha_val = bg_alpha if bg_alpha is not None else 0.45
+        base_bg = prepare_ambient_background(
+            width, height, bg_image_path=bg_image_path, blur_radius=blur_val, overlay_alpha=alpha_val
+        )
+        base_bg = apply_top_scrim(base_bg, height=140, start_alpha=0.65)
         frame_files: List[str] = []
         durations: List[float] = []
 
@@ -331,19 +354,20 @@ def render_video(
             title_x = badge_right + 30
             draw.text((title_x, 70), title, font=font_title, fill="#F8FAFC")
             progress_str = f"{idx + 1:02d} / {total_cues:02d}"
-            draw.text((width - 240, 70), progress_str, font=font_header, fill="#94A3B8")
-            draw.line([(100, 125), (width - 100, 125)], fill="#334155", width=2)
+            draw.text((width - 240, 70), progress_str, font=font_header, fill="#E2E8F0")
 
-            # 2. Central Primary Subtitle Card
-            center_lines = wrap_text(cue["text"], font_center, 1500, draw)
+            # 2. Central Primary Subtitle Card (1440px centered, balanced breathing room)
+            card_x1 = 240
+            card_x2 = width - 240
+            center_lines = wrap_text(cue["text"], font_center, 1240, draw)
             line_height = 62
             total_text_h = len(center_lines) * line_height
             start_y = 440 - (total_text_h // 2)
 
             card_pad_y = 40
-            card_box = [100, start_y - card_pad_y, width - 100, start_y + total_text_h + card_pad_y]
+            card_box = [card_x1, start_y - card_pad_y, card_x2, start_y + total_text_h + card_pad_y]
             draw.rounded_rectangle(card_box, radius=18, fill="#1E293B", outline="#475569", width=2)
-            draw.rounded_rectangle([100, card_box[1], 112, card_box[3]], radius=4, fill="#38BDF8")
+            draw.rounded_rectangle([card_x1, card_box[1], card_x1 + 12, card_box[3]], radius=4, fill="#38BDF8")
 
             curr_y = start_y
             for line in center_lines:
@@ -360,12 +384,12 @@ def render_video(
             draw.rounded_rectangle([125, 775, 420, 805], radius=6, fill="#1E293B")
             draw.text((140, 780), "CONTEXT STREAM / 上下文回顾", font=font_context_label, fill="#94A3B8")
 
-            ctx_y = 825
+            ctx_y = 828
             if idx > 0:
-                draw.polygon([(130, ctx_y + 13), (140, ctx_y + 7), (140, ctx_y + 19)], fill="#64748B")
+                draw.polygon([(130, ctx_y + 13), (140, ctx_y + 7), (140, ctx_y + 19)], fill="#94A3B8")
                 prev_lines = wrap_text(cues[idx - 1]["text"], font_context_dim, 1630, draw)
-                draw.text((155, ctx_y), prev_lines[0] if prev_lines else "", font=font_context_dim, fill="#64748B")
-                ctx_y += 38
+                draw.text((155, ctx_y), prev_lines[0] if prev_lines else "", font=font_context_dim, fill="#94A3B8")
+                ctx_y += 42
 
             draw.polygon([(130, ctx_y + 7), (130, ctx_y + 21), (142, ctx_y + 14)], fill="#38BDF8")
             curr_ctx_lines = wrap_text(cue["text"], font_context, 1630, draw)
@@ -373,9 +397,9 @@ def render_video(
             ctx_y += 42
 
             if idx + 1 < total_cues:
-                draw.text((130, ctx_y), "…", font=font_context_dim, fill="#64748B")
+                draw.text((130, ctx_y), "…", font=font_context_dim, fill="#94A3B8")
                 next_lines = wrap_text(cues[idx + 1]["text"], font_context_dim, 1630, draw)
-                draw.text((155, ctx_y), next_lines[0] if next_lines else "", font=font_context_dim, fill="#64748B")
+                draw.text((155, ctx_y), next_lines[0] if next_lines else "", font=font_context_dim, fill="#94A3B8")
 
             frame_file = os.path.join(temp_dir, f"frame_{idx:04d}.png")
             img.save(frame_file)
@@ -445,6 +469,8 @@ def generate_dual_subtitle_video(
     subtitle: Optional[str] = None,
     bg_image: Optional[str | Path] = None,
     level: str = "a2",
+    bg_blur: Optional[int] = None,
+    bg_alpha: Optional[float] = None,
 ) -> str:
     """High-level end-to-end generator pipeline: input text -> Edge-TTS speech & cues -> rendered MP4."""
     input_p = Path(input_path).resolve()
@@ -483,10 +509,27 @@ def generate_dual_subtitle_video(
         cues = parse_vtt(vtt_path)
         logger.info(f"Parsed {len(cues)} sentence cues from {vtt_path}")
 
-        rendered_mp4 = render_video(cues, mp3_path, output_mp4, title=title, tag=actual_tag, bg_image_path=bg_image)
+        rendered_mp4 = render_video(
+            cues,
+            mp3_path,
+            output_mp4,
+            title=title,
+            tag=actual_tag,
+            bg_image_path=bg_image,
+            bg_blur=bg_blur,
+            bg_alpha=bg_alpha,
+        )
 
         if cover_path:
-            generate_video_cover(cover_path, title=title, tag=actual_tag, subtitle=actual_sub, bg_image_path=bg_image)
+            generate_video_cover(
+                cover_path,
+                title=title,
+                tag=actual_tag,
+                subtitle=actual_sub,
+                bg_image_path=bg_image,
+                bg_blur=bg_blur,
+                bg_alpha=bg_alpha,
+            )
 
         return rendered_mp4
     finally:
@@ -527,12 +570,19 @@ def generate_video_cover(
     width: int = 1920,
     height: int = 1080,
     bg_image_path: Optional[str | Path] = None,
+    bg_blur: Optional[int] = None,
+    bg_alpha: Optional[float] = None,
 ) -> Path:
     """Generate a standard 16:9 (1920x1080) video cover image for video platforms."""
     out_p = Path(output_path).resolve()
     out_p.parent.mkdir(parents=True, exist_ok=True)
 
-    img = prepare_ambient_background(width, height, bg_image_path=bg_image_path)
+    blur_val = bg_blur if bg_blur is not None else 12
+    alpha_val = bg_alpha if bg_alpha is not None else 0.45
+    img = prepare_ambient_background(
+        width, height, bg_image_path=bg_image_path, blur_radius=blur_val, overlay_alpha=alpha_val
+    )
+    img = apply_top_scrim(img, height=160, start_alpha=0.65)
     draw = ImageDraw.Draw(img)
 
     font_badge = _get_font(28, bold=True)
@@ -689,6 +739,8 @@ def create_dual_sub_payload(
     notes: Optional[str] = None,
     bg_image: Optional[str | Path] = None,
     level: str = "a2",
+    bg_blur: Optional[int] = None,
+    bg_alpha: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Assemble a complete standard video payload: video.mp4, cover.png, payload.md, sentences.txt."""
     p_dir = Path(payload_dir).resolve()
@@ -736,6 +788,8 @@ def create_dual_sub_payload(
         tag=cfg["tag"],
         bg_image=actual_bg,
         level=cfg["level"],
+        bg_blur=bg_blur,
+        bg_alpha=bg_alpha,
     )
 
     # 2. Generate cover
@@ -745,6 +799,8 @@ def create_dual_sub_payload(
         tag=cfg["tag"],
         subtitle=cfg["subtitle"],
         bg_image_path=actual_bg,
+        bg_blur=bg_blur,
+        bg_alpha=bg_alpha,
     )
 
     # 3. Generate payload.md

@@ -68,6 +68,18 @@ def main():
         "--bg-image",
         help="Path to custom ambient background image (or auto-detected from payload dir).",
     )
+    parser.add_argument(
+        "--bg-blur",
+        type=int,
+        default=12,
+        help="Gaussian blur radius for ambient background (default: 12).",
+    )
+    parser.add_argument(
+        "--bg-alpha",
+        type=float,
+        default=0.45,
+        help="Dark overlay alpha for ambient background (default: 0.45).",
+    )
     args = parser.parse_args()
 
     input_file = Path(args.input).resolve()
@@ -98,6 +110,8 @@ def main():
                 notes=args.notes,
                 bg_image=args.bg_image,
                 level=args.level.lower(),
+                bg_blur=args.bg_blur,
+                bg_alpha=args.bg_alpha,
             )
 
             print(f"Video created:   {result['video_path']}")
@@ -126,6 +140,8 @@ def main():
                 subtitle=args.subtitle,
                 bg_image=args.bg_image,
                 level=args.level.lower(),
+                bg_blur=args.bg_blur,
+                bg_alpha=args.bg_alpha,
             )
             print(f"Video generated successfully: {out}")
             if cover_path and cover_path.exists():

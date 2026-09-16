@@ -6,6 +6,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from src.blogger.core.dual_sub_video import (
+    apply_top_scrim,
     CEFR_LEVEL_PRESETS,
     clean_video_desc,
     clean_video_title,
@@ -273,6 +274,18 @@ This is the second practice sentence.
         # Custom tag already with level prefix
         cfg2 = resolve_level_preset(level="b2", tag="B2 · SPECIAL")
         self.assertEqual(cfg2["tag"], "B2 · SPECIAL")
+
+    def test_apply_top_scrim(self):
+        # Create an all-white image (255, 255, 255)
+        white_img = Image.new("RGB", (640, 360), (255, 255, 255))
+        scrimmed = apply_top_scrim(white_img, height=100, start_alpha=0.65)
+        self.assertEqual(scrimmed.size, (640, 360))
+        # Top pixel should be significantly darkened by the scrim
+        top_pixel = scrimmed.getpixel((320, 0))
+        self.assertLess(top_pixel[0], 200)
+        # Pixel below the scrim (y=150) should remain untouched pure white
+        bottom_pixel = scrimmed.getpixel((320, 150))
+        self.assertEqual(bottom_pixel, (255, 255, 255))
 
 
 if __name__ == "__main__":
