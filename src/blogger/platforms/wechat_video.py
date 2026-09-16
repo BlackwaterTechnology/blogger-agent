@@ -120,13 +120,33 @@ class WechatVideoPublisher:
         # 2. Stage: Library fallback
         if "action=list_video" in url:
             logger.info("Entering Library Stage...")
-            self._handle_library_page(w_idx, t_idx, title)
-            time.sleep(6)
-            try:
-                w_idx, t_idx = self.chrome.find_global_tab(["material_type=15"])
-                url = self.chrome.get_tab_url(w_idx, t_idx)
-            except Exception:
-                pass
+            lib_res = self._handle_library_page(w_idx, t_idx, title)
+            if lib_res == "CLICKED":
+                time.sleep(6)
+                try:
+                    w_idx, t_idx = self.chrome.find_global_tab(["material_type=15"])
+                    url = self.chrome.get_tab_url(w_idx, t_idx)
+                except Exception:
+                    pass
+            else:
+                logger.info(f"Video '{title[:20]}' not found in library ({lib_res}). Redirecting to upload page...")
+                parsed = urllib.parse.urlparse(url)
+                token = urllib.parse.parse_qs(parsed.query).get("token", [""])[0]
+                if token:
+                    target = f"https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/videomsg_edit&action=video_edit&type=15&token={token}&lang=en_US"
+                    self.chrome.set_tab_url(w_idx, t_idx, target, settle_seconds=5.0)
+                    time.sleep(3)
+                    url = self.chrome.get_tab_url(w_idx, t_idx)
+                    if "videomsg_edit" in url or "action=video_edit" in url:
+                        logger.info("Entering Upload Stage from library redirect...")
+                        success_jump = self._handle_initial_upload(w_idx, t_idx, video_path, title, desc, cover_path)
+                        if success_jump:
+                            time.sleep(6)
+                            try:
+                                w_idx, t_idx = self.chrome.find_global_tab(["material_type=15"])
+                                url = self.chrome.get_tab_url(w_idx, t_idx)
+                            except Exception:
+                                pass
 
         # 3. Stage: Final Edit (strictly requires video type=15 / material_type=15)
         if "action=edit" in url and ("material_type=15" in url or "type=15" in url):
@@ -511,3 +531,4 @@ class WechatVideoPublisher:
         """
         res = self.chrome.execute_javascript(w_idx, t_idx, js_find)
         logger.info(f"Clicking publish for video '{title[:20]}': {res}")
+        return res
