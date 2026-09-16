@@ -60,13 +60,15 @@ def main():
         help="Fill the publish dialog but stop before clicking the final submit button.",
     )
     video_parser.add_argument("--voice", default="en-US-JennyNeural", help="Edge-TTS voice for dual-subtitle video")
-    video_parser.add_argument("--rate", default="-6%", help="Speech rate for dual-subtitle video")
+    video_parser.add_argument("--level", default="a2", choices=["a2", "b1", "b2", "c1", "A2", "B1", "B2", "C1"], help="CEFR English level (a2, b1, b2, c1; default: a2)")
+    video_parser.add_argument("--rate", help="Speech rate for dual-subtitle video (defaults to level preset, e.g. -12%% for A2)")
     video_parser.add_argument("--pitch", default="+2Hz", help="Speech pitch for dual-subtitle video")
     video_parser.add_argument("--title", help="Header title for dual-subtitle video")
     video_parser.add_argument("--tag", help="Header badge tag for dual-subtitle video")
     video_parser.add_argument("--desc", help="Summary / description for dual-subtitle video payload (60-120 chars)")
     video_parser.add_argument("--collection", default="软件教程", help="Collection for video matching blogger.toml (e.g. 软件教程, 程序员, agent)")
     video_parser.add_argument("--output", help="Output MP4 path for generated video")
+    video_parser.add_argument("--bg-image", help="Ambient background image path (auto-detects bg.png in payload dir)")
 
 
 
@@ -271,7 +273,8 @@ def handle_video(args, payload_path):
         title = getattr(args, "title", None)
         desc = getattr(args, "desc", None)
         collection = getattr(args, "collection", None) or "软件教程"
-        tag = getattr(args, "tag", None) or "LISTENING PRACTICE"
+        tag = getattr(args, "tag", None)
+        level = (getattr(args, "level", None) or "a2").lower()
 
         if existing_md and existing_md.exists():
             try:
@@ -282,6 +285,8 @@ def handle_video(args, payload_path):
                     desc = article_data["desc"]
                 if not collection and article_data.get("collection"):
                     collection = article_data["collection"]
+                if getattr(args, "level", None) is None and article_data.get("level"):
+                    level = str(article_data["level"]).lower()
             except Exception as e:
                 logger.debug(f"Failed to parse existing payload.md: {e}")
 
@@ -291,7 +296,7 @@ def handle_video(args, payload_path):
             desc = f"Master English listening with {title}, featuring dual-tier subtitles and context stream."
 
         title = clean_video_title(title)
-        desc = clean_video_desc(desc, title)
+        desc = clean_video_desc(desc, title, level=level)
 
         # 2. Determine output paths
         if getattr(args, "output", None):
@@ -302,8 +307,21 @@ def handle_video(args, payload_path):
         cover_path = payload_dir / "cover.png"
         payload_md_path = payload_dir / "payload.md"
 
+        # Resolve ambient background image
+        bg_image = getattr(args, "bg_image", None)
+        if bg_image:
+            bg_image = Path(bg_image).resolve()
+            if not bg_image.exists():
+                logger.warning(f"Specified bg_image '{bg_image}' not found.")
+                bg_image = None
+        if not bg_image and payload_dir:
+            for candidate in [payload_dir / "bg.png", payload_dir / "background.png"]:
+                if candidate.exists():
+                    bg_image = candidate
+                    break
+
         # 3. Generate dual-subtitle video
-        logger.info(f"Generating dual-subtitle video from {input_file} to {out_mp4}...")
+        logger.info(f"Generating dual-subtitle video ({level.upper()}) from {input_file} to {out_mp4}...")
         try:
             generate_dual_subtitle_video(
                 input_path=input_file,
@@ -313,6 +331,8 @@ def handle_video(args, payload_path):
                 pitch=args.pitch,
                 title=title,
                 tag=tag,
+                bg_image=bg_image,
+                level=level,
             )
         except Exception as e:
             logger.error(f"Failed to generate dual-subtitle video: {e}")
@@ -324,7 +344,8 @@ def handle_video(args, payload_path):
             generate_video_cover(
                 output_path=cover_path,
                 title=title,
-                tag=tag,
+                tag=tag or "A2 · ELEMENTARY",
+                bg_image_path=bg_image,
             )
 
         # 5. Generate payload.md if missing
@@ -338,6 +359,7 @@ def handle_video(args, payload_path):
                 video_filename=out_mp4.name,
                 cover_filename=cover_path.name,
                 sentences_path=input_file if input_file.suffix == ".txt" else None,
+                level=level,
             )
 
         # 6. Parse payload.md to construct complete article_data for publishing

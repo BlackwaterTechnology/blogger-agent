@@ -1,18 +1,23 @@
 import os
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from src.blogger.core.dual_sub_video import (
+    CEFR_LEVEL_PRESETS,
     clean_video_desc,
     clean_video_title,
     create_dual_sub_payload,
     create_gradient_bg,
+    generate_ambient_svg,
     generate_video_cover,
     generate_video_payload_md,
     parse_time,
     parse_vtt,
+    prepare_ambient_background,
+    resolve_level_preset,
     wrap_text,
 )
 from src.blogger.core.markdown_parser import parse_markdown_payload
@@ -156,6 +161,118 @@ This is the second practice sentence.
             allowed_collections = get_wechat_collections(content_type="video")
             if allowed_collections:
                 self.assertIn(data["collection"], allowed_collections)
+
+    def test_prepare_ambient_background_fallback(self):
+        # When no bg_image_path is provided, should fall back to gradient
+        img = prepare_ambient_background(640, 360, bg_image_path=None)
+        self.assertIsInstance(img, Image.Image)
+        self.assertEqual(img.size, (640, 360))
+        top_pixel = img.getpixel((320, 0))
+        self.assertEqual(top_pixel, (11, 19, 43))
+
+        # When nonexistent file is provided, should gracefully fall back
+        img_missing = prepare_ambient_background(640, 360, bg_image_path="/nonexistent/path/to/img.png")
+        self.assertEqual(img_missing.size, (640, 360))
+
+    def test_prepare_ambient_background_with_image(self):
+        # Create a bright test image with distinct dimensions to test aspect fill and crop
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+            test_img_path = f.name
+
+        try:
+            bright_img = Image.new("RGB", (800, 400), "#FF5500")
+            bright_img.save(test_img_path)
+
+            ambient_img = prepare_ambient_background(
+                width=640,
+                height=360,
+                bg_image_path=test_img_path,
+                blur_radius=10,
+                overlay_color="#0B132B",
+                overlay_alpha=0.75,
+            )
+            self.assertEqual(ambient_img.size, (640, 360))
+            # Blended pixel should be darker than #FF5500 due to #0B132B overlay
+            pixel = ambient_img.getpixel((320, 180))
+            # Red channel should be darkened by 75% overlay
+            self.assertLess(pixel[0], 120)
+            self.assertGreater(pixel[0], 20)
+        finally:
+            if os.path.exists(test_img_path):
+                os.remove(test_img_path)
+
+    def test_generate_ambient_svg(self):
+        with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as f:
+            svg_path = f.name
+
+        try:
+            out_p = generate_ambient_svg(svg_path, width=1920, height=1080)
+            self.assertTrue(out_p.exists())
+            content = out_p.read_text(encoding="utf-8")
+            self.assertIn('viewBox="0 0 1920 1080"', content)
+            self.assertIn("radialGradient", content)
+            self.assertIn("#38BDF8", content)
+        finally:
+            if os.path.exists(svg_path):
+                os.remove(svg_path)
+
+    @mock.patch("src.blogger.core.dual_sub_video.generate_dual_subtitle_video")
+    def test_create_dual_sub_payload_with_bg_image(self, mock_gen_video):
+        mock_gen_video.return_value = "/dummy/video.mp4"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            sent_file = tmp_path / "input.txt"
+            sent_file.write_text("Sentence one.\nSentence two.\n", encoding="utf-8")
+
+            custom_bg = tmp_path / "custom_art.png"
+            Image.new("RGB", (100, 100), "#336699").save(custom_bg)
+
+            payload_dir = (tmp_path / "payload_out").resolve()
+            res = create_dual_sub_payload(
+                payload_dir=payload_dir,
+                sentences_path=sent_file,
+                title="Testing Ambient Video",
+                desc="A test description of sufficient length to meet the requirement properly.",
+                bg_image=custom_bg,
+            )
+
+            self.assertTrue((payload_dir / "bg.png").exists())
+            self.assertEqual(res["bg_image"], str(payload_dir / "bg.png"))
+            self.assertTrue(res["cover_path"].exists())
+            self.assertTrue(res["payload_md"].exists())
+            mock_gen_video.assert_called_once()
+            _, kwargs = mock_gen_video.call_args
+            self.assertEqual(kwargs.get("bg_image"), payload_dir / "bg.png")
+
+    def test_resolve_level_preset_default_a2(self):
+        cfg = resolve_level_preset()
+        self.assertEqual(cfg["level"], "a2")
+        self.assertEqual(cfg["rate"], "-12%")
+        self.assertEqual(cfg["tag"], "A2 · ELEMENTARY")
+        self.assertIn("CEFR A2", cfg["subtitle"])
+
+    def test_resolve_level_preset_all_levels(self):
+        for lv, expected_rate, expected_tag_part in [
+            ("a2", "-12%", "ELEMENTARY"),
+            ("b1", "-6%", "INTERMEDIATE"),
+            ("b2", "-3%", "PROFESSIONAL"),
+            ("c1", "+0%", "ADVANCED"),
+        ]:
+            cfg = resolve_level_preset(level=lv)
+            self.assertEqual(cfg["level"], lv)
+            self.assertEqual(cfg["rate"], expected_rate)
+            self.assertIn(expected_tag_part, cfg["tag"])
+
+    def test_resolve_level_preset_custom_overrides(self):
+        # Custom rate and custom tag
+        cfg = resolve_level_preset(level="a2", rate="-8%", tag="DEV OPS")
+        self.assertEqual(cfg["rate"], "-8%")
+        # Custom tag should be prefixed with level
+        self.assertEqual(cfg["tag"], "A2 · DEV OPS")
+
+        # Custom tag already with level prefix
+        cfg2 = resolve_level_preset(level="b2", tag="B2 · SPECIAL")
+        self.assertEqual(cfg2["tag"], "B2 · SPECIAL")
 
 
 if __name__ == "__main__":

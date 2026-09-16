@@ -45,11 +45,12 @@ def main():
     parser.add_argument("--payload-dir", help="Directory for assembling standard video payload (videos/<topic>/).")
     parser.add_argument("--cover", help="Destination path for generated 16:9 cover image (cover.png).")
     parser.add_argument("--voice", default="en-US-JennyNeural", help="Edge-TTS voice name (default: en-US-JennyNeural).")
-    parser.add_argument("--rate", default="-6%", help="Edge-TTS speech rate (default: -6%%).")
+    parser.add_argument("--level", default="a2", choices=["a2", "b1", "b2", "c1", "A2", "B1", "B2", "C1"], help="CEFR English level (a2, b1, b2, c1; default: a2).")
+    parser.add_argument("--rate", help="Edge-TTS speech rate (defaults to level preset, e.g. -12%% for A2, -6%% for B1).")
     parser.add_argument("--pitch", default="+2Hz", help="Edge-TTS speech pitch (default: +2Hz).")
     parser.add_argument("--title", default="English Listening Practice", help="Title displayed on top header and metadata.")
-    parser.add_argument("--tag", default="LISTENING PRACTICE", help="Badge tag on top left.")
-    parser.add_argument("--subtitle", default="Dual-Subtitle Immersion & Shadowing Drill", help="Subtitle on cover image.")
+    parser.add_argument("--tag", help="Badge tag on top left (defaults to level preset, e.g. A2 · ELEMENTARY).")
+    parser.add_argument("--subtitle", help="Subtitle on cover image (defaults to level preset).")
     parser.add_argument("--desc", help="Description / summary for payload.md (strictly 60-120 characters).")
     parser.add_argument("--collection", default="软件教程", help="Collection matching blogger.toml (default: '软件教程').")
     parser.add_argument("--author", default="Blogger Agent", help="Author name in payload.md.")
@@ -62,6 +63,10 @@ def main():
         "--no-publish",
         action="store_true",
         help="Dry run for publishing (fills dialog but skips final submit).",
+    )
+    parser.add_argument(
+        "--bg-image",
+        help="Path to custom ambient background image (or auto-detected from payload dir).",
     )
     args = parser.parse_args()
 
@@ -91,6 +96,8 @@ def main():
                 subtitle=args.subtitle,
                 author=args.author,
                 notes=args.notes,
+                bg_image=args.bg_image,
+                level=args.level.lower(),
             )
 
             print(f"Video created:   {result['video_path']}")
@@ -117,6 +124,8 @@ def main():
                 tag=args.tag,
                 cover_path=cover_path,
                 subtitle=args.subtitle,
+                bg_image=args.bg_image,
+                level=args.level.lower(),
             )
             print(f"Video generated successfully: {out}")
             if cover_path and cover_path.exists():

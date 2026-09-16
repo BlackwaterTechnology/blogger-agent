@@ -33,9 +33,10 @@ To support multi-platform automated publishing, video assets must follow the sta
 ```text
 videos/<topic>/
 ├── payload.md                     # 视频元数据与发布正文（必须，Frontmatter 严格校验）
-├── cover.png                      # 16:9 高清封面（1920x1080，自动生成或自定义）
+├── cover.png                      # 16:9 高清封面（1920x1080，与视频共享氛围底图）
 ├── video.mp4                      # 生成的双字幕高清视频（1080p H.264）
-└── sentences.txt                  # 原始听力/文本素材（建议归档留存）
+├── sentences.txt                  # 原始听力/文本素材（建议归档留存）
+└── bg.png                         # 氛围主题底图（可选，自动用于高斯模糊与暗色蒙版）
 ```
 
 ### `payload.md` 模板与元数据约束
@@ -92,7 +93,9 @@ The generation pipeline relies on decoupled, deterministic stages:
 ## UI Layout Specifications
 
 - **Canvas**: 1920x1080 (16:9 Full HD).
-- **Background**: Deep navy gradient (`#0B132B` to `#1C2541`) for high contrast and minimal eye fatigue.
+- **Background**: 
+  - **Ambient Theme Backdrop（推荐）**: 单张主题插图经 Aspect-Fill 智能裁剪，叠加 `35px` 深度高斯模糊与 `75%` 深海蓝蒙版（`#0B132B`，`alpha=0.75`），形成高质感流光氛围（Ambient Glow），彻底消除背景视觉干扰。
+  - **Fallback**: 未指定背景图时，平滑降级为深曜黑蓝线性渐变（`#0B132B` 至 `#1C2541`）。
 - **Top Header Bar**: Topic badge tag (e.g. `DEVOPS ENGLISH`), lesson title, and progress counter (e.g. `05 / 29`).
 - **Center Primary Subtitle**:
   - Position: Vertical center (`Y = 400 - 480`).
@@ -102,6 +105,28 @@ The generation pipeline relies on decoupled, deterministic stages:
   - Position: Near bottom (`Y = 760 - 990`).
   - Font: 23pt - 25pt readable sans-serif.
   - Role: Displays preceding sentence (`◀`, dimmed gray), current sentence (`▶`, highlighted cyan), and next sentence (`…`, preview gray).
+
+---
+
+## Ambient Backdrop Standard & Sourcing Strategy (氛围底图规范与双轨生成策略)
+
+为了兼顾视听体验的沉浸感与学习工具的阅读专注度，采用**“强氛围弱干扰”**设计，支持根据主题特性的双轨生图策略：
+
+### 1. 职场、生活与社论场景 ➔ Agent Function (`generate_image`)
+适用于商务会议、机场出行、咖啡馆点餐、面试英语等具备真实空间感的话题。
+- **生图标准**：遵循杂志社论艺术风格（Modern Editorial Flat Vector 或 Isometric Diorama），**坚决杜绝发光蓝脑、机械手、乱码字符与人物正脸**。
+- **Prompt 范式**：
+  > *"Modern editorial vector illustration of a cozy open-plan tech startup office in the morning, soft warm sunlight streaming through large glass windows, minimal laptops on wooden desks, clean muted slate navy and warm amber color palette, flat design, sophisticated art magazine style, no text, no characters' faces."*
+- **生成后操作**：保存为 `videos/<topic>/bg.png`，渲染时自动被检测并应用高斯模糊与暗色蒙版。
+
+### 2. 硬核技术、架构与开发场景 ➔ 原生 SVG 弥散光斑 (`generate_ambient_svg`)
+适用于 Linux、K8s、数据库、系统底层等偏极客话题。
+- **生成方式**：无需外部 API，直接调用内置 `generate_ambient_svg` 生成包含青色/靛蓝/翡翠绿大弥散光球（Mesh Blobs）及 Blueprint 科技网格的 SVG，经 `sips -s format png --resampleWidth 1920` 秒级导出为 `bg.png`。
+- **特点**：零 API 成本、纯本地秒级生成、100% 确定性。
+
+### 3. 约定优于配置（Convention over Configuration）
+- 只要 Payload 目录存在 `bg.png` 或 `background.png`，脚本自动启用作为背景；
+- 导出的 `cover.png` 自动复用同款氛围背景，确保视频封画风格完全一致。
 
 ---
 
@@ -184,12 +209,42 @@ python3 -m src.blogger.cli video \
 | `--desc` | 否 | 自动生成英文摘要 | 英文视频简介/摘要（严格 60 ~ 120 字符） |
 | `--collection` | 否 | `软件教程` | 平台合集（匹配 `blogger.toml`） |
 | `--voice` | 否 | `en-US-JennyNeural` | Edge-TTS 语音音色 |
-| `--rate` | 否 | `-6%` | 语速微调（如 `-6%`, `+0%`） |
+| `--level` | 否 | `a2` | CEFR 英语分级（`a2`, `b1`, `b2`, `c1`；默认 `a2`，自动联动语速与 Badge） |
+| `--rate` | 否 | 联动 level（A2为 `-12%`） | 语速微调（若手动指定则覆盖 level 预设，如 `-12%`, `-6%`, `+0%`） |
 | `--pitch` | 否 | `+2Hz` | 语调微调 |
-| `--tag` | 否 | `LISTENING PRACTICE` | 视频左上角英文主题 Badge |
-| `--subtitle` | 否 | `Dual-Subtitle Immersion & Shadowing Drill` | 封面上展示的英文副标题 |
+| `--tag` | 否 | 联动 level（A2为 `A2 · ELEMENTARY`） | 视频左上角英文主题 Badge（自定义文本将自动附加级别前缀） |
+| `--subtitle` | 否 | 联动 level（A2为 `CEFR A2 Elementary · Slow & Clear Drill`） | 封面上展示的英文副标题 |
+| `--bg-image` | 否 | 自动检测 `bg.png` | 自定义氛围主题背景图片路径（经高斯模糊与暗色蒙版后呈现） |
 | `--platform` | 否 | - | 生成后直接发布的平台（如 `wechat_video,bilibili`） |
 | `--no-publish`| 否 | False | 预览模式（跳过最终发布点击） |
+
+---
+
+## CEFR English Difficulty Standards (英语分级规范与 Agent 素材创作标准)
+
+为了确保听力与跟读训练符合**“可理解性输入（Comprehensible Input / i+1）”**的认知规律，本 Skill 严格以国际标准 **CEFR（欧洲共同语言参考标准）** 为基准建立分级与参数联动：
+
+### 1. 四级分级矩阵（默认：A2）
+
+| CEFR 级别 | 目标受众与场景 | 词汇量基准 | 建议单句长度 | 默认语速 (`--rate`) | 默认 Header Badge | 默认封面副标题 |
+|---|---|---|---|---|---|---|
+| **A2** (默认) | **基础入门 / 慢速精听**<br>日常打招呼、极简命令、生存口语 | ~1,500 词 | 6 ~ 10 词 | `-12%` | `A2 · ELEMENTARY` | `CEFR A2 Elementary · Slow & Clear Drill` |
+| **B1** | **进阶实用 / 职场通用**<br>通用工作流沟通、邮件回复、需求讨论 | ~3,000 词 | 10 ~ 16 词 | `-6%` | `B1 · INTERMEDIATE` | `CEFR B1 Intermediate · Workplace Listening` |
+| **B2** | **职场实战 / 专业流利**<br>DevOps 站会、故障排查、架构选型、面试 | ~5,000 词 | 14 ~ 22 词 | `-3%` | `B2 · PROFESSIONAL` | `CEFR B2 Professional · Fluent Immersion` |
+| **C1** | **母语级实战 / 高阶沉浸**<br>开源峰会演讲、技术哲学、复杂争辩 | 8,000+ 词 | 18 ~ 30 词 (复合长句) | `+0%` (自然常速) | `C1 · ADVANCED` | `CEFR C1 Advanced · Native Pace Shadowing` |
+
+### 2. 参数自动联动机制
+- **零配置开箱即用**：传入 `--level a2`（或默认缺省）时，引擎自动将 Edge-TTS 语速调至 `-12%`，顶部 Header 自动设为 `A2 · ELEMENTARY`，封面副标题自动设为 `CEFR A2 Elementary · Slow & Clear Drill`。
+- **自定义 Tag 智能前缀**：若用户指定 `--tag "DEVOPS"`，系统会自动规范化为 `A2 · DEVOPS`，确保难度标签始终在移动端可视区域清晰可见。
+- **手动覆盖**：如果显式指定了 `--rate` 或 `--tag`，以用户手动指定的参数为准。
+
+### 3. Agent 素材创作铁律（当 Agent 负责起草 `sentences.txt` 时）
+1. **未指定级别时，默认按 A2 编写**：
+   - 句子结构采用主谓宾（SVO），避免多层嵌套从句；
+   - 优先使用常见动词（get, run, check, fix, send）与高频技术词；
+   - 每句话控制在 6 ~ 10 个英文单词，杜绝单行超过 14 个词。
+2. **专业话题推荐升阶**：
+   - 如果用户明确指定是“架构师面试”、“线上重大故障排查”等高阶话题，Agent 应主动建议或指定 `--level b2`。
 
 ---
 
@@ -202,13 +257,14 @@ python3 -m src.blogger.cli video \
    - 长度建议在 30 ~ 60 字符以内。
 3. **封面卡片规范（Cover Art）**：
    - 主标题：居中大卡片展示英文标题。
-   - 副标题：默认英文 `Dual-Subtitle Immersion & Shadowing Drill`（或自定义英文说明）。
-   - 顶部 Badge：纯英文全大写（如 `LISTENING PRACTICE`, `TECH TALK`）。
+   - 副标题：默认英文 `CEFR A2 Elementary · Slow & Clear Drill`（自动随 level 联动，或自定义英文说明）。
+   - 顶部 Badge：纯英文全大写带级别标识（如 `A2 · ELEMENTARY`, `B2 · DEVOPS`）。
    - 底部元信息：已内置 `1080P FULL HD | DUAL-SUBTITLE STREAM`。
 4. **简介摘要规范（Description）**：
    - 必须为纯英文，且字符数严格控制在 **60 ~ 120 字符** 之间。
    - 自动补全机制已内置英文描述模版，杜绝中文文本混入英文视频元数据。
 5. **发布前自检清单**：
+   - [ ] `level` 是否匹配目标受众（默认为 `a2`，若为深度技术讨论建议 `b2`）。
    - [ ] `title` 是否为纯英文 Title Case，无 Emoji 与特殊字符。
    - [ ] `cover.png` 上的标题与副标题是否全部为英文。
    - [ ] `payload.md` 中的 `desc` 是否为英文且字符数在 60 ~ 120 之间。

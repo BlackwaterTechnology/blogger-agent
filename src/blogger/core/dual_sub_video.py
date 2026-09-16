@@ -19,7 +19,90 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+
+CEFR_LEVEL_PRESETS: Dict[str, Dict[str, str]] = {
+    "a2": {
+        "level": "a2",
+        "name": "A2 Elementary",
+        "tag": "A2 · ELEMENTARY",
+        "rate": "-12%",
+        "subtitle": "CEFR A2 Elementary · Slow & Clear Drill",
+        "desc_level": "A2 Elementary",
+    },
+    "b1": {
+        "level": "b1",
+        "name": "B1 Intermediate",
+        "tag": "B1 · INTERMEDIATE",
+        "rate": "-6%",
+        "subtitle": "CEFR B1 Intermediate · Workplace Listening",
+        "desc_level": "B1 Intermediate",
+    },
+    "b2": {
+        "level": "b2",
+        "name": "B2 Professional",
+        "tag": "B2 · PROFESSIONAL",
+        "rate": "-3%",
+        "subtitle": "CEFR B2 Professional · Fluent Immersion",
+        "desc_level": "B2 Professional",
+    },
+    "c1": {
+        "level": "c1",
+        "name": "C1 Advanced",
+        "tag": "C1 · ADVANCED",
+        "rate": "+0%",
+        "subtitle": "CEFR C1 Advanced · Native Pace Shadowing",
+        "desc_level": "C1 Advanced",
+    },
+}
+
+
+def resolve_level_preset(
+    level: Optional[str] = "a2",
+    rate: Optional[str] = None,
+    tag: Optional[str] = None,
+    subtitle: Optional[str] = None,
+) -> Dict[str, str]:
+    """Resolve speech rate, header tag, and subtitle based on CEFR level preset.
+
+    Default level is 'a2'. Custom rate, tag, or subtitle will override the level presets.
+    If tag is custom and lacks level prefix, the level code will be prefixed automatically.
+    """
+    norm_level = (level or "a2").strip().lower()
+    preset = CEFR_LEVEL_PRESETS.get(norm_level, CEFR_LEVEL_PRESETS["a2"])
+
+    resolved_rate = rate if (rate is not None and rate != "") else preset["rate"]
+
+    if tag and tag.strip() and tag.strip() != "LISTENING PRACTICE":
+        clean_tag = tag.strip()
+        if not any(
+            clean_tag.upper().startswith(f"{lv.upper()} ")
+            or clean_tag.upper().startswith(f"{lv.upper()}·")
+            or clean_tag.upper().startswith(f"{lv.upper()} ·")
+            for lv in ["A2", "B1", "B2", "C1"]
+        ):
+            resolved_tag = f"{norm_level.upper()} · {clean_tag.upper()}"
+        else:
+            resolved_tag = clean_tag.upper()
+    else:
+        resolved_tag = preset["tag"]
+
+    if subtitle and subtitle.strip() and subtitle.strip() not in [
+        "双字幕沉浸式跟读与听力自测",
+        "Dual-Subtitle Immersion & Shadowing Drill",
+    ]:
+        resolved_sub = subtitle.strip()
+    else:
+        resolved_sub = preset["subtitle"]
+
+    return {
+        "level": norm_level,
+        "rate": resolved_rate,
+        "tag": resolved_tag,
+        "subtitle": resolved_sub,
+        "desc_level": preset["desc_level"],
+    }
 
 
 def parse_time(t_str: str) -> float:
@@ -97,6 +180,86 @@ def create_gradient_bg(
     return img
 
 
+def prepare_ambient_background(
+    width: int = 1920,
+    height: int = 1080,
+    bg_image_path: Optional[str | Path] = None,
+    blur_radius: int = 35,
+    overlay_color: str = "#0B132B",
+    overlay_alpha: float = 0.75,
+) -> Image.Image:
+    """Prepare an ambient background image with aspect-fill cropping, Gaussian blur, and dark scrim.
+
+    Falls back to a linear gradient if bg_image_path is not provided or cannot be loaded.
+    """
+    if bg_image_path:
+        p = Path(bg_image_path).resolve()
+        if p.exists() and p.is_file():
+            try:
+                img = Image.open(p).convert("RGB")
+                orig_w, orig_h = img.size
+                if orig_w > 0 and orig_h > 0:
+                    scale = max(width / orig_w, height / orig_h)
+                    new_w = int(orig_w * scale)
+                    new_h = int(orig_h * scale)
+                    resample_filter = getattr(Image.Resampling, "LANCZOS", Image.LANCZOS)
+                    img = img.resize((new_w, new_h), resample_filter)
+
+                    left = max(0, (new_w - width) // 2)
+                    top = max(0, (new_h - height) // 2)
+                    img = img.crop((left, top, left + width, top + height))
+
+                    if blur_radius > 0:
+                        img = img.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+
+                    overlay = Image.new("RGB", (width, height), overlay_color)
+                    img = Image.blend(img, overlay, overlay_alpha)
+                    return img
+            except Exception as e:
+                logger.warning(f"Failed to process ambient background image from {p}: {e}. Falling back to gradient.")
+
+    return create_gradient_bg(width, height)
+
+
+def generate_ambient_svg(
+    output_path: str | Path,
+    theme: str = "tech_navy",
+    width: int = 1920,
+    height: int = 1080,
+) -> Path:
+    """Generate a modern geometric SVG with multi-color radial gradient blobs and blueprint grid."""
+    out_p = Path(output_path).resolve()
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+
+    svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" width="{width}" height="{height}">
+  <defs>
+    <radialGradient id="blob1" cx="25%" cy="35%" r="45%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#0B132B" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blob2" cx="75%" cy="65%" r="50%">
+      <stop offset="0%" stop-color="#6366F1" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#0B132B" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blob3" cx="50%" cy="85%" r="40%">
+      <stop offset="0%" stop-color="#10B981" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#0B132B" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse">
+      <path d="M 80 0 L 0 0 0 80" fill="none" stroke="#1E293B" stroke-width="1.5" stroke-opacity="0.5"/>
+    </pattern>
+  </defs>
+  <rect width="{width}" height="{height}" fill="#0B132B"/>
+  <rect width="{width}" height="{height}" fill="url(#grid)"/>
+  <circle cx="480" cy="380" r="450" fill="url(#blob1)"/>
+  <circle cx="1440" cy="700" r="500" fill="url(#blob2)"/>
+  <circle cx="960" cy="920" r="400" fill="url(#blob3)"/>
+</svg>"""
+
+    out_p.write_text(svg_content, encoding="utf-8")
+    return out_p
+
+
 def _get_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
     """Resolve standard sans-serif font across platforms with fallback, including CJK support."""
     candidate_paths = [
@@ -128,6 +291,7 @@ def render_video(
     output_mp4: str | Path,
     title: str = "English Listening Practice",
     tag: str = "LISTENING PRACTICE",
+    bg_image_path: Optional[str | Path] = None,
 ) -> str:
     """Render frame cards and mux with audio into an MP4 file using FFmpeg."""
     width, height = 1920, 1080
@@ -141,7 +305,7 @@ def render_video(
         font_context = _get_font(25, bold=False)
         font_context_dim = _get_font(23, bold=False)
 
-        base_bg = create_gradient_bg(width, height)
+        base_bg = prepare_ambient_background(width, height, bg_image_path=bg_image_path)
         frame_files: List[str] = []
         durations: List[float] = []
 
@@ -273,30 +437,37 @@ def generate_dual_subtitle_video(
     input_path: str | Path,
     output_mp4: str | Path,
     voice: str = "en-US-JennyNeural",
-    rate: str = "-6%",
+    rate: Optional[str] = None,
     pitch: str = "+2Hz",
     title: str = "English Listening Practice",
-    tag: str = "LISTENING PRACTICE",
+    tag: Optional[str] = None,
     cover_path: Optional[str | Path] = None,
-    subtitle: str = "双字幕沉浸式跟读与听力自测",
+    subtitle: Optional[str] = None,
+    bg_image: Optional[str | Path] = None,
+    level: str = "a2",
 ) -> str:
     """High-level end-to-end generator pipeline: input text -> Edge-TTS speech & cues -> rendered MP4."""
     input_p = Path(input_path).resolve()
     if not input_p.exists():
         raise FileNotFoundError(f"Input file '{input_p}' does not exist.")
 
+    cfg = resolve_level_preset(level=level, rate=rate, tag=tag, subtitle=subtitle)
+    actual_rate = cfg["rate"]
+    actual_tag = cfg["tag"]
+    actual_sub = cfg["subtitle"]
+
     temp_dir = tempfile.mkdtemp(prefix="tts_sub_")
     try:
         mp3_path = os.path.join(temp_dir, "speech.mp3")
         vtt_path = os.path.join(temp_dir, "speech.vtt")
 
-        logger.info(f"Synthesizing speech and generating timestamps using {voice}...")
+        logger.info(f"Synthesizing speech ({cfg['level'].upper()} rate={actual_rate}) and timestamps using {voice}...")
         tts_cmd = [
             sys.executable,
             "-m",
             "edge_tts",
             f"--voice={voice}",
-            f"--rate={rate}",
+            f"--rate={actual_rate}",
             f"--pitch={pitch}",
             "-f",
             str(input_p),
@@ -312,10 +483,10 @@ def generate_dual_subtitle_video(
         cues = parse_vtt(vtt_path)
         logger.info(f"Parsed {len(cues)} sentence cues from {vtt_path}")
 
-        rendered_mp4 = render_video(cues, mp3_path, output_mp4, title=title, tag=tag)
+        rendered_mp4 = render_video(cues, mp3_path, output_mp4, title=title, tag=actual_tag, bg_image_path=bg_image)
 
         if cover_path:
-            generate_video_cover(cover_path, title=title, tag=tag, subtitle=subtitle)
+            generate_video_cover(cover_path, title=title, tag=actual_tag, subtitle=actual_sub, bg_image_path=bg_image)
 
         return rendered_mp4
     finally:
@@ -331,14 +502,15 @@ def clean_video_title(title: str) -> str:
     return cleaned
 
 
-def clean_video_desc(desc: str, default_title: str = "") -> str:
+def clean_video_desc(desc: str, default_title: str = "", level: str = "a2") -> str:
     """Ensure description length is strictly between 60 and 120 characters in English."""
     desc = desc.strip()
+    preset = CEFR_LEVEL_PRESETS.get(level.lower(), CEFR_LEVEL_PRESETS["a2"])
     if len(desc) < 60:
         if default_title and len(desc) < 20:
-            desc = f"Master English listening with {default_title}, featuring dual-tier subtitles and live context stream."
+            desc = f"Master English listening with {default_title}, featuring {preset['desc_level']} dual-tier subtitles."
         else:
-            padding = " Featuring dual-tier subtitles and live context stream for immersive English listening practice."
+            padding = f" Featuring dual-tier subtitles and {preset['desc_level']} context stream for immersion."
             desc = (desc + padding).strip()
             if len(desc) < 60:
                 desc = (desc + " Ideal for daily shadowing drills.").strip()
@@ -350,16 +522,17 @@ def clean_video_desc(desc: str, default_title: str = "") -> str:
 def generate_video_cover(
     output_path: str | Path,
     title: str,
-    tag: str = "LISTENING PRACTICE",
-    subtitle: str = "Dual-Subtitle Immersion & Shadowing Drill",
+    tag: str = "A2 · ELEMENTARY",
+    subtitle: str = "CEFR A2 Elementary · Slow & Clear Drill",
     width: int = 1920,
     height: int = 1080,
+    bg_image_path: Optional[str | Path] = None,
 ) -> Path:
     """Generate a standard 16:9 (1920x1080) video cover image for video platforms."""
     out_p = Path(output_path).resolve()
     out_p.parent.mkdir(parents=True, exist_ok=True)
 
-    img = create_gradient_bg(width, height, top_hex="#0B132B", bottom_hex="#1C2541")
+    img = prepare_ambient_background(width, height, bg_image_path=bg_image_path)
     draw = ImageDraw.Draw(img)
 
     font_badge = _get_font(28, bold=True)
@@ -425,6 +598,7 @@ def generate_video_payload_md(
     cover_filename: str = "cover.png",
     sentences_path: Optional[str | Path] = None,
     notes: Optional[str] = None,
+    level: str = "a2",
 ) -> Path:
     """Generate a standard payload.md compliant with publish-video and video platform specifications."""
     p_dir = Path(payload_dir).resolve()
@@ -432,7 +606,7 @@ def generate_video_payload_md(
     out_md = p_dir / "payload.md"
 
     clean_t = clean_video_title(title)
-    clean_d = clean_video_desc(desc, default_title=clean_t)
+    clean_d = clean_video_desc(desc, default_title=clean_t, level=level)
 
     # Validate collection
     allowed = []
@@ -463,6 +637,7 @@ def generate_video_payload_md(
         f'title: "{clean_t}"',
         f'author: "{author}"',
         f'desc: "{clean_d}"',
+        f'level: "{level.lower()}"',
         f'collection: "{collection}"',
         f'cover: "{cover_filename}"',
         f'video: "{video_filename}"',
@@ -506,12 +681,14 @@ def create_dual_sub_payload(
     desc: str,
     collection: str = "软件教程",
     voice: str = "en-US-JennyNeural",
-    rate: str = "-6%",
+    rate: Optional[str] = None,
     pitch: str = "+2Hz",
-    tag: str = "LISTENING PRACTICE",
-    subtitle: str = "Dual-Subtitle Immersion & Shadowing Drill",
+    tag: Optional[str] = None,
+    subtitle: Optional[str] = None,
     author: str = "Blogger Agent",
     notes: Optional[str] = None,
+    bg_image: Optional[str | Path] = None,
+    level: str = "a2",
 ) -> Dict[str, Any]:
     """Assemble a complete standard video payload: video.mp4, cover.png, payload.md, sentences.txt."""
     p_dir = Path(payload_dir).resolve()
@@ -525,6 +702,26 @@ def create_dual_sub_payload(
     if sent_p != dest_sent:
         shutil.copy2(sent_p, dest_sent)
 
+    cfg = resolve_level_preset(level=level, rate=rate, tag=tag, subtitle=subtitle)
+
+    # Resolve ambient background image
+    actual_bg: Optional[Path] = None
+    if bg_image:
+        bg_src = Path(bg_image).resolve()
+        if bg_src.exists():
+            dest_bg = p_dir / "bg.png"
+            if bg_src != dest_bg:
+                shutil.copy2(bg_src, dest_bg)
+            actual_bg = dest_bg
+        else:
+            logger.warning(f"Specified bg_image '{bg_image}' not found.")
+
+    if not actual_bg:
+        for candidate in [p_dir / "bg.png", p_dir / "background.png"]:
+            if candidate.exists():
+                actual_bg = candidate
+                break
+
     video_path = p_dir / "video.mp4"
     cover_path = p_dir / "cover.png"
 
@@ -533,18 +730,21 @@ def create_dual_sub_payload(
         input_path=dest_sent,
         output_mp4=video_path,
         voice=voice,
-        rate=rate,
+        rate=cfg["rate"],
         pitch=pitch,
         title=title,
-        tag=tag,
+        tag=cfg["tag"],
+        bg_image=actual_bg,
+        level=cfg["level"],
     )
 
     # 2. Generate cover
     generate_video_cover(
         output_path=cover_path,
         title=title,
-        tag=tag,
-        subtitle=subtitle,
+        tag=cfg["tag"],
+        subtitle=cfg["subtitle"],
+        bg_image_path=actual_bg,
     )
 
     # 3. Generate payload.md
@@ -558,6 +758,7 @@ def create_dual_sub_payload(
         cover_filename="cover.png",
         sentences_path=dest_sent,
         notes=notes,
+        level=cfg["level"],
     )
 
     return {
@@ -566,7 +767,11 @@ def create_dual_sub_payload(
         "video_path": video_path,
         "cover_path": cover_path,
         "sentences_path": dest_sent,
+        "bg_image": str(actual_bg) if actual_bg else None,
+        "level": cfg["level"],
+        "rate": cfg["rate"],
+        "tag": cfg["tag"],
         "title": clean_video_title(title),
-        "desc": clean_video_desc(desc, title),
+        "desc": clean_video_desc(desc, title, level=cfg["level"]),
         "collection": collection,
     }
