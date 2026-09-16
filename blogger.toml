@@ -14,7 +14,8 @@ video_collections = [
     "agent",
     "claude code",
     "程序员",
-    "软件教程"
+    "软件教程",
+    "English"
 ]
 photo_collections = [
     "DevSecOps图文",

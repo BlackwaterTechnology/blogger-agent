@@ -71,14 +71,14 @@ def main():
     parser.add_argument(
         "--bg-blur",
         type=int,
-        default=12,
-        help="Gaussian blur radius for ambient background (default: 12).",
+        default=3,
+        help="Gaussian blur radius for ambient background (default: 3).",
     )
     parser.add_argument(
         "--bg-alpha",
         type=float,
-        default=0.45,
-        help="Dark overlay alpha for ambient background (default: 0.45).",
+        default=0.20,
+        help="Dark overlay alpha for ambient background (default: 0.20).",
     )
     args = parser.parse_args()
 

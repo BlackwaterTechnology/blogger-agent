@@ -94,7 +94,7 @@ The generation pipeline relies on decoupled, deterministic stages:
 
 - **Canvas**: 1920x1080 (16:9 Full HD).
 - **Background**: 
-  - **Ambient Theme Backdrop（推荐）**: 单张主题插图经 Aspect-Fill 智能裁剪，叠加 `35px` 深度高斯模糊与 `75%` 深海蓝蒙版（`#0B132B`，`alpha=0.75`），形成高质感流光氛围（Ambient Glow），彻底消除背景视觉干扰。
+  - **Ambient Theme Backdrop（推荐）**: 单张主题插图经 Aspect-Fill 智能裁剪，叠加 **`3px` 电影级微景深高斯模糊**与 **`20%` 深海蓝蒙版（`#0B132B`，`alpha=0.20`）**。在保留插画丰富细节、色彩饱满度与温暖光影的同时，通过微景深将实色字幕卡片自然衬托立体浮现，彻底告别画面发灰过淡。
   - **Fallback**: 未指定背景图时，平滑降级为深曜黑蓝线性渐变（`#0B132B` 至 `#1C2541`）。
 - **Top Header Bar**: Topic badge tag (e.g. `DEVOPS ENGLISH`), lesson title, and progress counter (e.g. `05 / 29`).
 - **Center Primary Subtitle**:
@@ -103,6 +103,7 @@ The generation pipeline relies on decoupled, deterministic stages:
   - Role: Directly matches the currently spoken audio phrase.
 - **Bottom Context Stream**:
   - Position: Near bottom (`Y = 760 - 990`).
+  - Label: Dynamic capsule badge labeled `CONTEXT STREAM` (pure English, strictly zero Chinese).
   - Font: 23pt - 25pt readable sans-serif.
   - Role: Displays preceding sentence (`◀`, dimmed gray), current sentence (`▶`, highlighted cyan), and next sentence (`…`, preview gray).
 
@@ -110,14 +111,16 @@ The generation pipeline relies on decoupled, deterministic stages:
 
 ## Ambient Backdrop Standard & Sourcing Strategy (氛围底图规范与双轨生成策略)
 
-为了兼顾视听体验的沉浸感与学习工具的阅读专注度，采用**“强氛围弱干扰”**设计，支持根据主题特性的双轨生图策略：
+为了兼顾视听体验的沉浸感与学习工具的阅读专注度，采用**“强氛围、弱干扰、细节生动”**设计，支持根据主题特性的双轨生图策略：
 
 ### 1. 职场、生活与社论场景 ➔ Agent Function (`generate_image`)
 适用于商务会议、机场出行、咖啡馆点餐、面试英语等具备真实空间感的话题。
 - **生图标准**：遵循杂志社论艺术风格（Modern Editorial Flat Vector 或 Isometric Diorama），**坚决杜绝发光蓝脑、机械手、乱码字符与人物正脸**。
+- **顶部留白铁律**：Prompt **必须显式声明 `clean dark negative space at the top, no text`**，确保图片上部区域纯净深色，避免 AI 绘制杂乱按钮或伪文字导致与顶部标题栏文字重叠冲突。
+- **实色容器保护原则（Solid Container Protection）**：中央主字幕采用 `#1E293B` 实色圆角卡片，底部上下文采用 `#0F172A` 实色卡片，文字自带天然高对比度隔离屏障。因此背景处理**严禁重度高斯模糊与暴力压暗**，统一采用默认微景深（`blur=3`）与低度蒙版（`alpha=0.20`），实现画质细节与文本可读性的双重极致。
 - **Prompt 范式**：
-  > *"Modern editorial vector illustration of a cozy open-plan tech startup office in the morning, soft warm sunlight streaming through large glass windows, minimal laptops on wooden desks, clean muted slate navy and warm amber color palette, flat design, sophisticated art magazine style, no text, no characters' faces."*
-- **生成后操作**：保存为 `videos/<topic>/bg.png`，渲染时自动被检测并应用高斯模糊与暗色蒙版。
+  > *"Modern editorial vector illustration of a cozy open-plan tech startup office in the morning, soft warm sunlight streaming through large glass windows, minimal laptops on wooden desks, clean muted slate navy and warm amber color palette, clean dark negative space at the top, flat design, sophisticated art magazine style, no text, no characters' faces."*
+- **生成后操作**：保存为 `videos/<topic>/bg.png`，渲染时自动被检测并应用电影级微景深与微光蒙版。
 
 ### 2. 硬核技术、架构与开发场景 ➔ 原生 SVG 弥散光斑 (`generate_ambient_svg`)
 适用于 Linux、K8s、数据库、系统底层等偏极客话题。
@@ -263,7 +266,11 @@ python3 -m src.blogger.cli video \
 4. **简介摘要规范（Description）**：
    - 必须为纯英文，且字符数严格控制在 **60 ~ 120 字符** 之间。
    - 自动补全机制已内置英文描述模版，杜绝中文文本混入英文视频元数据。
-5. **发布前自检清单**：
+5. **视频内画面全英文铁律（Zero Chinese on Video Frames）**：
+   - 视频画面内部所有元素（顶部 Badge、标题、进度指示、中央主字幕、底部 `CONTEXT STREAM` 标签及前后回顾句）必须**100% 保持纯英文**。
+   - 严禁在底部容器或画面任何角落出现任何中文标签（如旧版的“/ 上下文回顾”），确保纯正的沉浸式英语学习环境与高水准国际化交付质感。
+6. **发布前自检清单**：
+   - [ ] 视频画面内所有标签（包括底部 `CONTEXT STREAM`）是否为 100% 纯英文，严格无中文。
    - [ ] `level` 是否匹配目标受众（默认为 `a2`，若为深度技术讨论建议 `b2`）。
    - [ ] `title` 是否为纯英文 Title Case，无 Emoji 与特殊字符。
    - [ ] `cover.png` 上的标题与副标题是否全部为英文。

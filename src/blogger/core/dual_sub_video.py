@@ -184,11 +184,11 @@ def prepare_ambient_background(
     width: int = 1920,
     height: int = 1080,
     bg_image_path: Optional[str | Path] = None,
-    blur_radius: int = 12,
+    blur_radius: int = 3,
     overlay_color: str = "#0B132B",
-    overlay_alpha: float = 0.45,
+    overlay_alpha: float = 0.20,
 ) -> Image.Image:
-    """Prepare an ambient background image with aspect-fill cropping, Gaussian blur, and dark scrim.
+    """Prepare an ambient background image with aspect-fill cropping, subtle micro-blur, and dark scrim.
 
     Falls back to a linear gradient if bg_image_path is not provided or cannot be loaded.
     """
@@ -223,8 +223,8 @@ def prepare_ambient_background(
 
 def apply_top_scrim(
     img: Image.Image,
-    height: int = 140,
-    start_alpha: float = 0.65,
+    height: int = 150,
+    start_alpha: float = 0.75,
     overlay_color: tuple[int, int, int] = (11, 19, 43),
 ) -> Image.Image:
     """Apply a subtle top dark-gradient scrim to guarantee header text contrast against light backgrounds."""
@@ -323,12 +323,12 @@ def render_video(
         font_context = _get_font(25, bold=False)
         font_context_dim = _get_font(23, bold=False)
 
-        blur_val = bg_blur if bg_blur is not None else 12
-        alpha_val = bg_alpha if bg_alpha is not None else 0.45
+        blur_val = bg_blur if bg_blur is not None else 3
+        alpha_val = bg_alpha if bg_alpha is not None else 0.20
         base_bg = prepare_ambient_background(
             width, height, bg_image_path=bg_image_path, blur_radius=blur_val, overlay_alpha=alpha_val
         )
-        base_bg = apply_top_scrim(base_bg, height=140, start_alpha=0.65)
+        base_bg = apply_top_scrim(base_bg, height=150, start_alpha=0.75)
         frame_files: List[str] = []
         durations: List[float] = []
 
@@ -381,8 +381,13 @@ def render_video(
             bottom_box = [100, 760, width - 100, 990]
             draw.rounded_rectangle(bottom_box, radius=14, fill="#0F172A", outline="#334155", width=2)
 
-            draw.rounded_rectangle([125, 775, 420, 805], radius=6, fill="#1E293B")
-            draw.text((140, 780), "CONTEXT STREAM / 上下文回顾", font=font_context_label, fill="#94A3B8")
+            label_text = "CONTEXT STREAM"
+            bbox_label = draw.textbbox((0, 0), label_text, font=font_context_label)
+            label_w = bbox_label[2] - bbox_label[0]
+            pill_pad_x = 14
+            pill_right = 125 + pill_pad_x + label_w + pill_pad_x
+            draw.rounded_rectangle([125, 775, pill_right, 805], radius=6, fill="#1E293B")
+            draw.text((125 + pill_pad_x, 780), label_text, font=font_context_label, fill="#94A3B8")
 
             ctx_y = 828
             if idx > 0:
@@ -577,12 +582,12 @@ def generate_video_cover(
     out_p = Path(output_path).resolve()
     out_p.parent.mkdir(parents=True, exist_ok=True)
 
-    blur_val = bg_blur if bg_blur is not None else 12
-    alpha_val = bg_alpha if bg_alpha is not None else 0.45
+    blur_val = bg_blur if bg_blur is not None else 3
+    alpha_val = bg_alpha if bg_alpha is not None else 0.20
     img = prepare_ambient_background(
         width, height, bg_image_path=bg_image_path, blur_radius=blur_val, overlay_alpha=alpha_val
     )
-    img = apply_top_scrim(img, height=160, start_alpha=0.65)
+    img = apply_top_scrim(img, height=160, start_alpha=0.75)
     draw = ImageDraw.Draw(img)
 
     font_badge = _get_font(28, bold=True)
