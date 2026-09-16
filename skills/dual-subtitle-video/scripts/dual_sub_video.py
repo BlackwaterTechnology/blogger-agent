@@ -44,7 +44,7 @@ def main():
     parser.add_argument("-o", "--output", help="Destination path for generated MP4 video file.")
     parser.add_argument("--payload-dir", help="Directory for assembling standard video payload (videos/<topic>/).")
     parser.add_argument("--cover", help="Destination path for generated 16:9 cover image (cover.png).")
-    parser.add_argument("--voice", default="en-US-JennyNeural", help="Edge-TTS voice name (default: en-US-JennyNeural).")
+    parser.add_argument("--voice", default="en-US-JennyNeural", help="Edge-TTS voice or alias (e.g. 'brian' / 'male' for warm male mentor, 'andrew' for crisp tech male, 'jenny' / 'female'; default: en-US-JennyNeural).")
     parser.add_argument("--level", default="a2", choices=["a2", "b1", "b2", "c1", "A2", "B1", "B2", "C1"], help="CEFR English level (a2, b1, b2, c1; default: a2).")
     parser.add_argument("--rate", help="Edge-TTS speech rate (defaults to level preset, e.g. -12%% for A2, -6%% for B1).")
     parser.add_argument("--pitch", default="+2Hz", help="Edge-TTS speech pitch (default: +2Hz).")
@@ -80,6 +80,21 @@ def main():
         default=0.20,
         help="Dark overlay alpha for ambient background (default: 0.20).",
     )
+    parser.add_argument(
+        "--layout",
+        default="standard",
+        choices=["standard", "avatar"],
+        help="Visual layout mode: 'standard' (centered cards) or 'avatar' (digital tutor presenter layout; default: 'standard').",
+    )
+    parser.add_argument(
+        "--avatar",
+        help="Path to presenter avatar image (defaults to built-in avatar skills/dual-subtitle-video/images/avatar_geek_studio.png when --layout avatar).",
+    )
+    parser.add_argument(
+        "--avatar-badge",
+        default="AI TECH MENTOR",
+        help="Role badge text on avatar card in avatar layout (default: 'AI TECH MENTOR').",
+    )
     args = parser.parse_args()
 
     input_file = Path(args.input).resolve()
@@ -89,6 +104,10 @@ def main():
 
     try:
         desc_text = args.desc or f"Master English listening with {args.title}, featuring dual-tier subtitles and context stream."
+
+        layout_val = args.layout
+        if args.avatar and layout_val == "standard":
+            layout_val = "avatar"
 
         if args.payload_dir:
             payload_p = Path(args.payload_dir).resolve()
@@ -112,6 +131,9 @@ def main():
                 level=args.level.lower(),
                 bg_blur=args.bg_blur,
                 bg_alpha=args.bg_alpha,
+                layout=layout_val,
+                avatar_image=args.avatar,
+                avatar_badge=args.avatar_badge,
             )
 
             print(f"Video created:   {result['video_path']}")
@@ -142,6 +164,9 @@ def main():
                 level=args.level.lower(),
                 bg_blur=args.bg_blur,
                 bg_alpha=args.bg_alpha,
+                layout=layout_val,
+                avatar_image=args.avatar,
+                avatar_badge=args.avatar_badge,
             )
             print(f"Video generated successfully: {out}")
             if cover_path and cover_path.exists():

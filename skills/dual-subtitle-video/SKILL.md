@@ -218,8 +218,52 @@ python3 -m src.blogger.cli video \
 | `--tag` | 否 | 联动 level（A2为 `A2 · ELEMENTARY`） | 视频左上角英文主题 Badge（自定义文本将自动附加级别前缀） |
 | `--subtitle` | 否 | 联动 level（A2为 `CEFR A2 Elementary · Slow & Clear Drill`） | 封面上展示的英文副标题 |
 | `--bg-image` | 否 | 自动检测 `bg.png` | 自定义氛围主题背景图片路径（经高斯模糊与暗色蒙版后呈现） |
+| `--layout` | 否 | `standard` | 视频视觉布局风格（`standard` 为经典居中卡片；`avatar` 为皮克斯 3D / 虚拟导师双栏演播室布局） |
+| `--avatar` | 否 | 内置极客演播室头像 | 演播主播肖像图片路径（若指定 `--avatar` 则自动切换为 avatar 布局；默认内置 `skills/dual-subtitle-video/images/avatar_geek_studio.png`） |
+| `--avatar-badge` | 否 | `AI TECH MENTOR` | 人物卡片左下角角色标签文本（如 `AI TECH MENTOR`, `ENGLISH TUTOR`） |
 | `--platform` | 否 | - | 生成后直接发布的平台（如 `wechat_video,bilibili`） |
 | `--no-publish`| 否 | False | 预览模式（跳过最终发布点击） |
+
+---
+
+## Visual Layout Modes (视觉布局模式与人物演播室选型)
+
+`dual-subtitle-video` 支持两种视觉布局模式，可在生成时自由切换：
+
+### 1. 经典居中卡片模式（`--layout standard`，默认模式）
+- **特点**：全屏居中 1440px 聚焦卡片 + 底部 1630px 上下文流。
+- **适用场景**：专注纯文本听力精读、词汇背诵、无主播干扰的纯净沉浸式跟读。
+- **示例命令**：
+  ```bash
+  python3 skills/dual-subtitle-video/scripts/dual_sub_video.py \
+    -i sentences.txt \
+    --payload-dir videos/topic/ \
+    --layout standard
+  ```
+
+### 2. 3D 皮克斯 / 虚拟导师演播室模式（`--layout avatar`）
+- **特点**：16:9 演播室双栏架构。左侧 35% 为高清演播导师卡片（带青色发光边框与身份 Badge），右侧 65% 为主字幕聚焦卡片与实时上下文流；背景采用同款演播室景深微光虚化，封画与视频完美统一。
+- **内置素材库**：
+  - `skills/dual-subtitle-video/images/avatar_geek_studio.png`：经过顶部画幅裁剪与水印微修的皮克斯 3D 极客演播室导师（默认使用）；
+  - `skills/dual-subtitle-video/images/极客科技演播室.png`：原始高画幅机房背景母图备用。
+- **适用场景**：个人 IP 打造、程序员日常职场英语、DevOps 站会演练、高完播率社交平台短视频。
+- **示例命令**：
+  ```bash
+  # 使用默认内置极客演播导师
+  python3 skills/dual-subtitle-video/scripts/dual_sub_video.py \
+    -i sentences.txt \
+    --payload-dir videos/devops_topic/ \
+    --layout avatar \
+    --title "DevOps Daily Standup Practice"
+
+  # 使用自定义人物图片与个性化 Badge
+  python3 skills/dual-subtitle-video/scripts/dual_sub_video.py \
+    -i sentences.txt \
+    --payload-dir videos/custom_topic/ \
+    --layout avatar \
+    --avatar path/to/my_photo.png \
+    --avatar-badge "SENIOR ARCHITECT"
+  ```
 
 ---
 

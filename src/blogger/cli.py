@@ -69,6 +69,9 @@ def main():
     video_parser.add_argument("--collection", default="软件教程", help="Collection for video matching blogger.toml (e.g. 软件教程, 程序员, agent)")
     video_parser.add_argument("--output", help="Output MP4 path for generated video")
     video_parser.add_argument("--bg-image", help="Ambient background image path (auto-detects bg.png in payload dir)")
+    video_parser.add_argument("--layout", default="standard", choices=["standard", "avatar"], help="Visual layout for dual-subtitle video ('standard' or 'avatar')")
+    video_parser.add_argument("--avatar", help="Path to avatar image for dual-subtitle video (defaults to built-in avatar in avatar layout)")
+    video_parser.add_argument("--avatar-badge", default="AI TECH MENTOR", help="Role badge text on avatar card")
 
 
 
@@ -320,8 +323,14 @@ def handle_video(args, payload_path):
                     bg_image = candidate
                     break
 
+        layout = getattr(args, "layout", "standard")
+        avatar_img = getattr(args, "avatar", None)
+        avatar_badge = getattr(args, "avatar_badge", "AI TECH MENTOR")
+        if avatar_img and layout == "standard":
+            layout = "avatar"
+
         # 3. Generate dual-subtitle video
-        logger.info(f"Generating dual-subtitle video ({level.upper()}) from {input_file} to {out_mp4}...")
+        logger.info(f"Generating dual-subtitle video ({level.upper()}, layout={layout}) from {input_file} to {out_mp4}...")
         try:
             generate_dual_subtitle_video(
                 input_path=input_file,
@@ -333,6 +342,9 @@ def handle_video(args, payload_path):
                 tag=tag,
                 bg_image=bg_image,
                 level=level,
+                layout=layout,
+                avatar_image=avatar_img,
+                avatar_badge=avatar_badge,
             )
         except Exception as e:
             logger.error(f"Failed to generate dual-subtitle video: {e}")
@@ -346,6 +358,9 @@ def handle_video(args, payload_path):
                 title=title,
                 tag=tag or "A2 · ELEMENTARY",
                 bg_image_path=bg_image,
+                layout=layout,
+                avatar_image=avatar_img,
+                avatar_badge=avatar_badge,
             )
 
         # 5. Generate payload.md if missing
@@ -360,6 +375,7 @@ def handle_video(args, payload_path):
                 cover_filename=cover_path.name,
                 sentences_path=input_file if input_file.suffix == ".txt" else None,
                 level=level,
+                layout=layout,
             )
 
         # 6. Parse payload.md to construct complete article_data for publishing

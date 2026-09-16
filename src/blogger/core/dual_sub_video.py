@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
+import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 
@@ -103,6 +104,38 @@ def resolve_level_preset(
         "subtitle": resolved_sub,
         "desc_level": preset["desc_level"],
     }
+
+
+VOICE_PRESETS: Dict[str, str] = {
+    # High-quality English Male Voices
+    "male": "en-US-BrianNeural",
+    "brian": "en-US-BrianNeural",
+    "male_mentor": "en-US-BrianNeural",
+    "andrew": "en-US-AndrewNeural",
+    "male_tech": "en-US-AndrewNeural",
+    "guy": "en-US-GuyNeural",
+    "male_news": "en-US-GuyNeural",
+    "christopher": "en-US-ChristopherNeural",
+    "male_authority": "en-US-ChristopherNeural",
+    "ryan": "en-GB-RyanNeural",
+    "male_british": "en-GB-RyanNeural",
+    # High-quality English Female Voices
+    "female": "en-US-JennyNeural",
+    "jenny": "en-US-JennyNeural",
+    "female_clear": "en-US-JennyNeural",
+    "ava": "en-US-AvaNeural",
+    "female_warm": "en-US-AvaNeural",
+    "emma": "en-US-EmmaNeural",
+    "female_conversational": "en-US-EmmaNeural",
+}
+
+
+def resolve_voice(voice: Optional[str] = None) -> str:
+    """Resolve Edge-TTS voice identifier, allowing friendly aliases like 'male', 'brian', 'andrew'."""
+    if not voice or not voice.strip():
+        return "en-US-JennyNeural"
+    clean_v = voice.strip()
+    return VOICE_PRESETS.get(clean_v.lower(), clean_v)
 
 
 def parse_time(t_str: str) -> float:
@@ -301,6 +334,133 @@ def _get_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
         return ImageFont.load_default()
 
 
+def resolve_avatar_image(avatar_path: Optional[str | Path] = None) -> Optional[Path]:
+    """Resolve presenter avatar image path, falling back to built-in avatar if available."""
+    if avatar_path:
+        p = Path(avatar_path).resolve()
+        if p.exists():
+            return p
+        logger.warning(f"Specified avatar image '{avatar_path}' not found.")
+
+    # Check default in skills/dual-subtitle-video/images/avatar_geek_studio.png
+    repo_root = Path(__file__).resolve().parents[3]
+    default_avatar = repo_root / "skills/dual-subtitle-video/images/avatar_geek_studio.png"
+    if default_avatar.exists():
+        return default_avatar
+    return None
+
+
+def resolve_avatar_states(base_avatar: Optional[str | Path]) -> Dict[str, Path]:
+    """Find available animation states for an avatar.
+
+    Looks for sibling files based on naming convention:
+    - closed (base): <stem><suffix> (always present if base_avatar exists)
+    - open: <stem>_mouth_open<suffix>, <stem>_open<suffix>
+    - wide: <stem>_mouth_wide<suffix>, <stem>_wide<suffix>
+    - blink: <stem>_blink<suffix>, <stem>_eyes_closed<suffix>
+
+    Returns dict mapping state name ('closed', 'open', 'wide', 'blink') to Path.
+    """
+    states: Dict[str, Path] = {}
+    if not base_avatar:
+        return states
+
+    p = Path(base_avatar).resolve()
+    if not p.exists():
+        return states
+
+    states["closed"] = p
+    stem = p.stem
+    parent = p.parent
+    suffix = p.suffix
+
+    # 1. Mouth open candidates
+    for cand in [
+        parent / f"{stem}_mouth_open{suffix}",
+        parent / f"{stem}_open{suffix}",
+        parent / f"{stem}_mouth_open.png",
+    ]:
+        if cand.exists():
+            states["open"] = cand
+            break
+
+    # 2. Mouth wide candidates
+    for cand in [
+        parent / f"{stem}_mouth_wide{suffix}",
+        parent / f"{stem}_wide{suffix}",
+        parent / f"{stem}_mouth_wide.png",
+    ]:
+        if cand.exists():
+            states["wide"] = cand
+            break
+
+    # 3. Eyes blink candidates
+    for cand in [
+        parent / f"{stem}_blink{suffix}",
+        parent / f"{stem}_eyes_closed{suffix}",
+        parent / f"{stem}_blink.png",
+    ]:
+        if cand.exists():
+            states["blink"] = cand
+            break
+
+    # Fallback to built-in avatar siblings if base matches default avatar name
+    if len(states) == 1 and stem in ["avatar", "avatar_geek_studio"]:
+        repo_root = Path(__file__).resolve().parents[3]
+        default_dir = repo_root / "skills/dual-subtitle-video/images"
+        for st_name, fname in [
+            ("open", "avatar_geek_studio_mouth_open.png"),
+            ("wide", "avatar_geek_studio_mouth_wide.png"),
+            ("blink", "avatar_geek_studio_blink.png"),
+        ]:
+            cand = default_dir / fname
+            if cand.exists() and st_name not in states:
+                states[st_name] = cand
+
+    return states
+
+
+def compute_soundwave_bars(
+    audio_samples: Optional[Any],
+    t_start: float,
+    t_end: float,
+    num_bars: int = 24,
+) -> List[float]:
+    """Compute normalized frequency/energy levels (0.08 to 1.0) for soundwave equalizer bars."""
+    if audio_samples is None or len(audio_samples) == 0:
+        return [0.08] * num_bars
+
+    s = max(0, int(t_start * 16000))
+    e = min(len(audio_samples), int(t_end * 16000))
+    if e <= s:
+        return [0.08] * num_bars
+
+    chunk = audio_samples[s:e]
+    if len(chunk) < 64:
+        return [0.08] * num_bars
+
+    rms = float(np.sqrt(np.mean(chunk.astype(float) ** 2)))
+    if rms < 180:  # silence threshold
+        return [0.08] * num_bars
+
+    fft = np.abs(np.fft.rfft(chunk))
+    # Focus on speech frequency band
+    usable_bins = fft[: min(len(fft), max(num_bars * 2, int(len(fft) * 0.55)))]
+    splits = np.array_split(usable_bins, num_bars)
+
+    raw_vals = [float(np.mean(b)) if len(b) > 0 else 0.0 for b in splits]
+    max_v = max(raw_vals) if raw_vals and max(raw_vals) > 0 else 1.0
+
+    loudness_gain = min(1.0, rms / 3200.0)
+    bars: List[float] = []
+    for val in raw_vals:
+        norm = (val / max_v) * loudness_gain
+        clamped = max(0.08, min(1.0, norm))
+        bars.append(float(clamped))
+
+    return bars
+
+
 def render_video(
     cues: List[Dict[str, Any]],
     audio_path: str | Path,
@@ -310,23 +470,96 @@ def render_video(
     bg_image_path: Optional[str | Path] = None,
     bg_blur: Optional[int] = None,
     bg_alpha: Optional[float] = None,
+    layout: str = "standard",
+    avatar_image: Optional[str | Path] = None,
+    avatar_badge: str = "AI TECH MENTOR",
 ) -> str:
-    """Render frame cards and mux with audio into an MP4 file using FFmpeg."""
+    """Render frame cards and mux with audio into an MP4 file using FFmpeg.
+    
+    Supports two visual layout modes:
+    - 'standard': Classic centered primary subtitle and bottom context stream.
+    - 'avatar': 16:9 dual-column layout with studio presenter card and dynamic audio equalizer.
+    """
     width, height = 1920, 1080
     temp_dir = tempfile.mkdtemp(prefix="dual_sub_")
 
     try:
+        is_avatar_mode = (layout or "").lower() == "avatar"
+        actual_avatar: Optional[Path] = None
+        av_card_base: Optional[Image.Image] = None
+        av_mask = None
+        card_w, card_h = 640, 870
+        audio_samples: Optional[np.ndarray] = None
+
         font_header = _get_font(24, bold=True)
-        font_title = _get_font(32, bold=True)
-        font_center = _get_font(44, bold=True)
+        font_title = _get_font(30 if is_avatar_mode else 32, bold=True)
+        font_center = _get_font(42 if is_avatar_mode else 44, bold=True)
         font_context_label = _get_font(20, bold=True)
         font_context = _get_font(25, bold=False)
         font_context_dim = _get_font(23, bold=False)
+        font_hud_title = _get_font(18, bold=True)
+        font_hud_sub = _get_font(14, bold=True)
 
-        blur_val = bg_blur if bg_blur is not None else 3
-        alpha_val = bg_alpha if bg_alpha is not None else 0.20
+        if is_avatar_mode:
+            actual_avatar = resolve_avatar_image(avatar_image)
+            if not actual_avatar:
+                logger.warning("Avatar layout requested but avatar image could not be resolved. Falling back to standard layout.")
+                is_avatar_mode = False
+            else:
+                try:
+                    base_raw = Image.open(actual_avatar).convert("RGB")
+                    av_scale = max(card_w / base_raw.width, card_h / base_raw.height)
+                    anw, anh = int(base_raw.width * av_scale), int(base_raw.height * av_scale)
+                    av_resized = base_raw.resize((anw, anh), Image.Resampling.LANCZOS)
+                    av_left = (anw - card_w) // 2
+                    av_top = (anh - card_h) // 2
+                    av_card_base = av_resized.crop((av_left, av_top, av_left + card_w, av_top + card_h)).convert("RGBA")
+
+                    av_mask = Image.new("L", (card_w, card_h), 0)
+                    av_mask_draw = ImageDraw.Draw(av_mask)
+                    av_mask_draw.rounded_rectangle([0, 0, card_w, card_h], radius=24, fill=255)
+
+                    card_draw = ImageDraw.Draw(av_card_base)
+                    # Outer border
+                    card_draw.rounded_rectangle([0, 0, card_w, card_h], radius=24, outline="#38BDF8", width=3)
+
+                    # Top Mentor Tag Pill
+                    card_draw.rounded_rectangle([25, 25, 230, 62], radius=8, fill="#0F172AE6", outline="#38BDF8", width=1)
+                    card_draw.text((40, 32), avatar_badge, font=font_hud_title, fill="#38BDF8")
+
+                    # Bottom Audio Equalizer HUD
+                    hud_x1, hud_y1 = 20, card_h - 110
+                    hud_x2, hud_y2 = card_w - 20, card_h - 20
+                    card_draw.rounded_rectangle([hud_x1, hud_y1, hud_x2, hud_y2], radius=16, fill="#0B132BEF", outline="#38BDF8", width=2)
+
+                    # Pulse Indicator & Labels
+                    card_draw.ellipse([hud_x1 + 20, hud_y1 + 24, hud_x1 + 32, hud_y1 + 36], fill="#10B981")
+                    card_draw.text((hud_x1 + 42, hud_y1 + 20), "VOICE STREAM", font=font_hud_sub, fill="#10B981")
+                    card_draw.text((hud_x1 + 20, hud_y1 + 48), "SPEECH EQUALIZER", font=_get_font(12, bold=False), fill="#64748B")
+
+                    logger.info("Studio avatar presenter card prepared with pristine static portrait and soundwave HUD.")
+                except Exception as e:
+                    logger.warning(f"Failed to prepare avatar card: {e}. Falling back to standard layout.")
+                    is_avatar_mode = False
+
+            # Load audio PCM samples for real-time equalizer bars
+            if is_avatar_mode and audio_path and os.path.exists(str(audio_path)):
+                try:
+                    ffmpeg_bin = shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
+                    pcm_cmd = [ffmpeg_bin, "-i", str(audio_path), "-f", "s16le", "-ac", "1", "-ar", "16000", "-"]
+                    res = subprocess.run(pcm_cmd, capture_output=True)
+                    if res.returncode == 0 and res.stdout:
+                        audio_samples = np.frombuffer(res.stdout, dtype=np.int16)
+                        logger.info(f"Loaded {len(audio_samples)} audio samples for studio soundwave equalizer.")
+                except Exception as e:
+                    logger.warning(f"Failed to load audio samples for equalizer: {e}")
+
+        blur_val = bg_blur if bg_blur is not None else (20 if is_avatar_mode else 3)
+        alpha_val = bg_alpha if bg_alpha is not None else (0.45 if is_avatar_mode else 0.20)
+        effective_bg_image = bg_image_path or (actual_avatar if is_avatar_mode else None)
+
         base_bg = prepare_ambient_background(
-            width, height, bg_image_path=bg_image_path, blur_radius=blur_val, overlay_alpha=alpha_val
+            width, height, bg_image_path=effective_bg_image, blur_radius=blur_val, overlay_alpha=alpha_val
         )
         base_bg = apply_top_scrim(base_bg, height=150, start_alpha=0.75)
         frame_files: List[str] = []
@@ -340,82 +573,183 @@ def render_video(
             duration = cue["end"] - cue["start"]
             if idx + 1 < total_cues:
                 duration = cues[idx + 1]["start"] - cue["start"]
+            if duration <= 0:
+                duration = max(0.5, cue["end"] - cue["start"])
 
             img = base_bg.copy()
             draw = ImageDraw.Draw(img)
 
-            # 1. Top Header Bar
-            badge_bbox = draw.textbbox((0, 0), tag, font=font_header)
-            badge_w = badge_bbox[2] - badge_bbox[0]
-            badge_right = max(420, 100 + 20 + badge_w + 20)
-            draw.rounded_rectangle([100, 60, badge_right, 102], radius=8, fill="#1E293B", outline="#3B82F6", width=2)
-            draw.text((120, 70), tag, font=font_header, fill="#60A5FA")
+            if is_avatar_mode and av_card_base and av_mask:
+                # ===================== STUDIO AVATAR DUAL-COLUMN LAYOUT =====================
+                # 1. Top Header Bar
+                badge_bbox = draw.textbbox((0, 0), tag, font=font_header)
+                badge_w = badge_bbox[2] - badge_bbox[0]
+                badge_right = max(420, 80 + 25 + badge_w + 25)
+                draw.rounded_rectangle([80, 50, badge_right, 96], radius=8, fill="#1E293B", outline="#3B82F6", width=2)
+                draw.text((105, 60), tag, font=font_header, fill="#60A5FA")
 
-            title_x = badge_right + 30
-            draw.text((title_x, 70), title, font=font_title, fill="#F8FAFC")
-            progress_str = f"{idx + 1:02d} / {total_cues:02d}"
-            draw.text((width - 240, 70), progress_str, font=font_header, fill="#E2E8F0")
+                draw.text((badge_right + 30, 60), title, font=font_title, fill="#F8FAFC")
+                progress_str = f"{idx + 1:02d} / {total_cues:02d}"
+                draw.text((width - 240, 60), progress_str, font=font_header, fill="#E2E8F0")
 
-            # 2. Central Primary Subtitle Card (1440px centered, balanced breathing room)
-            card_x1 = 240
-            card_x2 = width - 240
-            center_lines = wrap_text(cue["text"], font_center, 1240, draw)
-            line_height = 62
-            total_text_h = len(center_lines) * line_height
-            start_y = 440 - (total_text_h // 2)
+                # 2. Right Column: Primary Subtitle Card
+                right_x1 = 760
+                right_x2 = width - 80
+                prim_y1 = 130
+                prim_y2 = 560
+                draw.rounded_rectangle([right_x1, prim_y1, right_x2, prim_y2], radius=20, fill="#1E293B", outline="#475569", width=2)
+                draw.rounded_rectangle([right_x1, prim_y1, right_x1 + 12, prim_y2], radius=4, fill="#38BDF8")
 
-            card_pad_y = 40
-            card_box = [card_x1, start_y - card_pad_y, card_x2, start_y + total_text_h + card_pad_y]
-            draw.rounded_rectangle(card_box, radius=18, fill="#1E293B", outline="#475569", width=2)
-            draw.rounded_rectangle([card_x1, card_box[1], card_x1 + 12, card_box[3]], radius=4, fill="#38BDF8")
+                center_lines = wrap_text(cue["text"], font_center, right_x2 - right_x1 - 120, draw)
+                line_height = 58
+                total_text_h = len(center_lines) * line_height
+                start_y = prim_y1 + (prim_y2 - prim_y1 - total_text_h) // 2
+                for line in center_lines:
+                    draw.text((right_x1 + 60, start_y), line, font=font_center, fill="#FFFFFF")
+                    start_y += line_height
 
-            curr_y = start_y
-            for line in center_lines:
-                bbox = draw.textbbox((0, 0), line, font=font_center)
-                line_w = bbox[2] - bbox[0]
-                x = (width - line_w) // 2
-                draw.text((x, curr_y), line, font=font_center, fill="#FFFFFF")
-                curr_y += line_height
+                # 3. Right Column: Context Stream Card
+                ctx_y1 = 600
+                ctx_y2 = 1000
+                draw.rounded_rectangle([right_x1, ctx_y1, right_x2, ctx_y2], radius=18, fill="#0F172A", outline="#334155", width=2)
 
-            # 3. Bottom Context Review Box
-            bottom_box = [100, 760, width - 100, 990]
-            draw.rounded_rectangle(bottom_box, radius=14, fill="#0F172A", outline="#334155", width=2)
+                draw.rounded_rectangle([right_x1 + 40, ctx_y1 + 25, right_x1 + 240, ctx_y1 + 58], radius=6, fill="#1E293B")
+                draw.text((right_x1 + 55, ctx_y1 + 30), "CONTEXT STREAM", font=font_context_label, fill="#94A3B8")
 
-            label_text = "CONTEXT STREAM"
-            bbox_label = draw.textbbox((0, 0), label_text, font=font_context_label)
-            label_w = bbox_label[2] - bbox_label[0]
-            pill_pad_x = 14
-            pill_right = 125 + pill_pad_x + label_w + pill_pad_x
-            draw.rounded_rectangle([125, 775, pill_right, 805], radius=6, fill="#1E293B")
-            draw.text((125 + pill_pad_x, 780), label_text, font=font_context_label, fill="#94A3B8")
+                ctx_y = ctx_y1 + 88
+                if idx > 0:
+                    draw.polygon([(right_x1 + 45, ctx_y + 13), (right_x1 + 55, ctx_y + 7), (right_x1 + 55, ctx_y + 19)], fill="#94A3B8")
+                    prev_lines = wrap_text(cues[idx - 1]["text"], font_context_dim, right_x2 - right_x1 - 120, draw)
+                    draw.text((right_x1 + 75, ctx_y), prev_lines[0] if prev_lines else "", font=font_context_dim, fill="#94A3B8")
+                    ctx_y += 42
 
-            ctx_y = 828
-            if idx > 0:
-                draw.polygon([(130, ctx_y + 13), (140, ctx_y + 7), (140, ctx_y + 19)], fill="#94A3B8")
-                prev_lines = wrap_text(cues[idx - 1]["text"], font_context_dim, 1630, draw)
-                draw.text((155, ctx_y), prev_lines[0] if prev_lines else "", font=font_context_dim, fill="#94A3B8")
+                draw.polygon([(right_x1 + 45, ctx_y + 7), (right_x1 + 45, ctx_y + 21), (right_x1 + 57, ctx_y + 14)], fill="#38BDF8")
+                curr_ctx_lines = wrap_text(cue["text"], font_context, right_x2 - right_x1 - 120, draw)
+                draw.text((right_x1 + 75, ctx_y), curr_ctx_lines[0] if curr_ctx_lines else "", font=font_context, fill="#38BDF8")
                 ctx_y += 42
 
-            draw.polygon([(130, ctx_y + 7), (130, ctx_y + 21), (142, ctx_y + 14)], fill="#38BDF8")
-            curr_ctx_lines = wrap_text(cue["text"], font_context, 1630, draw)
-            draw.text((155, ctx_y), curr_ctx_lines[0] if curr_ctx_lines else "", font=font_context, fill="#38BDF8")
-            ctx_y += 42
+                if idx + 1 < total_cues:
+                    draw.text((right_x1 + 45, ctx_y), "…", font=font_context_dim, fill="#94A3B8")
+                    next_lines = wrap_text(cues[idx + 1]["text"], font_context_dim, right_x2 - right_x1 - 120, draw)
+                    draw.text((right_x1 + 75, ctx_y), next_lines[0] if next_lines else "", font=font_context_dim, fill="#94A3B8")
 
-            if idx + 1 < total_cues:
-                draw.text((130, ctx_y), "…", font=font_context_dim, fill="#94A3B8")
-                next_lines = wrap_text(cues[idx + 1]["text"], font_context_dim, 1630, draw)
-                draw.text((155, ctx_y), next_lines[0] if next_lines else "", font=font_context_dim, fill="#94A3B8")
+                # 4. Left Column: Studio Presenter Card with Live Equalizer Soundwave
+                card_x1, card_y1 = 80, 130
+                slice_step = 0.10
+                num_slices = max(1, int(round(duration / slice_step)))
+                actual_slice_dur = duration / num_slices
+                cue_start_t = cue["start"]
 
-            frame_file = os.path.join(temp_dir, f"frame_{idx:04d}.png")
-            img.save(frame_file)
-            frame_files.append(frame_file)
-            durations.append(duration)
+                hud_x1 = 20
+                bars_start_x = hud_x1 + 205
+                max_bar_h = 48
+                baseline_y = (card_h - 20) - 20
+                bar_w = 11
+                gap = 5
+
+                for s in range(num_slices):
+                    t_start = cue_start_t + s * actual_slice_dur
+                    t_end = t_start + actual_slice_dur
+                    bars = compute_soundwave_bars(audio_samples, t_start, t_end, num_bars=24)
+
+                    slice_card = av_card_base.copy()
+                    slice_card_draw = ImageDraw.Draw(slice_card)
+
+                    for b_idx, level in enumerate(bars):
+                        bh = max(4, int(level * max_bar_h))
+                        bx = bars_start_x + b_idx * (bar_w + gap)
+                        by1 = baseline_y - bh
+                        by2 = baseline_y
+                        if level > 0.75:
+                            bcolor = "#38BDF8"  # bright cyan
+                        elif level > 0.40:
+                            bcolor = "#60A5FA"  # soft sky blue
+                        else:
+                            bcolor = "#3B82F6"  # deep blue
+                        slice_card_draw.rounded_rectangle([bx, by1, bx + bar_w, by2], radius=3, fill=bcolor)
+
+                    slice_img = img.copy()
+                    slice_img.paste(slice_card, (card_x1, card_y1), av_mask)
+
+                    frame_file = os.path.join(temp_dir, f"frame_{idx:04d}_{s:03d}.png")
+                    slice_img.save(frame_file)
+                    frame_files.append(frame_file)
+                    durations.append(actual_slice_dur)
+
+            else:
+                # ===================== STANDARD CENTERED CARD LAYOUT =====================
+                # 1. Top Header Bar
+                badge_bbox = draw.textbbox((0, 0), tag, font=font_header)
+                badge_w = badge_bbox[2] - badge_bbox[0]
+                badge_right = max(420, 100 + 20 + badge_w + 20)
+                draw.rounded_rectangle([100, 60, badge_right, 102], radius=8, fill="#1E293B", outline="#3B82F6", width=2)
+                draw.text((120, 70), tag, font=font_header, fill="#60A5FA")
+
+                title_x = badge_right + 30
+                draw.text((title_x, 70), title, font=font_title, fill="#F8FAFC")
+                progress_str = f"{idx + 1:02d} / {total_cues:02d}"
+                draw.text((width - 240, 70), progress_str, font=font_header, fill="#E2E8F0")
+
+                # 2. Central Primary Subtitle Card (1440px centered, balanced breathing room)
+                card_x1 = 240
+                card_x2 = width - 240
+                center_lines = wrap_text(cue["text"], font_center, 1240, draw)
+                line_height = 62
+                total_text_h = len(center_lines) * line_height
+                start_y = 440 - (total_text_h // 2)
+
+                card_pad_y = 40
+                card_box = [card_x1, start_y - card_pad_y, card_x2, start_y + total_text_h + card_pad_y]
+                draw.rounded_rectangle(card_box, radius=18, fill="#1E293B", outline="#475569", width=2)
+                draw.rounded_rectangle([card_x1, card_box[1], card_x1 + 12, card_box[3]], radius=4, fill="#38BDF8")
+
+                curr_y = start_y
+                for line in center_lines:
+                    bbox = draw.textbbox((0, 0), line, font=font_center)
+                    line_w = bbox[2] - bbox[0]
+                    x = (width - line_w) // 2
+                    draw.text((x, curr_y), line, font=font_center, fill="#FFFFFF")
+                    curr_y += line_height
+
+                # 3. Bottom Context Review Box
+                bottom_box = [100, 760, width - 100, 990]
+                draw.rounded_rectangle(bottom_box, radius=14, fill="#0F172A", outline="#334155", width=2)
+
+                label_text = "CONTEXT STREAM"
+                bbox_label = draw.textbbox((0, 0), label_text, font=font_context_label)
+                label_w = bbox_label[2] - bbox_label[0]
+                pill_pad_x = 14
+                pill_right = 125 + pill_pad_x + label_w + pill_pad_x
+                draw.rounded_rectangle([125, 775, pill_right, 805], radius=6, fill="#1E293B")
+                draw.text((125 + pill_pad_x, 780), label_text, font=font_context_label, fill="#94A3B8")
+
+                ctx_y = 828
+                if idx > 0:
+                    draw.polygon([(130, ctx_y + 13), (140, ctx_y + 7), (140, ctx_y + 19)], fill="#94A3B8")
+                    prev_lines = wrap_text(cues[idx - 1]["text"], font_context_dim, 1630, draw)
+                    draw.text((155, ctx_y), prev_lines[0] if prev_lines else "", font=font_context_dim, fill="#94A3B8")
+                    ctx_y += 42
+
+                draw.polygon([(130, ctx_y + 7), (130, ctx_y + 21), (142, ctx_y + 14)], fill="#38BDF8")
+                curr_ctx_lines = wrap_text(cue["text"], font_context, 1630, draw)
+                draw.text((155, ctx_y), curr_ctx_lines[0] if curr_ctx_lines else "", font=font_context, fill="#38BDF8")
+                ctx_y += 42
+
+                if idx + 1 < total_cues:
+                    draw.text((130, ctx_y), "…", font=font_context_dim, fill="#94A3B8")
+                    next_lines = wrap_text(cues[idx + 1]["text"], font_context_dim, 1630, draw)
+                    draw.text((155, ctx_y), next_lines[0] if next_lines else "", font=font_context_dim, fill="#94A3B8")
+
+                frame_file = os.path.join(temp_dir, f"frame_{idx:04d}.png")
+                img.save(frame_file)
+                frame_files.append(frame_file)
+                durations.append(duration)
 
         concat_file = os.path.join(temp_dir, "concat.txt")
         with open(concat_file, "w", encoding="utf-8") as f:
             for i in range(len(frame_files)):
                 f.write(f"file '{frame_files[i]}'\n")
-                f.write(f"duration {durations[i]:.3f}\n")
+                f.write(f"duration {durations[i]:.4f}\n")
             f.write(f"file '{frame_files[-1]}'\n")
 
         # Locate ffmpeg
@@ -476,6 +810,9 @@ def generate_dual_subtitle_video(
     level: str = "a2",
     bg_blur: Optional[int] = None,
     bg_alpha: Optional[float] = None,
+    layout: str = "standard",
+    avatar_image: Optional[str | Path] = None,
+    avatar_badge: str = "AI TECH MENTOR",
 ) -> str:
     """High-level end-to-end generator pipeline: input text -> Edge-TTS speech & cues -> rendered MP4."""
     input_p = Path(input_path).resolve()
@@ -492,12 +829,13 @@ def generate_dual_subtitle_video(
         mp3_path = os.path.join(temp_dir, "speech.mp3")
         vtt_path = os.path.join(temp_dir, "speech.vtt")
 
-        logger.info(f"Synthesizing speech ({cfg['level'].upper()} rate={actual_rate}) and timestamps using {voice}...")
+        actual_voice = resolve_voice(voice)
+        logger.info(f"Synthesizing speech ({cfg['level'].upper()} rate={actual_rate}) and timestamps using {actual_voice}...")
         tts_cmd = [
             sys.executable,
             "-m",
             "edge_tts",
-            f"--voice={voice}",
+            f"--voice={actual_voice}",
             f"--rate={actual_rate}",
             f"--pitch={pitch}",
             "-f",
@@ -523,6 +861,9 @@ def generate_dual_subtitle_video(
             bg_image_path=bg_image,
             bg_blur=bg_blur,
             bg_alpha=bg_alpha,
+            layout=layout,
+            avatar_image=avatar_image,
+            avatar_badge=avatar_badge,
         )
 
         if cover_path:
@@ -534,6 +875,9 @@ def generate_dual_subtitle_video(
                 bg_image_path=bg_image,
                 bg_blur=bg_blur,
                 bg_alpha=bg_alpha,
+                layout=layout,
+                avatar_image=avatar_image,
+                avatar_badge=avatar_badge,
             )
 
         return rendered_mp4
@@ -577,66 +921,177 @@ def generate_video_cover(
     bg_image_path: Optional[str | Path] = None,
     bg_blur: Optional[int] = None,
     bg_alpha: Optional[float] = None,
+    layout: str = "standard",
+    avatar_image: Optional[str | Path] = None,
+    avatar_badge: str = "AI TECH MENTOR",
 ) -> Path:
-    """Generate a standard 16:9 (1920x1080) video cover image for video platforms."""
+    """Generate a standard 16:9 (1920x1080) video cover image for video platforms.
+    
+    Supports both standard hero layout and digital tutor avatar presenter layout.
+    """
     out_p = Path(output_path).resolve()
     out_p.parent.mkdir(parents=True, exist_ok=True)
 
-    blur_val = bg_blur if bg_blur is not None else 3
-    alpha_val = bg_alpha if bg_alpha is not None else 0.20
+    is_avatar_mode = (layout or "").lower() == "avatar"
+    actual_avatar: Optional[Path] = None
+    if is_avatar_mode:
+        actual_avatar = resolve_avatar_image(avatar_image)
+        if not actual_avatar:
+            logger.warning("Avatar layout requested for cover but avatar image could not be resolved. Falling back to standard cover.")
+            is_avatar_mode = False
+
+    blur_val = bg_blur if bg_blur is not None else (20 if is_avatar_mode else 3)
+    alpha_val = bg_alpha if bg_alpha is not None else (0.45 if is_avatar_mode else 0.20)
+    effective_bg = bg_image_path or (actual_avatar if is_avatar_mode else None)
+
     img = prepare_ambient_background(
-        width, height, bg_image_path=bg_image_path, blur_radius=blur_val, overlay_alpha=alpha_val
+        width, height, bg_image_path=effective_bg, blur_radius=blur_val, overlay_alpha=alpha_val
     )
     img = apply_top_scrim(img, height=160, start_alpha=0.75)
     draw = ImageDraw.Draw(img)
 
-    font_badge = _get_font(28, bold=True)
-    font_title = _get_font(56, bold=True)
-    font_sub = _get_font(34, bold=False)
-    font_footer = _get_font(24, bold=False)
-
-    # 1. Top badge tag pill
-    badge_text = tag.upper()
-    bbox_badge = draw.textbbox((0, 0), badge_text, font=font_badge)
-    badge_w = bbox_badge[2] - bbox_badge[0]
-    pill_x1, pill_y1 = 120, 100
-    pill_x2, pill_y2 = pill_x1 + badge_w + 50, pill_y1 + 54
-    draw.rounded_rectangle([pill_x1, pill_y1, pill_x2, pill_y2], radius=10, fill="#1E293B", outline="#38BDF8", width=2)
-    draw.text((pill_x1 + 25, pill_y1 + 10), badge_text, font=font_badge, fill="#38BDF8")
-
-    # 2. Main Center Hero Card
-    card_x1, card_y1 = 120, 200
-    card_x2, card_y2 = width - 120, 880
-    draw.rounded_rectangle([card_x1, card_y1, card_x2, card_y2], radius=24, fill="#1E293B", outline="#334155", width=2)
-    # Left accent bar
-    draw.rounded_rectangle([card_x1, card_y1, card_x1 + 16, card_y2], radius=6, fill="#38BDF8")
-
-    # Clean title
     clean_t = clean_video_title(title)
-    title_lines = wrap_text(clean_t, font_title, card_x2 - card_x1 - 160, draw)
-    line_h = 76
 
-    # Vertical centering inside hero card
-    start_y = card_y1 + 120
-    for line in title_lines:
-        draw.text((card_x1 + 80, start_y), line, font=font_title, fill="#FFFFFF")
-        start_y += line_h
+    if is_avatar_mode and actual_avatar:
+        # ===================== AVATAR PRESENTER COVER LAYOUT =====================
+        # 1. Left Column: Avatar Card
+        card_x1, card_y1 = 100, 140
+        card_w, card_h = 620, 820
+        card_x2, card_y2 = card_x1 + card_w, card_y1 + card_h
 
-    # Subtitle with cyan bullet
-    sub_y = start_y + 40
-    bullet_size = 8
-    bx = card_x1 + 80
-    by = sub_y + 20
-    draw.polygon([(bx, by - bullet_size), (bx + bullet_size, by), (bx, by + bullet_size), (bx - bullet_size, by)], fill="#38BDF8")
-    draw.text((bx + 24, sub_y), subtitle, font=font_sub, fill="#94A3B8")
+        try:
+            av_raw = Image.open(actual_avatar).convert("RGB")
+            av_scale = max(card_w / av_raw.width, card_h / av_raw.height)
+            anw, anh = int(av_raw.width * av_scale), int(av_raw.height * av_scale)
+            av_resized = av_raw.resize((anw, anh), Image.Resampling.LANCZOS)
+            av_left = (anw - card_w) // 2
+            av_top = (anh - card_h) // 2
+            av_cropped = av_resized.crop((av_left, av_top, av_left + card_w, av_top + card_h)).convert("RGBA")
 
-    # Subtle divider line inside card
-    div_y = card_y2 - 100
-    draw.line([(card_x1 + 80, div_y), (card_x2 - 80, div_y)], fill="#334155", width=2)
+            mask = Image.new("L", (card_w, card_h), 0)
+            mask_draw = ImageDraw.Draw(mask)
+            mask_draw.rounded_rectangle([0, 0, card_w, card_h], radius=24, fill=255)
+            img.paste(av_cropped, (card_x1, card_y1), mask)
+            draw.rounded_rectangle([card_x1, card_y1, card_x2, card_y2], radius=24, outline="#38BDF8", width=3)
 
-    # Card footer info
-    draw.text((card_x1 + 80, div_y + 30), "1080P FULL HD | DUAL-SUBTITLE STREAM", font=font_footer, fill="#64748B")
-    draw.text((card_x2 - 440, div_y + 30), "FOCUS STREAM | CONTEXT HISTORY", font=font_footer, fill="#64748B")
+            # Top Mentor Tag Pill
+            draw.rounded_rectangle([card_x1 + 25, card_y1 + 25, card_x1 + 230, card_y1 + 62], radius=8, fill="#0F172AE6", outline="#38BDF8", width=1)
+            font_av_badge = _get_font(18, bold=True)
+            draw.text((card_x1 + 40, card_y1 + 32), avatar_badge, font=font_av_badge, fill="#38BDF8")
+
+            # Bottom Audio Equalizer HUD
+            hud_x1, hud_y1 = card_x1 + 20, card_y2 - 110
+            hud_x2, hud_y2 = card_x2 - 20, card_y2 - 20
+            draw.rounded_rectangle([hud_x1, hud_y1, hud_x2, hud_y2], radius=16, fill="#0B132BEF", outline="#38BDF8", width=2)
+            draw.ellipse([hud_x1 + 20, hud_y1 + 24, hud_x1 + 32, hud_y1 + 36], fill="#10B981")
+            font_hud_sub = _get_font(14, bold=True)
+            draw.text((hud_x1 + 42, hud_y1 + 20), "VOICE STREAM", font=font_hud_sub, fill="#10B981")
+            draw.text((hud_x1 + 20, hud_y1 + 48), "SPEECH EQUALIZER", font=_get_font(12, bold=False), fill="#64748B")
+
+            # Cover sample preview bars
+            preview_bars = [0.15, 0.45, 0.85, 0.95, 0.70, 0.80, 0.55, 0.90, 0.65, 0.40, 0.75, 0.85, 0.60, 0.35, 0.50, 0.70, 0.45, 0.30, 0.60, 0.40, 0.25, 0.20, 0.15, 0.10]
+            bars_start_x = hud_x1 + 200
+            max_bar_h = 48
+            baseline_y = hud_y2 - 20
+            bar_w = 11
+            gap = 5
+            for b_idx, level in enumerate(preview_bars):
+                bh = max(4, int(level * max_bar_h))
+                bx = bars_start_x + b_idx * (bar_w + gap)
+                by1 = baseline_y - bh
+                by2 = baseline_y
+                bcolor = "#38BDF8" if level > 0.75 else ("#60A5FA" if level > 0.40 else "#3B82F6")
+                draw.rounded_rectangle([bx, by1, bx + bar_w, by2], radius=3, fill=bcolor)
+        except Exception as e:
+            logger.warning(f"Failed to render avatar on cover: {e}")
+
+        # 2. Right Column: Hero Card
+        hero_x1, hero_y1 = 760, 140
+        hero_x2, hero_y2 = width - 100, 960
+        draw.rounded_rectangle([hero_x1, hero_y1, hero_x2, hero_y2], radius=24, fill="#1E293B", outline="#334155", width=2)
+        draw.rounded_rectangle([hero_x1, hero_y1, hero_x1 + 16, hero_y2], radius=6, fill="#38BDF8")
+
+        # Top Tag Pill
+        font_badge = _get_font(24, bold=True)
+        badge_text = tag.upper()
+        bbox_b = draw.textbbox((0, 0), badge_text, font=font_badge)
+        bw = bbox_b[2] - bbox_b[0]
+        draw.rounded_rectangle([hero_x1 + 70, hero_y1 + 60, hero_x1 + 70 + bw + 50, hero_y1 + 110], radius=10, fill="#0F172A", outline="#38BDF8", width=2)
+        draw.text((hero_x1 + 95, hero_y1 + 72), badge_text, font=font_badge, fill="#38BDF8")
+
+        # Clean Title
+        font_title = _get_font(50, bold=True)
+        title_lines = wrap_text(clean_t, font_title, hero_x2 - hero_x1 - 140, draw)
+        line_h = 68
+        ty = hero_y1 + 160
+        for line in title_lines:
+            draw.text((hero_x1 + 70, ty), line, font=font_title, fill="#FFFFFF")
+            ty += line_h
+
+        # Subtitle
+        font_sub = _get_font(28, bold=False)
+        sub_y = ty + 30
+        bullet_size = 8
+        bx = hero_x1 + 70
+        by = sub_y + 16
+        draw.polygon([(bx, by - bullet_size), (bx + bullet_size, by), (bx, by + bullet_size), (bx - bullet_size, by)], fill="#38BDF8")
+        draw.text((bx + 24, sub_y), subtitle, font=font_sub, fill="#94A3B8")
+
+        # Subtle divider line inside hero card
+        div_y = hero_y2 - 100
+        draw.line([(hero_x1 + 70, div_y), (hero_x2 - 70, div_y)], fill="#334155", width=2)
+
+        font_footer = _get_font(22, bold=False)
+        draw.text((hero_x1 + 70, div_y + 30), "1080P FULL HD | DUAL-SUBTITLE STREAM", font=font_footer, fill="#64748B")
+        draw.text((hero_x2 - 380, div_y + 30), "PIXAR 3D AVATAR MENTOR", font=font_footer, fill="#64748B")
+
+    else:
+        # ===================== STANDARD CENTERED HERO COVER =====================
+        font_badge = _get_font(28, bold=True)
+        font_title = _get_font(56, bold=True)
+        font_sub = _get_font(34, bold=False)
+        font_footer = _get_font(24, bold=False)
+
+        # 1. Top badge tag pill
+        badge_text = tag.upper()
+        bbox_badge = draw.textbbox((0, 0), badge_text, font=font_badge)
+        badge_w = bbox_badge[2] - bbox_badge[0]
+        pill_x1, pill_y1 = 120, 100
+        pill_x2, pill_y2 = pill_x1 + badge_w + 50, pill_y1 + 54
+        draw.rounded_rectangle([pill_x1, pill_y1, pill_x2, pill_y2], radius=10, fill="#1E293B", outline="#38BDF8", width=2)
+        draw.text((pill_x1 + 25, pill_y1 + 10), badge_text, font=font_badge, fill="#38BDF8")
+
+        # 2. Main Center Hero Card
+        card_x1, card_y1 = 120, 200
+        card_x2, card_y2 = width - 120, 880
+        draw.rounded_rectangle([card_x1, card_y1, card_x2, card_y2], radius=24, fill="#1E293B", outline="#334155", width=2)
+        # Left accent bar
+        draw.rounded_rectangle([card_x1, card_y1, card_x1 + 16, card_y2], radius=6, fill="#38BDF8")
+
+        title_lines = wrap_text(clean_t, font_title, card_x2 - card_x1 - 160, draw)
+        line_h = 76
+
+        # Vertical centering inside hero card
+        start_y = card_y1 + 120
+        for line in title_lines:
+            draw.text((card_x1 + 80, start_y), line, font=font_title, fill="#FFFFFF")
+            start_y += line_h
+
+        # Subtitle with cyan bullet
+        sub_y = start_y + 40
+        bullet_size = 8
+        bx = card_x1 + 80
+        by = sub_y + 20
+        draw.polygon([(bx, by - bullet_size), (bx + bullet_size, by), (bx, by + bullet_size), (bx - bullet_size, by)], fill="#38BDF8")
+        draw.text((bx + 24, sub_y), subtitle, font=font_sub, fill="#94A3B8")
+
+        # Subtle divider line inside card
+        div_y = card_y2 - 100
+        draw.line([(card_x1 + 80, div_y), (card_x2 - 80, div_y)], fill="#334155", width=2)
+
+        # Card footer info
+        draw.text((card_x1 + 80, div_y + 30), "1080P FULL HD | DUAL-SUBTITLE STREAM", font=font_footer, fill="#64748B")
+        draw.text((card_x2 - 440, div_y + 30), "FOCUS STREAM | CONTEXT HISTORY", font=font_footer, fill="#64748B")
 
     img.save(str(out_p), "PNG")
     logger.info(f"Video cover generated at: {out_p}")
@@ -654,6 +1109,8 @@ def generate_video_payload_md(
     sentences_path: Optional[str | Path] = None,
     notes: Optional[str] = None,
     level: str = "a2",
+    layout: str = "standard",
+    avatar_filename: Optional[str] = None,
 ) -> Path:
     """Generate a standard payload.md compliant with publish-video and video platform specifications."""
     p_dir = Path(payload_dir).resolve()
@@ -693,9 +1150,14 @@ def generate_video_payload_md(
         f'author: "{author}"',
         f'desc: "{clean_d}"',
         f'level: "{level.lower()}"',
+        f'layout: "{layout.lower()}"',
         f'collection: "{collection}"',
         f'cover: "{cover_filename}"',
         f'video: "{video_filename}"',
+    ]
+    if avatar_filename:
+        md_lines.append(f'avatar: "{avatar_filename}"')
+    md_lines.extend([
         "---",
         "",
         f"# {clean_t}",
@@ -704,7 +1166,7 @@ def generate_video_payload_md(
         "",
         clean_d,
         "",
-    ]
+    ])
 
     if notes:
         md_lines.extend([
@@ -746,6 +1208,9 @@ def create_dual_sub_payload(
     level: str = "a2",
     bg_blur: Optional[int] = None,
     bg_alpha: Optional[float] = None,
+    layout: str = "standard",
+    avatar_image: Optional[str | Path] = None,
+    avatar_badge: str = "AI TECH MENTOR",
 ) -> Dict[str, Any]:
     """Assemble a complete standard video payload: video.mp4, cover.png, payload.md, sentences.txt."""
     p_dir = Path(payload_dir).resolve()
@@ -779,6 +1244,39 @@ def create_dual_sub_payload(
                 actual_bg = candidate
                 break
 
+    # Resolve avatar if avatar layout requested
+    actual_avatar: Optional[Path] = None
+    avatar_filename: Optional[str] = None
+    is_avatar = (layout or "").lower() == "avatar"
+    if is_avatar:
+        resolved_av = resolve_avatar_image(avatar_image)
+        if resolved_av and resolved_av.exists():
+            dest_av = p_dir / "avatar.png"
+            if resolved_av != dest_av:
+                shutil.copy2(resolved_av, dest_av)
+            actual_avatar = dest_av
+            avatar_filename = "avatar.png"
+
+            # Copy all available avatar animation states into payload directory
+            source_states = resolve_avatar_states(resolved_av)
+            for st_name, st_path in source_states.items():
+                if st_name == "closed":
+                    continue
+                if st_name == "open":
+                    dest_st = p_dir / "avatar_mouth_open.png"
+                elif st_name == "wide":
+                    dest_st = p_dir / "avatar_mouth_wide.png"
+                elif st_name == "blink":
+                    dest_st = p_dir / "avatar_blink.png"
+                else:
+                    dest_st = p_dir / f"avatar_{st_name}.png"
+                if st_path.exists() and st_path != dest_st:
+                    shutil.copy2(st_path, dest_st)
+        else:
+            logger.warning(f"Avatar layout requested but avatar could not be resolved.")
+            is_avatar = False
+            layout = "standard"
+
     video_path = p_dir / "video.mp4"
     cover_path = p_dir / "cover.png"
 
@@ -795,6 +1293,9 @@ def create_dual_sub_payload(
         level=cfg["level"],
         bg_blur=bg_blur,
         bg_alpha=bg_alpha,
+        layout=layout,
+        avatar_image=actual_avatar,
+        avatar_badge=avatar_badge,
     )
 
     # 2. Generate cover
@@ -806,6 +1307,9 @@ def create_dual_sub_payload(
         bg_image_path=actual_bg,
         bg_blur=bg_blur,
         bg_alpha=bg_alpha,
+        layout=layout,
+        avatar_image=actual_avatar,
+        avatar_badge=avatar_badge,
     )
 
     # 3. Generate payload.md
@@ -820,6 +1324,8 @@ def create_dual_sub_payload(
         sentences_path=dest_sent,
         notes=notes,
         level=cfg["level"],
+        layout=layout,
+        avatar_filename=avatar_filename,
     )
 
     return {
@@ -829,6 +1335,8 @@ def create_dual_sub_payload(
         "cover_path": cover_path,
         "sentences_path": dest_sent,
         "bg_image": str(actual_bg) if actual_bg else None,
+        "avatar_image": str(actual_avatar) if actual_avatar else None,
+        "layout": layout,
         "level": cfg["level"],
         "rate": cfg["rate"],
         "tag": cfg["tag"],
