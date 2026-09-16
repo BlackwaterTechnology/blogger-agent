@@ -221,6 +221,9 @@ python3 -m src.blogger.cli video \
 | `--layout` | 否 | `standard` | 视频视觉布局风格（`standard` 为经典居中卡片；`avatar` 为皮克斯 3D / 虚拟导师双栏演播室布局） |
 | `--avatar` | 否 | 内置极客演播室头像 | 演播主播肖像图片路径（若指定 `--avatar` 则自动切换为 avatar 布局；默认内置 `skills/dual-subtitle-video/images/avatar_geek_studio.png`） |
 | `--avatar-badge` | 否 | `AI TECH MENTOR` | 人物卡片左下角角色标签文本（如 `AI TECH MENTOR`, `ENGLISH TUTOR`） |
+| `--avatar-video` | 否 | - | 动态口播视频路径（方案 B 神经数字人视频流，如 `avatar_talking.mp4`） |
+| `--avatar-driver`| 否 | `auto` | 数字人驱动引擎（`auto`, `mlx`, `pytorch`, `cloud`, `template`） |
+| `--generate-digital-human` | 否 | False | 是否显式生成数字人视频（方案 B） |
 | `--platform` | 否 | - | 生成后直接发布的平台（如 `wechat_video,bilibili`） |
 | `--no-publish`| 否 | False | 预览模式（跳过最终发布点击） |
 
@@ -228,7 +231,7 @@ python3 -m src.blogger.cli video \
 
 ## Visual Layout Modes (视觉布局模式与人物演播室选型)
 
-`dual-subtitle-video` 支持两种视觉布局模式，可在生成时自由切换：
+`dual-subtitle-video` 支持两种视觉布局模式与两种主播驱动方案，可在生成时自由切换：
 
 ### 1. 经典居中卡片模式（`--layout standard`，默认模式）
 - **特点**：全屏居中 1440px 聚焦卡片 + 底部 1630px 上下文流。
@@ -242,27 +245,41 @@ python3 -m src.blogger.cli video \
   ```
 
 ### 2. 3D 皮克斯 / 虚拟导师演播室模式（`--layout avatar`）
-- **特点**：16:9 演播室双栏架构。左侧 35% 为高清演播导师卡片（带青色发光边框与身份 Badge），右侧 65% 为主字幕聚焦卡片与实时上下文流；背景采用同款演播室景深微光虚化，封画与视频完美统一。
+- **特点**：16:9 演播室双栏架构。左侧 35% 为演播导师卡片（带青色发光边框、身份 Badge 与 24 轨真声音频频谱律动），右侧 65% 为主字幕聚焦卡片与实时上下文流；背景采用同款演播室景深微光虚化，封画与视频完美统一。
 - **内置素材库**：
   - `skills/dual-subtitle-video/images/avatar_geek_studio.png`：经过顶部画幅裁剪与水印微修的皮克斯 3D 极客演播室导师（默认使用）；
   - `skills/dual-subtitle-video/images/极客科技演播室.png`：原始高画幅机房背景母图备用。
-- **适用场景**：个人 IP 打造、程序员日常职场英语、DevOps 站会演练、高完播率社交平台短视频。
+- **方案 A（高清肖像 + 动态声波，默认）**：
+  - 保留 1080P 高清无损肖像，杜绝恐怖谷面部撕裂；
+  - 实时提取音频 PCM 与 FFT 频域能量，24 轨声波柱随语调声浪起伏跳动。
+- **方案 B（神经数字人驱动 / LivePortrait，`--generate-digital-human` 或 `--avatar-video`）**：
+  - 支持直接挂接预渲染口播视频（`--avatar-video`），或通过 Apple Silicon MLX / PyTorch MPS 运行 LivePortrait 生成口播视频；
+  - 自动通过 OpenCV / FFmpeg 将动态口播视频裁切并无缝融入演播室卡片与声波 HUD 中。
 - **示例命令**：
   ```bash
-  # 使用默认内置极客演播导师
+  # 方案 A：默认极客演播导师 + 动态声波 + Brian 美式男声
   python3 skills/dual-subtitle-video/scripts/dual_sub_video.py \
     -i sentences.txt \
     --payload-dir videos/devops_topic/ \
     --layout avatar \
+    --voice male \
     --title "DevOps Daily Standup Practice"
 
-  # 使用自定义人物图片与个性化 Badge
+  # 方案 B：直接挂接数字人口播视频
   python3 skills/dual-subtitle-video/scripts/dual_sub_video.py \
     -i sentences.txt \
-    --payload-dir videos/custom_topic/ \
+    --payload-dir videos/digital_topic/ \
     --layout avatar \
-    --avatar path/to/my_photo.png \
-    --avatar-badge "SENIOR ARCHITECT"
+    --avatar-video path/to/talking_avatar.mp4 \
+    --voice brian
+
+  # 方案 B：一键生成数字人口播视频流并拼合
+  python3 skills/dual-subtitle-video/scripts/dual_sub_video.py \
+    -i sentences.txt \
+    --payload-dir videos/auto_digital/ \
+    --layout avatar \
+    --generate-digital-human \
+    --avatar-driver auto
   ```
 
 ---

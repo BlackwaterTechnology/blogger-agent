@@ -72,6 +72,9 @@ def main():
     video_parser.add_argument("--layout", default="standard", choices=["standard", "avatar"], help="Visual layout for dual-subtitle video ('standard' or 'avatar')")
     video_parser.add_argument("--avatar", help="Path to avatar image for dual-subtitle video (defaults to built-in avatar in avatar layout)")
     video_parser.add_argument("--avatar-badge", default="AI TECH MENTOR", help="Role badge text on avatar card")
+    video_parser.add_argument("--avatar-video", help="Path to pre-rendered or driving digital human talking video (Scheme B)")
+    video_parser.add_argument("--avatar-driver", choices=["auto", "mlx", "pytorch", "cloud", "template"], help="Digital human driver engine (Scheme B)")
+    video_parser.add_argument("--generate-digital-human", action="store_true", help="Generate talking digital human video for studio avatar card")
 
 
 
@@ -326,7 +329,10 @@ def handle_video(args, payload_path):
         layout = getattr(args, "layout", "standard")
         avatar_img = getattr(args, "avatar", None)
         avatar_badge = getattr(args, "avatar_badge", "AI TECH MENTOR")
-        if avatar_img and layout == "standard":
+        avatar_vid = getattr(args, "avatar_video", None)
+        avatar_driver = getattr(args, "avatar_driver", None)
+        gen_dh = getattr(args, "generate_digital_human", False)
+        if (avatar_img or avatar_vid or avatar_driver or gen_dh) and layout == "standard":
             layout = "avatar"
 
         # 3. Generate dual-subtitle video
@@ -345,6 +351,9 @@ def handle_video(args, payload_path):
                 layout=layout,
                 avatar_image=avatar_img,
                 avatar_badge=avatar_badge,
+                avatar_video=avatar_vid,
+                avatar_driver=avatar_driver,
+                generate_digital_human=gen_dh,
             )
         except Exception as e:
             logger.error(f"Failed to generate dual-subtitle video: {e}")
@@ -361,11 +370,14 @@ def handle_video(args, payload_path):
                 layout=layout,
                 avatar_image=avatar_img,
                 avatar_badge=avatar_badge,
+                avatar_video=avatar_vid,
             )
 
         # 5. Generate payload.md if missing
         if not payload_md_path.exists():
             logger.info(f"Scaffolding payload.md at {payload_md_path}...")
+            dest_talking = payload_dir / "avatar_talking.mp4"
+            talking_filename = "avatar_talking.mp4" if dest_talking.exists() else None
             generate_video_payload_md(
                 payload_dir=payload_dir,
                 title=title,
@@ -376,6 +388,7 @@ def handle_video(args, payload_path):
                 sentences_path=input_file if input_file.suffix == ".txt" else None,
                 level=level,
                 layout=layout,
+                avatar_video_filename=talking_filename,
             )
 
         # 6. Parse payload.md to construct complete article_data for publishing

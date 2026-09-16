@@ -95,6 +95,20 @@ def main():
         default="AI TECH MENTOR",
         help="Role badge text on avatar card in avatar layout (default: 'AI TECH MENTOR').",
     )
+    parser.add_argument(
+        "--avatar-video",
+        help="Path to pre-rendered or driving digital human talking video (Scheme B).",
+    )
+    parser.add_argument(
+        "--avatar-driver",
+        choices=["auto", "mlx", "pytorch", "cloud", "template"],
+        help="Digital human driver engine (Scheme B).",
+    )
+    parser.add_argument(
+        "--generate-digital-human",
+        action="store_true",
+        help="Generate talking digital human video for studio avatar card (Scheme B).",
+    )
     args = parser.parse_args()
 
     input_file = Path(args.input).resolve()
@@ -106,7 +120,7 @@ def main():
         desc_text = args.desc or f"Master English listening with {args.title}, featuring dual-tier subtitles and context stream."
 
         layout_val = args.layout
-        if args.avatar and layout_val == "standard":
+        if (args.avatar or args.avatar_video or args.avatar_driver or args.generate_digital_human) and layout_val == "standard":
             layout_val = "avatar"
 
         if args.payload_dir:
@@ -134,6 +148,9 @@ def main():
                 layout=layout_val,
                 avatar_image=args.avatar,
                 avatar_badge=args.avatar_badge,
+                avatar_video=args.avatar_video,
+                avatar_driver=args.avatar_driver,
+                generate_digital_human=args.generate_digital_human,
             )
 
             print(f"Video created:   {result['video_path']}")
@@ -167,6 +184,9 @@ def main():
                 layout=layout_val,
                 avatar_image=args.avatar,
                 avatar_badge=args.avatar_badge,
+                avatar_video=args.avatar_video,
+                avatar_driver=args.avatar_driver,
+                generate_digital_human=args.generate_digital_human,
             )
             print(f"Video generated successfully: {out}")
             if cover_path and cover_path.exists():

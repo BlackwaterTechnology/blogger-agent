@@ -473,15 +473,18 @@ def render_video(
     layout: str = "standard",
     avatar_image: Optional[str | Path] = None,
     avatar_badge: str = "AI TECH MENTOR",
+    avatar_video: Optional[str | Path] = None,
 ) -> str:
     """Render frame cards and mux with audio into an MP4 file using FFmpeg.
     
     Supports two visual layout modes:
     - 'standard': Classic centered primary subtitle and bottom context stream.
     - 'avatar': 16:9 dual-column layout with studio presenter card and dynamic audio equalizer.
+      Supports static portrait (Route 1) and Scheme B digital human neural talking-head video (avatar_video).
     """
     width, height = 1920, 1080
     temp_dir = tempfile.mkdtemp(prefix="dual_sub_")
+    video_sampler: Optional[Any] = None
 
     try:
         is_avatar_mode = (layout or "").lower() == "avatar"
@@ -519,28 +522,22 @@ def render_video(
                     av_mask_draw = ImageDraw.Draw(av_mask)
                     av_mask_draw.rounded_rectangle([0, 0, card_w, card_h], radius=24, fill=255)
 
-                    card_draw = ImageDraw.Draw(av_card_base)
-                    # Outer border
-                    card_draw.rounded_rectangle([0, 0, card_w, card_h], radius=24, outline="#38BDF8", width=3)
-
-                    # Top Mentor Tag Pill
-                    card_draw.rounded_rectangle([25, 25, 230, 62], radius=8, fill="#0F172AE6", outline="#38BDF8", width=1)
-                    card_draw.text((40, 32), avatar_badge, font=font_hud_title, fill="#38BDF8")
-
-                    # Bottom Audio Equalizer HUD
-                    hud_x1, hud_y1 = 20, card_h - 110
-                    hud_x2, hud_y2 = card_w - 20, card_h - 20
-                    card_draw.rounded_rectangle([hud_x1, hud_y1, hud_x2, hud_y2], radius=16, fill="#0B132BEF", outline="#38BDF8", width=2)
-
-                    # Pulse Indicator & Labels
-                    card_draw.ellipse([hud_x1 + 20, hud_y1 + 24, hud_x1 + 32, hud_y1 + 36], fill="#10B981")
-                    card_draw.text((hud_x1 + 42, hud_y1 + 20), "VOICE STREAM", font=font_hud_sub, fill="#10B981")
-                    card_draw.text((hud_x1 + 20, hud_y1 + 48), "SPEECH EQUALIZER", font=_get_font(12, bold=False), fill="#64748B")
-
-                    logger.info("Studio avatar presenter card prepared with pristine static portrait and soundwave HUD.")
+                    logger.info("Studio avatar presenter card base prepared.")
                 except Exception as e:
                     logger.warning(f"Failed to prepare avatar card: {e}. Falling back to standard layout.")
                     is_avatar_mode = False
+
+            # Scheme B: Initialize VideoFrameSampler if digital human video is provided
+            if is_avatar_mode and avatar_video:
+                av_vid_path = Path(avatar_video).resolve()
+                if av_vid_path.exists():
+                    try:
+                        from src.blogger.core.digital_human import VideoFrameSampler
+                        video_sampler = VideoFrameSampler(av_vid_path, (card_w, card_h))
+                        logger.info(f"Studio layout: using Scheme B Digital Human video stream ({av_vid_path.name})")
+                    except Exception as e:
+                        logger.warning(f"Failed to initialize VideoFrameSampler for {av_vid_path}: {e}")
+                        video_sampler = None
 
             # Load audio PCM samples for real-time equalizer bars
             if is_avatar_mode and audio_path and os.path.exists(str(audio_path)):
@@ -652,8 +649,33 @@ def render_video(
                     t_end = t_start + actual_slice_dur
                     bars = compute_soundwave_bars(audio_samples, t_start, t_end, num_bars=24)
 
-                    slice_card = av_card_base.copy()
+                    if video_sampler is not None:
+                        try:
+                            slice_card = video_sampler.get_frame(t_start).convert("RGBA")
+                        except Exception as e:
+                            logger.warning(f"Error sampling digital human frame at t={t_start:.2f}: {e}")
+                            slice_card = av_card_base.copy()
+                    else:
+                        slice_card = av_card_base.copy()
+
                     slice_card_draw = ImageDraw.Draw(slice_card)
+
+                    # 1. Outer cyan border
+                    slice_card_draw.rounded_rectangle([0, 0, card_w, card_h], radius=24, outline="#38BDF8", width=3)
+
+                    # 2. Top Mentor Tag Pill
+                    slice_card_draw.rounded_rectangle([25, 25, 230, 62], radius=8, fill="#0F172AE6", outline="#38BDF8", width=1)
+                    slice_card_draw.text((40, 32), avatar_badge, font=font_hud_title, fill="#38BDF8")
+
+                    # 3. Bottom Audio Equalizer HUD
+                    hud_x1, hud_y1 = 20, card_h - 110
+                    hud_x2, hud_y2 = card_w - 20, card_h - 20
+                    slice_card_draw.rounded_rectangle([hud_x1, hud_y1, hud_x2, hud_y2], radius=16, fill="#0B132BEF", outline="#38BDF8", width=2)
+
+                    # Pulse Indicator & Labels
+                    slice_card_draw.ellipse([hud_x1 + 20, hud_y1 + 24, hud_x1 + 32, hud_y1 + 36], fill="#10B981")
+                    slice_card_draw.text((hud_x1 + 42, hud_y1 + 20), "VOICE STREAM", font=font_hud_sub, fill="#10B981")
+                    slice_card_draw.text((hud_x1 + 20, hud_y1 + 48), "SPEECH EQUALIZER", font=_get_font(12, bold=False), fill="#64748B")
 
                     for b_idx, level in enumerate(bars):
                         bh = max(4, int(level * max_bar_h))
@@ -793,6 +815,11 @@ def render_video(
         logger.info(f"Dual-subtitle video generated successfully: {output_path}")
         return str(output_path)
     finally:
+        if video_sampler is not None:
+            try:
+                video_sampler.close()
+            except Exception:
+                pass
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
@@ -813,6 +840,9 @@ def generate_dual_subtitle_video(
     layout: str = "standard",
     avatar_image: Optional[str | Path] = None,
     avatar_badge: str = "AI TECH MENTOR",
+    avatar_video: Optional[str | Path] = None,
+    avatar_driver: Optional[str] = None,
+    generate_digital_human: bool = False,
 ) -> str:
     """High-level end-to-end generator pipeline: input text -> Edge-TTS speech & cues -> rendered MP4."""
     input_p = Path(input_path).resolve()
@@ -852,6 +882,26 @@ def generate_dual_subtitle_video(
         cues = parse_vtt(vtt_path)
         logger.info(f"Parsed {len(cues)} sentence cues from {vtt_path}")
 
+        # Scheme B: Resolve or generate Digital Human talking head video
+        talking_avatar_video: Optional[Path] = None
+        if avatar_video:
+            av_vid_p = Path(avatar_video).resolve()
+            if av_vid_p.exists():
+                talking_avatar_video = av_vid_p
+                logger.info(f"Using provided digital human video: {talking_avatar_video}")
+        elif (generate_digital_human or avatar_driver) and (layout or "").lower() == "avatar":
+            resolved_av = resolve_avatar_image(avatar_image)
+            if resolved_av and resolved_av.exists():
+                from src.blogger.core.digital_human import get_digital_human_driver
+                driver = get_digital_human_driver(avatar_driver)
+                temp_talking_mp4 = Path(temp_dir) / "avatar_talking.mp4"
+                logger.info(f"Generating Scheme B digital human talking avatar with {driver.name}...")
+                talking_avatar_video = driver.generate(
+                    source_image=resolved_av,
+                    driving_audio=mp3_path,
+                    output_video=temp_talking_mp4,
+                )
+
         rendered_mp4 = render_video(
             cues,
             mp3_path,
@@ -864,6 +914,7 @@ def generate_dual_subtitle_video(
             layout=layout,
             avatar_image=avatar_image,
             avatar_badge=avatar_badge,
+            avatar_video=talking_avatar_video,
         )
 
         if cover_path:
@@ -878,6 +929,7 @@ def generate_dual_subtitle_video(
                 layout=layout,
                 avatar_image=avatar_image,
                 avatar_badge=avatar_badge,
+                avatar_video=talking_avatar_video,
             )
 
         return rendered_mp4
@@ -924,6 +976,7 @@ def generate_video_cover(
     layout: str = "standard",
     avatar_image: Optional[str | Path] = None,
     avatar_badge: str = "AI TECH MENTOR",
+    avatar_video: Optional[str | Path] = None,
 ) -> Path:
     """Generate a standard 16:9 (1920x1080) video cover image for video platforms.
     
@@ -936,7 +989,7 @@ def generate_video_cover(
     actual_avatar: Optional[Path] = None
     if is_avatar_mode:
         actual_avatar = resolve_avatar_image(avatar_image)
-        if not actual_avatar:
+        if not actual_avatar and not avatar_video:
             logger.warning("Avatar layout requested for cover but avatar image could not be resolved. Falling back to standard cover.")
             is_avatar_mode = False
 
@@ -952,7 +1005,7 @@ def generate_video_cover(
 
     clean_t = clean_video_title(title)
 
-    if is_avatar_mode and actual_avatar:
+    if is_avatar_mode and (actual_avatar or avatar_video):
         # ===================== AVATAR PRESENTER COVER LAYOUT =====================
         # 1. Left Column: Avatar Card
         card_x1, card_y1 = 100, 140
@@ -960,13 +1013,18 @@ def generate_video_cover(
         card_x2, card_y2 = card_x1 + card_w, card_y1 + card_h
 
         try:
-            av_raw = Image.open(actual_avatar).convert("RGB")
-            av_scale = max(card_w / av_raw.width, card_h / av_raw.height)
-            anw, anh = int(av_raw.width * av_scale), int(av_raw.height * av_scale)
-            av_resized = av_raw.resize((anw, anh), Image.Resampling.LANCZOS)
-            av_left = (anw - card_w) // 2
-            av_top = (anh - card_h) // 2
-            av_cropped = av_resized.crop((av_left, av_top, av_left + card_w, av_top + card_h)).convert("RGBA")
+            if avatar_video and Path(avatar_video).exists():
+                from src.blogger.core.digital_human import VideoFrameSampler
+                with VideoFrameSampler(avatar_video, (card_w, card_h)) as sampler:
+                    av_cropped = sampler.get_frame(0.0).convert("RGBA")
+            else:
+                av_raw = Image.open(actual_avatar).convert("RGB")
+                av_scale = max(card_w / av_raw.width, card_h / av_raw.height)
+                anw, anh = int(av_raw.width * av_scale), int(av_raw.height * av_scale)
+                av_resized = av_raw.resize((anw, anh), Image.Resampling.LANCZOS)
+                av_left = (anw - card_w) // 2
+                av_top = (anh - card_h) // 2
+                av_cropped = av_resized.crop((av_left, av_top, av_left + card_w, av_top + card_h)).convert("RGBA")
 
             mask = Image.new("L", (card_w, card_h), 0)
             mask_draw = ImageDraw.Draw(mask)
@@ -1111,6 +1169,7 @@ def generate_video_payload_md(
     level: str = "a2",
     layout: str = "standard",
     avatar_filename: Optional[str] = None,
+    avatar_video_filename: Optional[str] = None,
 ) -> Path:
     """Generate a standard payload.md compliant with publish-video and video platform specifications."""
     p_dir = Path(payload_dir).resolve()
@@ -1157,6 +1216,8 @@ def generate_video_payload_md(
     ]
     if avatar_filename:
         md_lines.append(f'avatar: "{avatar_filename}"')
+    if avatar_video_filename:
+        md_lines.append(f'avatar_video: "{avatar_video_filename}"')
     md_lines.extend([
         "---",
         "",
@@ -1211,6 +1272,9 @@ def create_dual_sub_payload(
     layout: str = "standard",
     avatar_image: Optional[str | Path] = None,
     avatar_badge: str = "AI TECH MENTOR",
+    avatar_video: Optional[str | Path] = None,
+    avatar_driver: Optional[str] = None,
+    generate_digital_human: bool = False,
 ) -> Dict[str, Any]:
     """Assemble a complete standard video payload: video.mp4, cover.png, payload.md, sentences.txt."""
     p_dir = Path(payload_dir).resolve()
@@ -1247,6 +1311,9 @@ def create_dual_sub_payload(
     # Resolve avatar if avatar layout requested
     actual_avatar: Optional[Path] = None
     avatar_filename: Optional[str] = None
+    actual_avatar_video: Optional[Path] = None
+    avatar_video_filename: Optional[str] = None
+
     is_avatar = (layout or "").lower() == "avatar"
     if is_avatar:
         resolved_av = resolve_avatar_image(avatar_image)
@@ -1277,6 +1344,15 @@ def create_dual_sub_payload(
             is_avatar = False
             layout = "standard"
 
+        if avatar_video:
+            src_av_vid = Path(avatar_video).resolve()
+            if src_av_vid.exists():
+                dest_av_vid = p_dir / "avatar_talking.mp4"
+                if src_av_vid != dest_av_vid:
+                    shutil.copy2(src_av_vid, dest_av_vid)
+                actual_avatar_video = dest_av_vid
+                avatar_video_filename = "avatar_talking.mp4"
+
     video_path = p_dir / "video.mp4"
     cover_path = p_dir / "cover.png"
 
@@ -1296,7 +1372,16 @@ def create_dual_sub_payload(
         layout=layout,
         avatar_image=actual_avatar,
         avatar_badge=avatar_badge,
+        avatar_video=actual_avatar_video,
+        avatar_driver=avatar_driver,
+        generate_digital_human=generate_digital_human,
     )
+
+    # If digital human video was generated during pipeline, record it
+    dest_talking = p_dir / "avatar_talking.mp4"
+    if dest_talking.exists():
+        actual_avatar_video = dest_talking
+        avatar_video_filename = "avatar_talking.mp4"
 
     # 2. Generate cover
     generate_video_cover(
@@ -1310,6 +1395,7 @@ def create_dual_sub_payload(
         layout=layout,
         avatar_image=actual_avatar,
         avatar_badge=avatar_badge,
+        avatar_video=actual_avatar_video,
     )
 
     # 3. Generate payload.md
@@ -1326,6 +1412,7 @@ def create_dual_sub_payload(
         level=cfg["level"],
         layout=layout,
         avatar_filename=avatar_filename,
+        avatar_video_filename=avatar_video_filename,
     )
 
     return {
@@ -1336,6 +1423,7 @@ def create_dual_sub_payload(
         "sentences_path": dest_sent,
         "bg_image": str(actual_bg) if actual_bg else None,
         "avatar_image": str(actual_avatar) if actual_avatar else None,
+        "avatar_video": str(actual_avatar_video) if actual_avatar_video else None,
         "layout": layout,
         "level": cfg["level"],
         "rate": cfg["rate"],
