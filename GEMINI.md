@@ -6,7 +6,9 @@
 
 The project offers core capabilities for:
 1. **Article Publishing**: Automating the publishing of local Markdown articles to web-based editors.
-2. **Video Generation**: Generating cinematic videos from documents or URLs using Google NotebookLM.
+2. **Video Generation**:
+   - **Cinematic Narrative Video (`generate-video`)**: Remote cloud AI video generation from documents or URLs using Google NotebookLM (15-45 min async workflow with subagent polling).
+   - **Dual-Subtitle Educational Video (`dual-subtitle-video`)**: Local lightweight card-based deterministic text-to-video using Edge-TTS, Pillow, and FFmpeg (seconds), fully integrated with `publish-video`.
 3. **Diagram Generation**: Creating infographics and technical diagrams via Kroki.
 
 ## Architecture
@@ -16,10 +18,11 @@ This tool uses Python and AppleScript to interact with a running instance of Goo
 ### Key Components
 - **Chrome Controllers**: Specialized controllers in `src/blogger/core/` (`cdp_chrome.py`, `jxa_chrome.py`, `chrome.py`) handle different aspects of browser interaction. CDP-based controllers allow for deeper interaction, while JXA handles macOS focus management.
 - **Markdown Parser**: `src/blogger/core/markdown_parser.py` uses `python-frontmatter` to parse articles, handling metadata and local image path rewriting.
+- **Visual & Video Generators**: `src/blogger/core/` houses `photo_card_generator.py`, `cover_generator.py`, `dual_sub_video.py`, and `diagrams.py`.
 - **Platform Publishers**: Platform-specific state machines in `src/blogger/platforms/` manage the complex UI flows for each site.
 - **Interfaces**:
     1. **MCP Server (`mcp_server.py`)**: Exposes structured JSON-RPC tools for modern IDEs. Note: it uses a round-trip mechanism where it materializes a temp Markdown file for the parser to consume.
-    2. **CLI Agent Skill (`cli.py`)**: Provides traditional terminal execution paths.
+    2. **CLI Agent Skill (`cli.py`)**: Provides traditional terminal execution paths (`blogger publish`, `blogger video`, `blogger infographic`).
 
 ## Directory Structure
 
@@ -30,6 +33,8 @@ This tool uses Python and AppleScript to interact with a running instance of Goo
         *   `cdp_chrome.py` / `jxa_chrome.py` / `chrome.py`: Browser automation core.
         *   `markdown_parser.py`: YAML frontmatter and image processing.
         *   `diagrams.py`: Kroki-based diagram generation.
+        *   `dual_sub_video.py`: Edge-TTS and Pillow subtitle card video pipeline.
+        *   `photo_card_generator.py` / `cover_generator.py`: Visual card synthesis.
     *   **`platforms/`**: Publisher implementations.
         *   `wechat.py`, `csdn.py`, `juejin.py`: Blog platforms.
         *   `bilibili.py`, `wechat_video.py`, `wechat_channels.py`: Video platforms.
@@ -38,7 +43,9 @@ This tool uses Python and AppleScript to interact with a running instance of Goo
 *   **`watermark_remover.py`**: Utility for removing AI-generated watermarks from videos.
 *   **`monitor_video.sh`**: Reference script for the background polling workflow.
 
-## Video Generation Workflow (NotebookLM)
+## Video Generation Workflows
+
+### 1. Cinematic Video Generation Workflow (NotebookLM)
 
 Video generation via Google NotebookLM is a long-running process (15–45 minutes). To maintain efficiency and avoid blocking, agents follow a specialized subagent-based workflow.
 
@@ -63,6 +70,23 @@ After download, the video typically requires watermark removal:
 ```bash
 python watermark_remover.py ./videos/[topic]/video.mp4 --model lama
 ```
+
+### 2. Dual-Subtitle Educational Video Workflow (Edge-TTS + FFmpeg)
+
+For language learning materials, listening drills, or presentation slide videos:
+- **Engine**: Edge-TTS (`edge-tts`) + Pillow frame rendering + FFmpeg concat demuxer.
+- **Latency**: Synchronous local execution, completing in seconds.
+- **Payload Compatibility**: Fully compatible with `publish-video` standard payload format (`payload.md`, `cover.png`, `video.mp4`).
+- **CLI Triggers**:
+  - Generate Payload:
+    ```bash
+    python3 skills/dual-subtitle-video/scripts/dual_sub_video.py --input sentences.txt --payload-dir videos/[topic]/ --title "Title"
+    ```
+  - Direct Publish:
+    ```bash
+    python3 -m src.blogger.cli publish --payload videos/[topic]/payload.md --platform wechat_video,wechat_channels,bilibili
+    ```
+- **Skill**: Follow instructions in `skills/dual-subtitle-video/SKILL.md`.
 
 ## Browser Automation Lessons Learned
 
@@ -212,3 +236,8 @@ if (cb && !cb.checked) {
      - `textarea#js_description` 专属于文章摘要（Summary / Digest）。
      - 注入时读取 frontmatter 中的 `desc`，必须严格执行截断守卫：`desc[:120].rstrip('，。；！？')`。
      - 注入方式必须调用 `HTMLTextAreaElement.prototype` 的原生 setter，并依次触发 `input`、`change`、`keyup`，确保 Vue 响应式状态同步及 `em.frm_counter`（如 `83/120`）正确渲染。
+7. **禁绝 ASCII/Unicode 字符画伪装图表 (Zero ASCII Diagrams - CRITICAL)**：
+   - **核心坑点**：严禁在 Markdown 正文中用 `┌─┐`、`│`、`└─┘`、`+---+` 等字符画、文本方框代码块替代真实图表。
+   - **移动端崩溃致命伤**：移动端（微信、掘金、知乎等）屏幕宽度极窄（~360px），且各平台 Monospace 字体兼容性不一。字符框图在手机上 100% 发生折行错位、排版撕裂，彻底沦为不可读的乱码线框。
+   - **交付铁律**：所有系统架构拓扑、时序因果管道、状态机流转回路、二元决策矩阵、终端切片与示范卡片，**必须且只能以真实高分辨率图片交付**（生成原生 2D SVG 并经 `sips -s format png --resampleWidth 1920` 导出 PNG），正文中使用标准 `![caption](image.png)` 语法嵌入。
+   - **脚本动态寻址**：文章目录下的生成脚本必须使用 `Path(__file__).parent.resolve()` 动态获取路径，严禁写死绝对目录。

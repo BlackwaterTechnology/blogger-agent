@@ -21,6 +21,8 @@ dependencies = [
     "notebooklm-py",
     "websocket-client",
     "playwright>=1.59.0",
+    "pillow",
+    "edge-tts",
 ]
 
 [project.scripts]

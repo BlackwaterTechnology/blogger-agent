@@ -1,633 +1,97 @@
 ---
 name: generate-article
-description: Use when the user asks to write a technical article, blog post, or WeChat draft, or explicitly uses the `/generate-article` slash command. Trigger phrases include "/generate-article", "写一篇文章", "整理成博客", "帮我发个草稿". The skill produces a Markdown payload directory (front matter + 正文 + 配图). Once drafted, it MUST dispatch a subagent to review the article.
+description: Write or revise Chinese technical articles and WeChat long-form drafts from notes, conversations, source material, or an outline. Use for /generate-article, 写一篇文章, or 整理成博客. Produces a reviewed Markdown payload with a cover and useful illustrations; publishing and standalone photo messages are separate workflows.
 ---
 
-# Generate Article Skill
+# Generate Article
 
-## Overview
+为技术实践者写可信、易读、能帮助判断或行动的文章。默认面向微信公众号长文；用户指定的读者、立场、篇幅和风格优先。先解决读者的问题，再决定标题和视觉表达。
 
-把任意输入（草稿、对话、观点、技术笔记）转化为**结构清晰、论点锐利、以图代言、具备高维社交货币**的中文技术与商业文章，生成高清插图与封面。
+## 1. 明确读者任务与材料
 
-本 skill 同时是**创作助手 + 编辑助手 + 建模助手**：基于第一性原理（First Principles Thinking）与 **T-A-O 认知协作架构**，逼迫创作过程完成从低维“知识记忆”到高维“架构定义与终审”的跃迁。
+先阅读输入、相关文件及用户提供的图片，从已有上下文提炼：
 
----
+- 具体读者及其正在遇到的问题；读完能够解释什么、做出什么判断或完成什么操作。
+- 本文最有价值的材料：实际案例、实现细节、观察、数据或对已有资料的清晰解释。
+- 核心回答及适用边界；现有材料是否足以支持它。
 
-## 核心底层哲学：5 大硬核业务假设
+只在缺失信息会改变写作方向时追问；其余采用合理假设并简短说明。不要要求用户逐项填写策划表，也不要在正文中输出创作自检过程。
 
-每一篇文章的创作与视觉建模，均必须建立在以下 5 个可被数据验证的业务假设之上：
+## 2. 核查证据，再组织论证
 
-1. **【极化主张假设】(Click Dissonance)**：标题必须具备反直觉张力与明确立场（CTR > 8%）。拒绝平铺直叙的话题陈述。**严禁在标题中使用 ` ｜ `、` —— `、` - ` 及两侧空格**，前 18~22 字符必须具备独立且完整的认知爆破力，标点统一使用中文冒号 `：`、问号 `？` 或自然标点。
-2. **【图文认知密度假设】(Visual Density)**：人脑处理图形比文本快 60,000 倍。用结构图表（PlantUML / SVG）替代冗长文字，将完读率提升至 50%+。
-3. **【社交货币假设】(Social Currency)**：微信朋友圈转发的本质是“自我人设塑造”。文章必须提炼至少 **1 个命名实体或方法论框架**（如 T-A-O 架构、审核权倒置悖论），转发率 > 5%。
-4. **【T-A-O 人机协同假设】(Orchestration)**：人类负责 Context Framing（问题高维定义）与 Checklist 终审背书；AI 负责 80% 的资料检索与文本草稿编译。
-5. **【一鱼两吃·双轨交付假设】(Dual-Delivery Storyboard Hypothesis)**：微信平台现已支持**“图文文章一键自动转为图片消息（小绿书画册）”**。因此，文章在策划之初就必须同步规划一套**自闭环、高信息密度、具备完整叙事逻辑的视觉分镜画册 (Self-Contained Visual Storyboard)**。全篇规划 **1 封面 + 3~5 张承载核心论点的结构插图（全篇共 4~6 张卡片）**。这些插图抽离出来后，读者脱离正文也能看懂 80%~90% 的核心精髓，一键转换即成爆款小绿书画册。
+沿核心问题检索必要资料，技术事实优先使用官方文档、源码、原始研究或可复现记录。涉及版本、价格、时效性或不确定细节时，查证后再写；不能检索时明确限制，不把记忆当作已核实事实。
 
----
+- 区分事实、作者经验、推断和演示示例。来源链接放在相关事实附近；长文需要时补充精简的文末资料列表。
+- 实测数据写清环境、版本、方法和条件；没有运行过的命令不称为“已验证”，没有亲历的故事不写成“我曾经”。示意图、模拟数据和终端示例须标明性质。
+- 证据支撑关键结论即可，不要求每小节凑数字、项目名或固定数量的引用。项目名本身不是证据。
+- 证据不足时缩小结论、改成有边界的问题分析，或请求关键材料；不编造补齐。仍影响主结论的疑点须在交付时标为待核实。
+- 考察反例、成本和不适用情形，避免把复杂取舍写成“旧方法全错、新方法全对”。原创术语只有在比常用表达更清楚时才保留，并解释含义，不强造方法论。
 
-## 📱 移动端优先（Mobile-First）排版与“一鱼两吃”画布规范
+## 3. 先写正文
 
-针对微信手机端（375px~414px 屏宽，正文有效宽度约 340px~380px，基准缩放比约为 360px）以及**微信一键转为图片消息（3:4 竖屏瀑布流）**的场景，所有正文配图必须严格遵守**移动端优先排版与自适应比例**，彻底根除小字发虚与上下黑边问题：
+按材料选择结构，不要求每篇具有相同幕次、章节数或篇幅：
 
-### 1. 缩放比与推荐画布尺寸 (Canvas Viewport Standard)
-- **推荐标准画布宽度：`1200px`**（缩放比为 $360 / 1200 = 0.30$，显著优于 1600px 画布的 0.225，文字在手机端具有极佳的视觉张力）。
-- **“一鱼两吃”友好画布宽高比（兼顾长文阅读与图片消息 3:4 竖屏流）**：
-  - **双栏对抗 / 2x2 矩阵 / 分层架构**：**强制首选 `viewBox="0 0 1200 900"` (4:3)** 或 `viewBox="0 0 1200 800"` (3:2)。（⚠️ **严禁使用 16:9 超扁平图作为正文核心插图**，否则在图片消息竖屏流中上下会产生大面积黑边）。
-  - **垂直 3~4 步流转拓扑 / 便当网格**：`viewBox="0 0 1200 1000"`、`viewBox="0 0 1200 1200"` 或 3:4 `viewBox="0 0 1200 1600"`（纵向流在移动端阅读沉浸感最强）。
-  - **文章封面 (cover.svg)**：`viewBox="0 0 1920 1080"` 或 `viewBox="0 0 1200 675"` (16:9)；**核心 Hook 与右侧微型卡片必须严格收敛在中央 60% 安全区 (Safe Zone)**，四周留出充足 padding，确保转为图片消息 3:4/1:1 裁剪时 100% 零切字。
+| 文章任务 | 组织重点 |
+|---|---|
+| 教程 / 技术解释 | 问题与前提 → 最小例子或机制 → 操作与验证 → 常见失败和边界 |
+| 故障复盘 / 经验 | 实际症状与影响 → 排查证据 → 原因与修复 → 验证与教训；仅使用已知经历 |
+| 方案对比 | 读者场景与约束 → 同条件比较 → 成本与取舍 → 有条件的选择建议 |
+| 观点 / 趋势解读 | 具体观察与主张 → 事实与推导 → 反例和不确定性 → 对读者的影响 |
 
-### 2. 五级字号阶梯与硬性底线 (Font Size Hierarchy on 1200px Canvas)
-| 视觉层级 | 1200px 画布字号 | 手机端映射视觉大小 | 适用场景 |
-|---|---|---|---|
-| **L1 画布大标题** | `44px ~ 52px` | 13.2px ~ 15.6px (超粗) | 全图核心主标题 |
-| **L2 分类徽标 / 阶段 Pill** | `28px ~ 32px` | 8.4px ~ 9.6px (加粗) | 顶部分类 Badge、步骤序号 Pill |
-| **L3 卡片标题 / 关键指标** | `36px ~ 42px` | 10.8px ~ 12.6px (加粗) | 模块卡片标题、大号百分比/数据对比 |
-| **L4 正文核心短语 / 节点** | `32px ~ 36px` | 9.6px ~ 10.8px (中粗) | 核心概念、关键动作、结论要点 |
-| **L5 辅助说明 / 底部注记** | `28px ~ 30px` | 8.4px ~ 9.0px (常规) | 辅助短语、避坑说明、底部 Takeaway |
-| **⛔ 绝对硬性底线** | **`≥ 28px`** | — | **全图绝对禁止任何低于 28px 的文字**！（若使用 1600px 画布，底线必须提升至 `≥ 36px`） |
+开篇尽快交代具体问题与阅读收益，不用宏大背景铺垫。中段围绕例子、机制和取舍展开；结尾给出实际建议、适用条件或尚未解决的问题，已经讲完就结束。不要强加争议问题或关注、转发号召。
 
-### 3. 防拥挤与“自闭环”布局四大铁律 (Anti-Clutter & Self-Contained Rules)
-1. **【横向最多 2 栏 (Max 2 Horizontal Columns)】**：
-   - **严禁在单张图内横向并排 3 栏或 4 栏卡片**！
-   - 多步骤流程（3~4 步）**必须采用垂直纵向流转（Top-to-Bottom Stacked Pipeline）**或 **2x2 四象限网格**。
-   - 方案/策略对比必须采用**垂直纵向堆叠卡片**或**标准双栏对抗 (2-Column VS)**。
-2. **【极致短语化与行数硬顶 (Max 2-3 Lines per Card)】**：
-   - 每个卡片/节点内部**严格限制在 2 ~ 3 行文字以内**。
-   - 每行文字控制在 **8 ~ 14 个字**（短语化、符号化连接如 `签名验签 · 0 Gas 代付`）。
-   - **严禁在图片中填入多行整句长句或解释段落**。详细推导与背景全盘留给 Markdown 正文。
-3. **【自带核心结论条 (Mandatory Takeaway Banner)】**：
-   - 结构图底部必须配备高对比度的 Takeaway Banner（总结 1 句核心认知/架构收益），保证图片脱离正文后具备独立可读性。
-4. **【视觉与文本职责清晰分工】**：
-   - 移动端插图 = **高对比度视觉锚点与独立叙事画册 (Visual Anchor & Standalone Deck)**
-   - 正文 Markdown = **严密推理逻辑与长句表达 (In-Depth Narrative)**
+像有经验的技术同行解释问题：用具体动词与对象，保留必要的术语和推导；不堆“高维、认知跃迁、赋能”等抽象词，不把“不是 X，而是 Y”当作默认句式。允许“我、你、我们”、编号步骤和自然标点；按语境判断是否说教，而非全局替换代词或技术名称中的空格、连字符。
 
----
+段落保持一个中心意思，小标题说明实际内容。列表用于并列信息或步骤，前后留空行；代码用围栏，保留可复制的文本。避免全文碎片化短句、连续口号、密集加粗和重复总结。篇幅由解释需要决定，不凑字数。
 
-## Required Tools
+## 4. 标题、摘要与视觉
 
-- **bash**：跑图片生成子进程。
-- **文件系统**：建 Payload 目录、保存图片与 Markdown。
-- **图片生成**（按内容类型分工，参数详见阶段 2）：
-  - **瑞士平面排版封面（首选/无AI噪点）**：`python tools/generate_cover.py` (支持 `swiss_red`, `navy_gold`, `emerald`, `slate_lime` 4 种杂志级主题配色)。
-  - **扁平矢量概念封面**：`generate_image` 等 AI 绘图工具（**必须带 2D 扁平矢量 Prompt 约束，严禁 3D 霓虹/发光脑/科幻 HUD/假文字等 AI 俗套**）。
-  - **二维坐标轴 / 精美自定义图表**：AI 生成或手写原生 SVG，利用 macOS 系统的 `sips` 工具进行本地 PNG 渲染。在需要高主观审美颜值、非标准或精确的坐标轴与信息图卡片时使用。
-  - **结构化图表（架构 / 流程 / 拓扑 / 思维导图 / 对比网格）**：本地离线渲染优先：
-    - `~/bin/plantuml.jar`（PlantUML，**基础流程/思维导图备选**。排版精密，可控性强，支持高 DPI。配合 `!pragma layout smetana` 无需 Graphviz）
-    - `~/bin/mmdc`（官方 `@mermaid-js/mermaid-cli`，Puppeteer + Dagre 布局，**备选/极简图表引擎**）
-  - **高维结构化知识长图 / 便当网格信息图 (NotebookLM Infographic)**：使用 `generate-infographic` 技能（`uv run notebooklm generate infographic`），将全文 Markdown 作为 Source 摄取，生成 `bento-grid` 便当网格、`editorial` 杂志社论等高密度长图。
-  - **最后兜底**：`blogger generate-diagram --type mermaid|plantuml --input x --output x.png`（kroki.io，受公网限制，仅本地工具不可用时使用）
-- **封面 letterbox 工具**：`tools/fit_wechat_cover.py`——把任意比例的封面 letterbox 到目标比例（默认 16:9，可选 1:1），支持 `--bg white|black|auto|#RRGGBB` 与 `-o/--output` alias。详见 §2.3。
+正文成立后，提出三个角度不同、准确具体的标题，推荐一个写入元数据。标题可以平实、提问或有张力，但必须让读者知道文章谈什么，正文能兑现承诺。只有事实支持时才采用反直觉表述，不强制字数、标点样式或冲突强度。
 
----
+摘要说明问题与阅读价值，不重复标题，不编造收益数字。遵守下方交付契约。
 
-## Workflow
+制作视觉资产前读取 [视觉与渲染规范](references/visual-guidelines.md)。制图前必须先进行**信息关系与表现模式分析**，从 6 大专业表现模式（便当盒规约、因果时序流、二元权衡矩阵、系统拓扑边界、状态机闭环、实证量化/终端切片）及具象隐喻中按需匹配，严禁机械式地仅采用纯文字色块卡片堆砌：
 
-执行任务时**必须按顺序**走完以下阶段。
+- 默认交付一张封面。正文通常使用 1–3 张有用图片，也可以无图；数量不是质量指标。
+- 严禁仅把段落换成方框或列表卡片；一张图必须具备不可替代的空间、时序、状态或拓扑建模解释力：
+  - 解释系统组件与网络时，采用带边界容器的**系统拓扑图 (Topology)**；
+  - 解释生命周期与探测/重试时，采用带守卫分支与回路的**状态机图 (State Machine)**；
+  - 解释故障扩散与执行时序时，采用具备因果推进的**时序管道 (Causal Pipeline)**；
+  - 解释架构选型与利弊时，采用**二元对抗或四象限矩阵 (Trade-off Matrix)**；
+  - 证明实际效果与报错时，优先采用**实测终端切片 (Terminal Slice)** 或有来源的数据图表。
+- **禁绝 ASCII 字符画伪图表 (CRITICAL)**：严禁在 Markdown 正文中用 `┌─┐`、`│`、`└─┘`、`+---+` 等字符画代码块伪装图表。凡正文提及“来看一张典型的 xx 图/卡片”、“如下图所示”，必须在当前文章目录下实际生成对应的真实 SVG 与高分辨率 PNG 资产，并使用 `![caption](image.png)` 正式嵌入。
+- **复杂图表委托专用技能**：需要精细绘制系统拓扑、状态机闭环、时序因果管道或终端切片时，直接调用或参考专职的 [generate-diagram](../generate-diagram/SKILL.md) 技能标准，使用原生 SVG 组件样板高质量出图。
+- **绘图脚本动态寻址**：文章目录下的生成脚本严禁硬编码绝对路径，必须使用 `Path(__file__).parent.resolve()` 动态获取当前目录。
+- 关键结论与必要解释留在正文，图在相关段落附近出现，提供有意义的替代文本或图注；不要让读者依赖放大图片才能读懂主线。
+- 长文不承担独立画册的固定五幕。只有用户明确需要图片消息时，才使用仓库中的 [generate-photo-message](../generate-photo-message/SKILL.md) 另行适配，复用事实材料，不覆盖长文或声称自动转换就能获得传播效果。
 
----
+## 5. 交付契约
 
-### 阶段 1：双重自检（实质 + 形式）
+新文章保存到 `articles/YYYY-MM-DD-<slug>/`，日期取当前日期，slug 使用语义化英文。修改已有文章时沿用用户指定目录，不无故新建或覆盖其他文章。
 
-在生成任何 Markdown 或图片之前，**必须在回复中先输出以下两份自检并填答**。两份都答完才能进入阶段 2。
-
-#### A. 内容质量自检（这一步决定文章好不好）
-
-```text
-【内容质量自检】
-1. 一句话主张：这篇文章想让读者改变看法 / 学到的那一句话是什么？
-   - 必须是陈述句、有动词、有立场、具备反直觉张力。
-   - 反例："Agent Harness 的演进趋势"（话题，不是主张）
-   - 正例："Harness 不再是工程师的护城河，模型本身正在吞掉框架"
-
-2. 社交货币与命名实体：本文提炼出了哪 1 个具备传播力的概念实体/方法论？
-   - 正例：T-A-O 认知协作架构、审核权倒置悖论、Context Framing。
-   - 如果答不上来，重新提炼命名实体后再继续。
-
-3. 证据清单：我准备用哪 2-3 件具体证据支撑主张？必须落到下面至少两类：
-   □ 代码 / 命令 / 配置片段
-   □ 数据 / 数字 / 时间线
-   □ 真实产品、项目、人物、法律判例（带名字）
-   □ 引用或一手资料（带出处）
-   ⚠ 不允许全文都是「我们认为」「业界普遍」「值得思考」这类无证据陈述。
-
-4. 一鱼两吃视觉分镜清单（全篇规划 4~6 张自闭环视觉卡片，构建完整叙事画册）：
-   必须按照【小绿书 5 幕分镜流】规划整套图表，写明"画什么 + 用哪种模态"：
-   - 卡片 01 (封面 / cover.png)：爆破 Hook + 核心认知冲突微型卡片（关键元素居中，兼顾 16:9 长文与 3:4 画册封面）
-   - 卡片 02 (矛盾对抗 / 破局痛点)：【模态 1】具象场景隐喻 或 【模态 3】二元对抗矩阵（传统 ❌ vs 现代 ✅）
-   - 卡片 03 (核心机制 / 架构拓扑)：【模态 2】大字号垂直流水线 (Step 1-2-3) 或 3 层分层架构 或 便当网格全景图
-   - 卡片 04 (实操落地 / 决策矩阵)：【模态 3】2x2 四象限决策矩阵 或 4 步避坑落地 SOP 清单
-   - 卡片 05 (核心复盘 / 争议互动)：【模态 2/3】Takeaway Checklist + 1 个评论区高争议互动思考题
-   ⚠ 自闭环硬性要求：每张图自带独立 Takeaway Banner，抽离出来后，读者脱离正文也能看懂 80%~90% 的核心精髓，一键转换即成小绿书爆款画册。
-   ⚠ 拒绝全篇单一深蓝 SVG：提倡在开篇或核心矛盾处引入【模态 1】具象概念隐喻图，激活读者右脑。
-
-5. 文章类型：这是哪种文章？(选一个，决定阶段 3 的结构)
-   □ 现象解读 / 新闻评论：hook → 事实 → 我的解读 → 影响
-   □ 技术解析 / 概念科普：钩子 → 类比 → 拆解 → 边界
-   □ 产品 / 项目对比：场景 → 维度对比 → 推荐
-   □ 经验沉淀 / 踩坑方法论：背景 → 理论/架构 → 实践步骤 → 训练法
-   □ 观点檄文 / 立场：论点 → 反方 → 论据 → 重申
-   □ 书评 / 读书笔记：钩子 → 这本书在说什么 → 我同意的部分 → 我补充的部分
-```
-
-#### B. 形式自检
-
-```text
-【形式自检】
-- 标题排版：前 18~22 字符必须包含完整认知钩子，0 ` ｜ ` / ` —— ` / 空格污染，标点统一使用全角中文标点。
-- 人称：全文使用「我们/大家」，严格不用「你/你的」（带说教感）。
-- 摘要 desc 长度严格 60–120 字符（绝对禁止超过 120 字符，防微信 64703 报错）。
-- 微信合集 collection：必须且只能从配置文件 blogger.toml 的 [platforms.wechat.accounts.default].article_collections 列表中选择（如 AI, Agent, AWS, Web3, DevSecOps, 认知思维, 信息安全, Iac, 云原生）。
-- 配图数量与“一鱼两吃”闭环：正文配图 3~5 张 + 封面 1 张（全篇共 4~6 张），每张图自带独立 Takeaway 结论条，脱离正文可独立自洽阅读，满足一键自动转为图片消息标准。
-- 画布比例自适应：正文插图首选 4:3 (1200x900) 或 3:2 (1200x800) 或 纵向流 (1200x1000~1200)，杜绝 16:9 扁平插图在图片消息竖屏流中上下留黑边。
-- 封面安全区：cover.png 关键 Hook 与右侧微型卡片严格控制在中央 60% 安全区，四周留足 padding 防转图片消息时裁剪失真。
-- 配图模态与色彩多样性：
-  - 是否避免了全篇 100% 冰冷单一深蓝图？是否合理混配了具象概念隐喻图（模态1）或非单一暗黑主题？
-  - 若包含 AI 绘图，是否严格杜绝了发光蓝脑、机械手、科幻 HUD、乱码假字等 AI 俗套？
-  - 1200px 画布下 SVG 图表所有文字是否严格 ≥ 28px（核心节点 ≥ 32px）？
-  - 是否严格遵守横向最多 2 栏（多步骤一律垂直纵向流转）？
-  - 单卡片文字是否控制在 2-3 行极简短语内？无长句堆砌？
-```
-
----
-
-### 阶段 2：视觉资产生成
-
-#### 2.0 素材盘点：先看用户给了什么
-1. 列出会话中已有的素材图。
-2. 决定用途（正文插图、封面或忽略）。
-
-#### 2.1 数量、命名与“一鱼两吃”分镜流
-- **必出 1 张复合封面**：`cover.png`（16:9，但关键视觉收敛于中央安全区）。
-- **正文核心插图 3–5 张**（全篇共 4–6 张视觉卡片，天然组成一套自闭环的小绿书卡片画册），语义化序号命名（如 `01-vs-comparison.png`, `02-architecture-pipeline.png`, `03-decision-quadrant.png`, `04-summary-checklist.png`）。
-
-#### 2.2 4 大视觉模态矩阵与“一鱼两吃” 5 幕分镜流 (The 5-Act Visual Storyboard)
-
-为保证文章一键转换为图片消息时具备极高的**完播率与公域算法推流潜力**，配图必须严格按照以下 5 幕分镜流进行内容承载：
-
-| 分镜序号 | 叙事幕次 | 推荐模态与工具 | 核心承载内容（图图有实质增量） | 转为图片消息时的角色 |
-|---|---|---|---|---|
-| **Act 01** | **首图 Hook 封面** | 原生 SVG 双栏杂志封面 (`tools/generate_cover.py`) 或 AI 隐喻封面 | 4~8 字爆破冲突短语 + 右侧微型数据对比/认知反差卡片 | **小绿书爆款封面 (Card 01)**：决定 80% 点击率 |
-| **Act 02** | **矛盾破局 / 二元对抗** | 【模态 3】原生 SVG 双栏对抗矩阵 或 【模态 1】具象场景隐喻 | 传统旧模式 ❌ vs 现代新范式 ✅（痛点剖析与破局关键） | **认知重构卡 (Card 02)**：击碎固有偏见 |
-| **Act 03** | **核心机制 / 架构拓扑** | 【模态 2】原生 SVG 垂直时序流水线 / 3 层系统拓扑 / 便当网格长图 | Step 1-2-3 垂直执行流转、阶段交付物与底层技术机理 | **深度心智模型卡 (Card 03)**：建立硬核技术壁垒 |
-| **Act 04** | **实操落地 / 决策矩阵** | 【模态 3】原生 SVG 2x2 四象限矩阵 或 4 步避坑落地 SOP | 技术选型象限评估、避坑 Checklist 或参数配置清单 | **截屏收藏干货卡 (Card 04)**：读者最爱收藏的高价值参考 |
-| **Act 05** | **核心复盘 / 争议互动** | 【模态 2/3】Takeaway 闭环卡片 + 评论区争议思考题 | 3 大落地铁律总结 + 1 个针对工程选型/现实痛点的争议思考题 | **尾卡推流 CTA (Card 05)**：引导评论互动撬动算法二次推流 |
-
-##### 2.2.1 4 大视觉模态分工矩阵
-
-| 模态标识 | 配图类型 | 推荐工具 | 核心价值与适用场景 | 关键约束与风格 |
-|---|---|---|---|---|
-| **🎨 模态 1** | **具象概念隐喻 / 场景插画** | `generate_image` (AI 绘图) | 开篇破局、现象隐喻、反直觉对比、角色冲突、生活化类比。激活右脑情感与好奇心。 | **5 大去 AI 味艺术风格**（见 §2.6），严禁蓝光脑/机械手/乱码字，强调具体物理实体与场景故事。 |
-| **📐 模态 2** | **结构拓扑 / 垂直时序流** | 原生 SVG / PlantUML | 核心机制拆解、端到端时序流、3 层架构拓扑。提供精密的工程心智模型。 | **首选 4:3 (`1200x900`)**，字号 ≥28px-36px，**多主题色板**（暗蓝/极简白/暖陶土/森林绿），垂直纵向流动。 |
-| **📊 模态 3** | **多维决策矩阵 / 二元对抗** | 原生 SVG (2x2 网格 / 双栏对抗) | 新旧对比、4 象限技术选型、8 大策略分类。提供结构化决策清单。 | **首选 4:3 (`1200x900`)**，高对比度 Badge，卡片内 2-3 行极简短语，底置 Takeaway Banner。 |
-| **📈 模态 4** | **实证量化图表 / 终端切片** | Matplotlib / 原生 SVG / 终端 Mockup | 收益率走势、基差价差剪刀差、实测 Benchmark、CLI 终端输出。提供无可辩驳的硬核证据。 | DPI 300+，专业金融终端/科研期刊排版质感。 |
-
-##### 2.2.2 原生 SVG 优先与防小字防截断铁律（CRITICAL）
-- 结构类插图优先使用**原生 SVG 矢量图编写**，画布推荐使用 `viewBox="0 0 1200 900"` (4:3) 或 `viewBox="0 0 1200 800"` (3:2)。
-- **严禁在 1600px 画布中使用低于 36px 的文字，严禁在 1200px 画布中使用低于 28px 的文字**。
-- 若使用 PlantUML 渲染后出现字号偏小、文字裁切或质感发灰，**必须立即重写为原生 SVG 模板并重新渲染**。
-
-#### 2.3 渲染命令（1080p~2K 标准与 DPI 300+ 规范）
-- **SVG / PNG 高画质渲染 (sips)**：设计 `.svg` 源码使用推荐的 `viewBox="0 0 1200 H"`（封面 `1920 1080`）。转换命令**必须包含 `--resampleWidth 1920`**：
-  `sips -s format png --resampleWidth 1920 <input.svg> --out <output.png>`
-- **PlantUML 高清渲染**：`java -jar ~/bin/plantuml.jar -png <input.puml>`。源码头部加入 `skinparam dpi 300`、`skinparam Shadowing false`、`skinparam pageWidth 2400`。
-
-#### 2.4 封面设计高阶规范 (Editorial Cover Design Standards)
-
-**严禁把正文全长标题直接填入封面**！封面是社交吸引力锚点，必须遵守**【双栏复合杂志架构 (Composite Editorial Layout)】**：
-
-1. **解耦“封面 Hook”与“正文 H1 标题”**：
-   - **封面大标题**：必须炼字为 **4 ~ 8 字认知冲突爆破短语**（例如：“11% 的谎言？”、“穿仓的必然性”），字号保持 `64px ~ 76px`，绝不使用 20+ 字的全长技术标题。
-   - **正文标题**：保留完整的 SEO 严密技术标题。
-
-2. **双栏复合杂志排版 (Dual-Column Architecture)**：
-   - **左栏 (40% 宽度)**：分类 Badge + 极简爆破短语 + 副标题 + 品牌/日期 Header。
-   - **右栏 (60% 宽度)**：**必须包含高对比度微型信息图/数据对比卡片 (Micro-Infographic Card)**（卡片内字号保持 `28px ~ 34px`）。
-
-3. **三种封面模式分级**：
-   - **模式 1 (强制首选)：复合矢量信息图封面** (默认必须使用 SVG 设计左文 Hook + 右侧微型信息图卡片，`sips -s format png --resampleWidth 1920` 渲染)，严禁生成无右侧信息图卡片的平铺标题封面。
-   - **模式 2：大字极简数据冲突封面** (突出巨大核心数据对比 `11% ➔ 3%`)。
-   - **模式 3：AI 概念场景插图 + 文字叠加** (`generate_image` 生成无字 2D 矢量图 + 叠加爆破 Hook)。
-
----
-
-#### 2.5 移动端原生 SVG 标杆设计范式 (4 High-Readability SVG Archetypes)
-
-在编写正文 SVG 插图时，**必须直接参考或套用以下 4 套大字号、高对比度、防拥挤的现代杂志级 SVG 范式**：
-
-##### 范式 A：双栏高对比对抗矩阵 (2-Column VS Comparison)
-适用于：传统模式 vs 现代模式、旧痛点 vs 新架构、中心化 vs 去中心化对比。
-```xml
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 820" width="1200" height="820">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0F172A" />
-      <stop offset="100%" stop-color="#1E293B" />
-    </linearGradient>
-  </defs>
-  <rect width="1200" height="820" fill="url(#bg)" />
-
-  <!-- Header Section -->
-  <g transform="translate(60, 50)">
-    <rect x="0" y="0" width="180" height="36" rx="18" fill="#1E293B" stroke="#38BDF8" stroke-width="1.5" />
-    <text x="90" y="24" fill="#38BDF8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="700" text-anchor="middle">架构演进对比</text>
-    <text x="0" y="80" fill="#F8FAFC" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="46" font-weight="900">传统模式 vs 现代签名代付</text>
-  </g>
-
-  <!-- 2-Column Container -->
-  <g transform="translate(60, 180)">
-    <!-- Left Column: Legacy (525px width) -->
-    <g transform="translate(0, 0)">
-      <rect width="525" height="440" rx="16" fill="#141B2D" stroke="#EF4444" stroke-width="2" />
-      <rect width="525" height="60" rx="16" fill="#450A0A" />
-      <rect y="40" width="525" height="20" fill="#450A0A" />
-      <text x="30" y="42" fill="#FCA5A5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="30" font-weight="800">❌ 传统模式：两阶段交互</text>
-
-      <g transform="translate(30, 95)">
-        <text x="0" y="25" fill="#F87171" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="700">步骤 1：链上 Approve</text>
-        <text x="0" y="70" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 必须持有 ETH 扣除 Gas</text>
-        
-        <line x1="0" y1="110" x2="465" y2="110" stroke="#334155" stroke-width="1.5" />
-
-        <text x="0" y="155" fill="#F87171" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="700">步骤 2：TransferFrom 划转</text>
-        <text x="0" y="200" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 二次 Gas 消耗 + 串行等待</text>
-
-        <rect y="240" width="465" height="70" rx="10" fill="#2A1215" stroke="#7F1D1D" stroke-width="1" />
-        <text x="20" y="284" fill="#FCA5A5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="700">⚠️ 痛点：无 ETH 时遭遇入金死锁</text>
-      </g>
-    </g>
-
-    <!-- Right Column: Modern Paradigm (525px width) -->
-    <g transform="translate(555, 0)">
-      <rect width="525" height="440" rx="16" fill="#141B2D" stroke="#10B981" stroke-width="2" />
-      <rect width="525" height="60" rx="16" fill="#064E3B" />
-      <rect y="40" width="525" height="20" fill="#064E3B" />
-      <text x="30" y="42" fill="#6EE7B7" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="30" font-weight="800">✅ 现代范式：Permit 签名代付</text>
-
-      <g transform="translate(30, 95)">
-        <text x="0" y="25" fill="#34D399" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="700">步骤 1：链下离线签名</text>
-        <text x="0" y="70" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 0 Gas 费用，私钥瞬时签名</text>
-        
-        <line x1="0" y1="110" x2="465" y2="110" stroke="#334155" stroke-width="1.5" />
-
-        <text x="0" y="155" fill="#34D399" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="700">步骤 2：Relayer 原子代付</text>
-        <text x="0" y="200" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 官方节点全额代付并划转</text>
-
-        <rect y="240" width="465" height="70" rx="10" fill="#062E24" stroke="#047857" stroke-width="1" />
-        <text x="20" y="284" fill="#6EE7B7" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="700">💡 优势：零门槛入金，单笔原子确认</text>
-      </g>
-    </g>
-  </g>
-
-  <!-- Bottom Takeaway Banner -->
-  <g transform="translate(60, 650)">
-    <rect width="1080" height="110" rx="14" fill="#0B1329" stroke="#38BDF8" stroke-width="1.5" />
-    <text x="35" y="46" fill="#38BDF8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="30" font-weight="800">💡 核心认知跃迁</text>
-    <text x="35" y="86" fill="#E2E8F0" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">将 Gas 支付与交易发起权解耦，把多阶段链上摩擦转化为单次原子签名。</text>
-  </g>
-</svg>
-```
-
-##### 范式 B：垂直流水线时序拓扑 (Vertical Linear Pipeline)
-适用于：多步骤时序交互、端到端数据流转、发布/执行流水线。**严禁横向 4 列挤压，必须采用垂直堆叠**。
-```xml
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 980" width="1200" height="980">
-  <defs>
-    <linearGradient id="bg_pipeline" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0A0F1D" />
-      <stop offset="100%" stop-color="#141C2E" />
-    </linearGradient>
-  </defs>
-  <rect width="1200" height="980" fill="url(#bg_pipeline)" />
-
-  <!-- Header -->
-  <g transform="translate(60, 50)">
-    <rect x="0" y="0" width="200" height="36" rx="18" fill="#1E293B" stroke="#10B981" stroke-width="1.5" />
-    <text x="100" y="24" fill="#10B981" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="700" text-anchor="middle">端到端执行链路</text>
-    <text x="0" y="80" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="46" font-weight="900">零 ETH 存款：签名与中继时序拓扑</text>
-  </g>
-
-  <!-- 3-4 Vertical Pipeline Cards (1080px width each) -->
-  <g transform="translate(60, 175)">
-    <!-- Step 1 Card -->
-    <g transform="translate(0, 0)">
-      <rect width="1080" height="150" rx="14" fill="#1E293B" stroke="#38BDF8" stroke-width="1.5" />
-      <rect x="25" y="25" width="120" height="38" rx="8" fill="#0284C7" />
-      <text x="85" y="51" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="22" font-weight="800" text-anchor="middle">STEP 01</text>
-      <text x="165" y="52" fill="#F8FAFC" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="800">用户前端发起离线签名</text>
-      <text x="165" y="105" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">触发 EIP-712 签名请求 · <tspan fill="#38BDF8" font-weight="700">0 Gas 纯私钥签名</tspan> · 产出 (v, r, s)</text>
-    </g>
-
-    <!-- Arrow 1 -->
-    <text x="540" y="195" fill="#38BDF8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="36" font-weight="bold" text-anchor="middle">⬇</text>
-
-    <!-- Step 2 Card -->
-    <g transform="translate(0, 220)">
-      <rect width="1080" height="150" rx="14" fill="#1E293B" stroke="#818CF8" stroke-width="1.5" />
-      <rect x="25" y="25" width="120" height="38" rx="8" fill="#4F46E5" />
-      <text x="85" y="51" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="22" font-weight="800" text-anchor="middle">STEP 02</text>
-      <text x="165" y="52" fill="#F8FAFC" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="800">官方 Relayer 聚合代付</text>
-      <text x="165" y="105" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">中继节点作为 msg.sender · <tspan fill="#818CF8" font-weight="700">官方全额代付 Gas</tspan> · 批量打包上链</text>
-    </g>
-
-    <!-- Arrow 2 -->
-    <text x="540" y="415" fill="#818CF8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="36" font-weight="bold" text-anchor="middle">⬇</text>
-
-    <!-- Step 3 Card -->
-    <g transform="translate(0, 440)">
-      <rect width="1080" height="150" rx="14" fill="#1E293B" stroke="#10B981" stroke-width="1.5" />
-      <rect x="25" y="25" width="120" height="38" rx="8" fill="#059669" />
-      <text x="85" y="51" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="22" font-weight="800" text-anchor="middle">STEP 03</text>
-      <text x="165" y="52" fill="#F8FAFC" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="800">智能合约密码学校验与原子入账</text>
-      <text x="165" y="105" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">合约执行 ecrecover 验证签名 · <tspan fill="#34D399" font-weight="700">原子划转资金</tspan> · 状态瞬时同步</text>
-    </g>
-
-    <!-- Bottom Takeaway -->
-    <g transform="translate(0, 630)">
-      <rect width="1080" height="110" rx="14" fill="#022C22" stroke="#10B981" stroke-width="1.5" />
-      <text x="35" y="46" fill="#34D399" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="30" font-weight="800">⚡ 架构核心收益</text>
-      <text x="35" y="86" fill="#D1FAE5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">实现真正意义上的「Web2 级流畅体验」与「Web3 级私钥自托管安全」。</text>
-    </g>
-  </g>
-</svg>
-```
-
-##### 范式 C：2x2 四象限分类网格 (2x2 Quadrant Matrix)
-适用于：策略分类、风险矩阵、技术选型四象限评估。
-```xml
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 860" width="1200" height="860">
-  <defs>
-    <linearGradient id="bg_quad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0B0E14" />
-      <stop offset="100%" stop-color="#141923" />
-    </linearGradient>
-  </defs>
-  <rect width="1200" height="860" fill="url(#bg_quad)" />
-
-  <g transform="translate(60, 45)">
-    <text x="0" y="40" fill="#F59E0B" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="46" font-weight="900">Redis 淘汰策略四象限决策矩阵</text>
-    <text x="0" y="80" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">根据数据特征与业务风险选择最优内存淘汰算法</text>
-  </g>
-
-  <!-- 2x2 Grid Container -->
-  <g transform="translate(60, 160)">
-    <!-- Top-Left Card -->
-    <g transform="translate(0, 0)">
-      <rect width="525" height="290" rx="14" fill="#141B2D" stroke="#6366F1" stroke-width="2" />
-      <text x="25" y="48" fill="#818CF8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="800">allkeys-lru (纯缓存首选 ⭐⭐⭐)</text>
-      <text x="25" y="105" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 规则：淘汰全量键中最久未访问</text>
-      <text x="25" y="150" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 场景：符合二八定律的读多业务</text>
-      <rect x="25" y="200" width="475" height="55" rx="8" fill="#1E2648" />
-      <text x="40" y="238" fill="#A5B4FC" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="700">推荐：Web 页面 / 实体数据缓存</text>
-    </g>
-
-    <!-- Top-Right Card -->
-    <g transform="translate(555, 0)">
-      <rect width="525" height="290" rx="14" fill="#141B2D" stroke="#38BDF8" stroke-width="2" />
-      <text x="25" y="48" fill="#38BDF8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="800">allkeys-lfu (防扫描穿透 ⭐⭐⭐)</text>
-      <text x="25" y="105" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 规则：淘汰全量键中访问频次最低</text>
-      <text x="25" y="150" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 场景：防止批处理 Scan 污染热点</text>
-      <rect x="25" y="200" width="475" height="55" rx="8" fill="#0C4A6E" />
-      <text x="40" y="238" fill="#7DD3FC" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="700">推荐：高并发电商 Feed / 计数器</text>
-    </g>
-
-    <!-- Bottom-Left Card -->
-    <g transform="translate(0, 320)">
-      <rect width="525" height="290" rx="14" fill="#1C1814" stroke="#F59E0B" stroke-width="2" />
-      <text x="25" y="48" fill="#FBBF24" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="800">volatile-ttl (生命周期驱动 ⭐⭐)</text>
-      <text x="25" y="105" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 规则：仅在带 TTL 键中挑最短者淘汰</text>
-      <text x="25" y="150" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 场景：显式依 TTL 分级的临时状态</text>
-      <rect x="25" y="200" width="475" height="55" rx="8" fill="#451A03" />
-      <text x="40" y="238" fill="#FDE68A" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="700">推荐：验证码 / 动态风控临时标记</text>
-    </g>
-
-    <!-- Bottom-Right Card -->
-    <g transform="translate(555, 320)">
-      <rect width="525" height="290" rx="14" fill="#1C1417" stroke="#EF4444" stroke-width="2" />
-      <text x="25" y="48" fill="#F87171" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="800">noeviction (拒写保真 / 默认)</text>
-      <text x="25" y="105" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 规则：内存满后写操作直接报错 OOM</text>
-      <text x="25" y="150" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 场景：强一致业务，绝对禁止丢数据</text>
-      <rect x="25" y="200" width="475" height="55" rx="8" fill="#3D1219" />
-      <text x="40" y="238" fill="#FCA5A5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="700">注意：必须配合外部容量告警与扩容</text>
-    </g>
-  </g>
-</svg>
-```
-
-##### 范式 D：3 层分层系统架构拓扑 (3-Tier Layered Architecture)
-适用于：系统分层、协议栈、技术架构拆解。
-```xml
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 880" width="1200" height="880">
-  <defs>
-    <linearGradient id="bg_arch" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0F172A" />
-      <stop offset="100%" stop-color="#1E293B" />
-    </linearGradient>
-  </defs>
-  <rect width="1200" height="880" fill="url(#bg_arch)" />
-
-  <g transform="translate(60, 45)">
-    <rect x="0" y="0" width="160" height="36" rx="18" fill="#1E293B" stroke="#38BDF8" stroke-width="1.5" />
-    <text x="80" y="24" fill="#38BDF8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="700" text-anchor="middle">系统架构拓扑</text>
-    <text x="0" y="80" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="46" font-weight="900">T-A-O 认知协作分层架构</text>
-  </g>
-
-  <!-- 3 Horizontal Stacked Layers (1080px width each) -->
-  <g transform="translate(60, 165)">
-    <!-- Layer 1: Context Layer -->
-    <g transform="translate(0, 0)">
-      <rect width="1080" height="175" rx="14" fill="#141B2D" stroke="#38BDF8" stroke-width="2" />
-      <rect x="25" y="25" width="160" height="38" rx="8" fill="#0284C7" />
-      <text x="105" y="51" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="22" font-weight="800" text-anchor="middle">LAYER 01 · 顶层</text>
-      <text x="210" y="52" fill="#F8FAFC" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="800">Context Framing（问题高维定义）</text>
-      <text x="25" y="110" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 人类专家主导 · 提炼极化主张与反直觉命题 · 设定业务边界</text>
-      <text x="25" y="148" fill="#38BDF8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="700">核心产出：第一性原理假设、命名实体与关键论据清单</text>
-    </g>
-
-    <!-- Arrow 1 -->
-    <text x="540" y="208" fill="#38BDF8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="32" font-weight="bold" text-anchor="middle">⬇</text>
-
-    <!-- Layer 2: Automation Layer -->
-    <g transform="translate(0, 235)">
-      <rect width="1080" height="175" rx="14" fill="#141B2D" stroke="#818CF8" stroke-width="2" />
-      <rect x="25" y="25" width="160" height="38" rx="8" fill="#4F46E5" />
-      <text x="105" y="51" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="22" font-weight="800" text-anchor="middle">LAYER 02 · 核心</text>
-      <text x="210" y="52" fill="#F8FAFC" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="800">AI Agent 编译与矢量建模引擎</text>
-      <text x="25" y="110" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 自动化资料聚合 · 原生大字号 SVG 渲染 · 爆破文案生成</text>
-      <text x="25" y="148" fill="#818CF8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="700">核心产出：图文 Payload、2K 渲染卡片与 Markdown 实体</text>
-    </g>
-
-    <!-- Arrow 2 -->
-    <text x="540" y="443" fill="#818CF8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="32" font-weight="bold" text-anchor="middle">⬇</text>
-
-    <!-- Layer 3: Verification Layer -->
-    <g transform="translate(0, 470)">
-      <rect width="1080" height="175" rx="14" fill="#141B2D" stroke="#10B981" stroke-width="2" />
-      <rect x="25" y="25" width="160" height="38" rx="8" fill="#059669" />
-      <text x="105" y="51" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="22" font-weight="800" text-anchor="middle">LAYER 03 · 终审</text>
-      <text x="210" y="52" fill="#F8FAFC" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="800">Checklist 机器终审与发布管道</text>
-      <text x="25" y="110" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 移动端字号机检 (≥28px) · 消除 AI 腔 · 一键发布至多平台</text>
-    </g>
-  </g>
-</svg>
-```
-
----
-
-#### 2.6 去除“AI味”的 5 大艺术风格 Prompt 范式 (5 High-Taste Editorial AI Styles)
-
-使用 `generate_image` 生成具象概念隐喻图（模态 1）时，**必须坚决杜绝 4 大廉价 AI 俗套**：
-- ❌ **严禁蓝光/紫色发光大脑 (Glowing Brains)**
-- ❌ **严禁机器人与人类手指相触/机械手握手 (Cybernetic Hands Shaking)**
-- ❌ **严禁科幻全息 HUD 悬浮面板与满屏代码雨 (Hologram Matrix HUD)**
-- ❌ **严禁画面中出现 AI 生成的无意义扭曲乱码英文字符 (Garbled Pseudo-Text)**
-
-必须直接采用国际顶级杂志（*The New Yorker*, *The Economist*, *Wired*, *Monocle*）的 **5 大高审美艺术流派**：
-
-##### 风格 1：现代杂志社论扁平插画 (Modern Editorial Flat Vector)
-- **适用场景**：商业逻辑、组织分工、认知偏差、产品理念。
-- **Prompt 模板**：
-  `Modern editorial vector illustration, flat 2D graphic design, elegant bold silhouettes, clean textured geometry, contemporary magazine style, subtle paper texture, cohesive sophisticated color palette of slate gray, warm amber, and deep navy, high contrast, award-winning editorial art. Scene depicting [具体场景/具象动作，如 an architect assembling modular puzzle blocks while discarding bloated blueprints]. No text, no words, no 3D glossy render.`
-
-##### 风格 2：实体机械/物理隐喻对比 (Physical Mechanical Metaphor)
-- **适用场景**：重型框架 vs 轻量内核、传统低效 vs 现代极速、山顶洞人极简 Token 压缩。
-- **Prompt 模板**：
-  `Conceptual physical metaphor illustration, vintage intricate mechanism contrasting with sleek modern minimalist artifact, rich tactile textures, warm atmospheric cinematic lighting, clear visual contrast, editorial storytelling art. Scene showing [具体物理对比，如 an enormous heavy steampunk cast-iron engine overflowing with gears and smoke pipes compared side by side with an ultra-lightweight geometric origami crane floating effortlessly]. High visual density, crisp detail, no text, no glowing sci-fi clichés.`
-
-##### 风格 3：复古清晰线稿与版画 (Vintage Ligne Claire / Moebius & Woodcut)
-- **适用场景**：认知哲学、博弈论、系统脆弱性、历史反思。
-- **Prompt 模板**：
-  `Ligne claire illustration style, Moebius inspired ink line art with subtle watercolor wash, delicate hatched shading, intellectual graphic novel aesthetic, matte muted earth tones (terracotta, olive green, cream paper). Scene showing [具体画面，如 an ancient scholar and a futuristic automaton playing a game of chess on an intricate labyrinth board]. High aesthetic, literary tone, clean composition, zero text.`
-
-##### 风格 4：等轴测微缩黏土模型 (Isometric Clay & Papercraft Diorama)
-- **适用场景**：数据孤岛、跨链套利流水线、分布式集群、安全防火墙。
-- **Prompt 模板**：
-  `Isometric stylized miniature diorama, handcrafted matte clay and folded paper aesthetic, soft tactile studio lighting, pastel and architectural color harmony of mint green, soft slate, and cream, clean focal composition. Scene showing [微缩系统场景，如 a miniature financial fortress with tiny vaults connected by clean optical pipelines, protected from storm clouds]. Studio photography feel, tactile materials, no garbled text, no neon glows.`
-
-##### 风格 5：包豪斯构成主义与瑞士印画 (Bauhaus Constructivism & Swiss Screenprint)
-- **适用场景**：第一性原理、架构解耦、去中心化平衡、极致极简主义。
-- **Prompt 模板**：
-  `Bauhaus constructivist graphic art, Swiss international typographic style, bold abstract geometric forms, diagonal dynamic balance, matte screen print texture, primary red, deep navy, and raw cream paper background. Concept representing [抽象物理力学平衡，如 a minimalist fulcrum balancing a giant boulder with a single delicate feather]. High tension, graphic poster art, no random AI noise.`
-
----
-
-#### 2.7 SVG 多主题色板系统与明色/暖色范式 (Multi-Theme Palette System)
-
-原生 SVG 插图不再局限于单一深蓝底色！必须根据文章领域与情绪基调自由选用以下 **4 款杂志级主题色板**：
-
-| 色板名称 | 背景色 (Canvas) | 卡片底色 (Card) | 主强调色 (Primary) | 辅助色 (Accent) | 适用领域 |
-|---|---|---|---|---|---|
-| **`slate_navy`** (深曜黑蓝) | `#0F172A` | `#141B2D` / `#1E293B` | `#F59E0B` (琥珀金) | `#38BDF8` (青蓝) / `#10B981` (翠绿) | 硬核系统、AI 底层、金融量化 |
-| **`swiss_white`** (瑞士白底) | `#F8F9FA` | `#FFFFFF` | `#E63946` (瑞士红) | `#1D3557` (深海蓝) / `#059669` (祖母绿) | 商业评论、认知哲学、极简社论 |
-| **`terracotta_warm`** (暖陶米纸) | `#FAF5EF` | `#FFFFFF` / `#F5EBE1` | `#EA580C` (陶土橙) | `#65A30D` (橄榄绿) / `#78350F` (深褐) | 职场方法、认知成长、教育人生 |
-| **`forest_emerald`** (深林薄荷) | `#022C22` | `#064E3B` | `#10B981` (薄荷绿) | `#34D399` (嫩绿) / `#F0FDF4` (象牙白) | 工程效能、开源治理、增长模型 |
-
-##### 范式 E：明色/白底瑞士社论对抗矩阵 (Swiss White 2-Column VS)
-```xml
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 820" width="1200" height="820">
-  <!-- Clean Off-White Background -->
-  <rect width="1200" height="820" fill="#F8F9FA" />
-
-  <!-- Header Section -->
-  <g transform="translate(60, 50)">
-    <rect x="0" y="0" width="180" height="36" rx="18" fill="#E5E7EB" />
-    <text x="90" y="24" fill="#374151" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="20" font-weight="700" text-anchor="middle">认知思维模型</text>
-    <text x="0" y="80" fill="#111827" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="46" font-weight="900">廉价信号 vs 硬核背书模型</text>
-  </g>
-
-  <!-- 2-Column Container -->
-  <g transform="translate(60, 180)">
-    <!-- Left Column: Cheap Signaling (525px) -->
-    <g transform="translate(0, 0)">
-      <rect width="525" height="440" rx="16" fill="#FFFFFF" stroke="#EF4444" stroke-width="2" />
-      <rect width="525" height="60" rx="16" fill="#FEE2E2" />
-      <rect y="40" width="525" height="20" fill="#FEE2E2" />
-      <text x="30" y="42" fill="#B91C1C" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="30" font-weight="800">❌ 廉价信号：低成本表态</text>
-
-      <g transform="translate(30, 95)">
-        <text x="0" y="25" fill="#DC2626" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="700">口头承诺 · 无抵押品</text>
-        <text x="0" y="70" fill="#4B5563" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 伪造边际成本接近 0</text>
-        
-        <line x1="0" y1="110" x2="465" y2="110" stroke="#E5E7EB" stroke-width="1.5" />
-
-        <text x="0" y="155" fill="#DC2626" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="700">短期投机 · 零违约惩罚</text>
-        <text x="0" y="200" fill="#4B5563" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 败露后无实际资产损失</text>
-
-        <rect y="240" width="465" height="70" rx="10" fill="#FEF2F2" stroke="#FCA5A5" stroke-width="1" />
-        <text x="20" y="284" fill="#991B1B" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="700">⚠️ 结果：沦为博弈论中的柠檬劣币</text>
-      </g>
-    </g>
-
-    <!-- Right Column: Hard Proof (525px) -->
-    <g transform="translate(555, 0)">
-      <rect width="525" height="440" rx="16" fill="#FFFFFF" stroke="#059669" stroke-width="2" />
-      <rect width="525" height="60" rx="16" fill="#D1FAE5" />
-      <rect y="40" width="525" height="20" fill="#D1FAE5" />
-      <text x="30" y="42" fill="#065F46" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="30" font-weight="800">✅ 硬核信号：非对称代价</text>
-
-      <g transform="translate(30, 95)">
-        <text x="0" y="25" fill="#059669" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="700">真实沉淀 · 锁定质押</text>
-        <text x="0" y="70" fill="#4B5563" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 需要支付不可逆的时间或资本</text>
-        
-        <line x1="0" y1="110" x2="465" y2="110" stroke="#E5E7EB" stroke-width="1.5" />
-
-        <text x="0" y="155" fill="#059669" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="34" font-weight="700">长期博弈 · 声誉连带责任</text>
-        <text x="0" y="200" fill="#4B5563" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">• 建立不可伪造的极高信任壁垒</text>
-
-        <rect y="240" width="465" height="70" rx="10" fill="#ECFDF5" stroke="#6EE7B7" stroke-width="1" />
-        <text x="20" y="284" fill="#065F46" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28" font-weight="700">💡 结果：沉淀为长期垄断社交资产</text>
-      </g>
-    </g>
-  </g>
-
-  <!-- Bottom Takeaway Banner -->
-  <g transform="translate(60, 650)">
-    <rect width="1080" height="110" rx="14" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1.5" />
-    <text x="35" y="46" fill="#1E40AF" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="30" font-weight="800">💡 第一性原理洞察</text>
-    <text x="35" y="86" fill="#374151" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" font-size="28">只有承受了不可逆沉没成本的信号，才能穿透噪音建立真实共识。</text>
-  </g>
-</svg>
-```
-
----
-
-### 阶段 3：起草 Markdown
-
-在 `articles/YYYY-MM-DD-<slug>` Payload 目录下创建 `article.md`。
-
-目录命名强制规范：
-- 格式：`articles/YYYY-MM-DD-<slug>`（例如 `articles/2026-08-03-true-nobility`）
-- 必须前置当前日期（YYYY-MM-DD），使用连字符 `-` 连接日期与语义化英文 slug。
-- **列表空行硬性规范**：无序列表（`*`, `-`）与有序列表（`1.`, `2.`）与其上方的正文段落之间，必须显式插入空行（如 `段落说明：\n\n* 列表项1`），防止在 Blogger / 微信 / CSDN 编辑器中被合并为无换行的单行长段落。
-
-#### Front Matter 规范 (CRITICAL)
-
-`article.md` 头部必须包含合规的 YAML Front Matter：
+`article.md` 示例（合集值须根据本地配置选择，示例不代表当前配置）：
 
 ```yaml
 ---
-title: "文章标题"
+title: "请求失败后，什么时候可以安全重试？"
 author: "Agent"
-desc: "60-120字的凝练摘要"
-collection: "AI" # ⚠️ 微信文章合集：必须且只能从 blogger.toml 的 article_collections 列表中选择！
+desc: "从请求是否产生副作用出发，解释重试的适用条件、验证方法与常见误区。"
+collection: "AI"
 cover: "cover.png"
 ---
 ```
 
-**`collection` (微信文章合集) 强制校验规则**：
-- `collection` 字段值**必须且只能**选择自项目根目录 `blogger.toml` 中 `[platforms.wechat.accounts.default].article_collections` 定义的有效合集名称列表（例如 `["AI", "Agent", "AWS", "Web3", "DevSecOps", "认知思维", "信息安全", "Iac", "云原生"]`）。
-- 严禁在 Front Matter 中填入未在 `blogger.toml` 中配置的合集名称。若需要新增合集，必须先编辑 `blogger.toml` 添加对应项目后再使用。
+- 保留现有 `title/author/desc/collection/cover` 字段与相对图片路径；不增加发布器必需字段。作者使用用户提供的身份，否则沿用 `Agent`，不虚构署名。
+- `desc` 为非空字符串，按去除首尾空白后的字符数不超过 120；没有 60 字符下限。120 是项目现有微信适配器的兼容约束，不推广为其他平台规则。现有解析器可能对短于 60 字的摘要记录旧警告，但仍可解析，不为消除警告填充废话。
+- 从项目根目录 `blogger.toml` 的 `[platforms.wechat.accounts.default].article_collections` 选择最相关的现有合集。配置缺失、列表为空或没有合适选项时说明问题并请求选项；可继续正文，但不伪造合法合集或自动修改账号配置。
+- `cover.png` 与正文引用的本地图片必须实际存在且可读；可保留 SVG 等源文件供修订。默认不设置 `type: photo`。标题候选和审稿记录不混入发布正文。
 
----
+## 6. 审稿与收尾
 
-### 阶段 4：Dispatch Review (Subagent)
+草稿与资产完成后使用 [review-article](../review-article/SKILL.md)。环境支持且允许委派时，交给独立子代理，提供文章路径、原始材料/来源及读者目标；否则单独执行该审稿流程，并说明未进行独立复核。不要递归派发审稿。
 
-**CRITICAL INSTRUCTION**: Writing is now complete, but you MUST NOT proceed to publish.
-You MUST dispatch a subagent (`@self`) 并指示其使用 `review-article` skill 审阅草案：
-- 审查配图数量是否达 4~6 张（1 封面 + 3~5 核心插图），是否构成完整自闭环的 5 幕叙事画册；
-- 审查每张插图是否自带独立 Takeaway 结论条，脱离正文能否独立作为小绿书卡片自洽阅览；
-- 审查插图字号（≥28px）、分栏（≤2栏）、自适应比例（4:3 / 3:2 / 纵向流）与封面居中安全区；
-- 审查标题反直觉爆破力（0 破折号/空格污染）、desc 长度（严格 60~120 字符，防 64703 错误）；
-- 审查正文 0 说教代词、0 AI 腔废话、0 列表段落粘连。
+最多进行两轮“审查 → 修复 → 复核”；复核受修改影响的事实、论证、图片和格式。无法消除的阻断问题明确列出，不以自评分替代完成状态。
 
-完成审阅并自动修复后，告知用户可运行 `/publish-article` 进行推送（并可在微信公众号后台一键转换为图片消息，实现一鱼两吃）！
+交付时给出目录或文件链接、三个标题及推荐项、简短的审稿结论与剩余限制。缺少关键证据、合法元数据或必要资产时，只能交付未完成草稿，不称为可发布成品。
 
+此流程完成到草稿交付。发布沿用独立的 `publish-article` 工作流，仅在用户要求发布时执行。若用户提供文章反馈或后台数据，可据此迭代；比较账号自身相近题材与流量来源，不承诺点击率、完读率、转发率或算法推荐提升。

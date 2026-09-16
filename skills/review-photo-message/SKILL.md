@@ -20,13 +20,13 @@ description: Use when invoked by a main agent to review a WeChat Photo Message (
                       │    微信图片消息专属质量打分卡 (Photo Rubric - 100分) │
                       └──────────────────────┬───────────────────────┘
                                              │
-        ┌──────────────────┬─────────────────┴────────────────┬──────────────────┐
-        ▼                  ▼                                  ▼                  ▼
- 【1. 视觉卡片与排版】35分 【2. 爆破封面与认知Hook】25分     【3. 伴随文案与质感】20分  【4. 互动传播与合规】20分
- · 3:4比例与1200px宽度(10)· 4-8字爆破冲突Hook (10)         · 350-700字硬约束(7)     · 标题≤20字与0破折号(6)
- · 字号≥28px底线无溢出(10)· 3行高对比度微型认知卡 (8)       · 换行独立与0粘连(7)     · desc摘要≤120字硬顶(5)
- · 模板流转与键名合规 (8)· 0 AI俗套(蓝脑/机械手/乱码)(7)    · 0 Markdown与0#标签(6)   · 结尾大号互动CTA (5)
- · 统一杂志配色 (7)                                                                  · 合集符合白名单(4)
+         ┌──────────────────┬─────────────────┴────────────────┬──────────────────┐
+         ▼                  ▼                                  ▼                  ▼
+  【1. 视觉卡片与排版】35分 【2. 爆破封面与认知Hook】25分     【3. 伴随文案与质感】20分  【4. 互动传播与合规】20分
+  · 3:4比例与1200px宽度(8) · 4-8字爆破冲突Hook (10)         · 350-700字硬约束(7)     · 标题≤20字与0破折号(6)
+  · 字号≥28px底线无溢出(9) · 3行高对比度微型认知卡 (8)       · 换行独立与0粘连(7)     · desc摘要≤120字硬顶(5)
+  · 模式匹配&防文字堆砌(10)· 0 AI俗套(蓝脑/机械手/乱码)(7)    · 0 Markdown与0#标签(6)   · 结尾大号互动CTA (5)
+  · 统一配色与无水印合规(8)                                                            · 合集符合白名单(4)
 ```
 
 ---
@@ -109,16 +109,23 @@ description: Use when invoked by a main agent to review a WeChat Photo Message (
      - 在 `pipeline_steps` 卡片中，Step 标题与交付物文字必须留有 24px+ 右侧安全边距。
      - 在 `summary_cta` 卡片中，互动提问过长时必须显式拆为两行。
 
-13. 0 工具固定水印与样板词审查 (Zero Boilerplate Watermark Audit)：
+13. 表现模式匹配与反文字卡片堆砌审查 (Visual Modes & Modeling Audit - CRITICAL)：
+   - 检查整套卡片是否针对技术机制匹配了正确的空间拓扑、状态机闭环、因果时序或实证切片；
+   - 严禁全套 Deck 出现超过 2 张无几何拓扑、无状态回路、无量化曲线的“纯文字色块方框”；
+   - 解释系统架构时是否体现了容器包含与连接边界；解释重试与探测时是否呈现了状态机回路；
+   - **0 ASCII 伪图表审查**：伴随文案中严禁残留任何 `┌─┐`、`│`、`+--+` 等方框字符代码块，凡涉及的图例示范必须落盘为实际渲染的 1200x1600 卡片；
+   - 若存在机械堆砌纯文字卡片或 ASCII 框图的情况，要求重绘为对应的专业表现模式（如 3:4 原生 SVG 拓扑图或状态机）。
+
+14. 0 工具固定水印与样板词审查 (Zero Boilerplate Watermark Audit)：
    - 卡片头部徽章旁绝对禁止出现未配置时的默认 `AGENT` 或 `@AGENT`。
    - 卡片底部左侧绝对禁止出现 `BLOGGER AGENT` 工具水印与硬编码固定文字。
    - 确保卡片呈现 100% 干净专业的原生阅读视觉。
 
-14. AI 绘图 0 俗套审查（若首图为 AI 生成）：
+15. AI 绘图 0 俗套审查（若首图为 AI 生成）：
    - 画面 100% 杜绝发光蓝脑、机械手、科幻 HUD、乱码假字。
    - 严格遵循 5 大杂志社论艺术风格（扁平插画 / 实体机械隐喻 / 清晰线稿 / 等轴黏土 / 包豪斯）。
 
-15. 互动探讨 CTA (Discussion Trigger)：
+16. 互动探讨 CTA (Discussion Trigger)：
    - 文末及卡片最后一张（`summary_cta`）必须包含面向读者的启发性争议提问（`💬 互动探讨：`），以引导评论区互动提升公域推荐权重。
 ```
 
@@ -126,15 +133,16 @@ description: Use when invoked by a main agent to review a WeChat Photo Message (
 
 ### 阶段 2：卡片排版修复与自动化重绘 (Auto-Fix & Re-render)
 
-若在检查过程中发现卡片存在文字溢出、字号过小或描述冗长：
-1. 直接编辑目标目录下的 `deck_spec.json`。
-2. 使用 `generate_photo_cards.py` 重新渲染 PNG 卡片：
-
-```bash
-uv run python tools/generate_photo_cards.py --config articles/YYYY-MM-DD-photo-<slug>/deck_spec.json --output-dir articles/YYYY-MM-DD-photo-<slug>/
-```
-
-3. 使用 `sips` 校验输出尺寸确保 1200x1600。
+若在检查过程中发现卡片存在模式不符、文字溢出、字号过小或描述冗长：
+1. **基础模板卡片**：直接编辑目标目录下的 `deck_spec.json`，并运行：
+   ```bash
+   uv run python tools/generate_photo_cards.py --config articles/YYYY-MM-DD-photo-<slug>/deck_spec.json --output-dir articles/YYYY-MM-DD-photo-<slug>/
+   ```
+2. **原生 3:4 SVG 卡片（拓扑/状态机/终端切片）**：直接编辑修改对应的 `.svg` 文件，并使用 `sips` 重新渲染：
+   ```bash
+   sips -s format png --resampleWidth 1200 articles/YYYY-MM-DD-photo-<slug>/0X_custom.svg --out articles/YYYY-MM-DD-photo-<slug>/0X_custom.png
+   ```
+3. 使用 `sips` 校验输出尺寸确保所有卡片均为 1200x1600。
 
 ---
 

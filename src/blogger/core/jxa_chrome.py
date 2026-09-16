@@ -374,4 +374,4 @@ function run() {{
             raise RuntimeError(f"failed to run jxa script: {stderr}\nOutput: {exc.stdout}") from exc
         except subprocess.TimeoutExpired as exc:
             raise RuntimeError("jxa script timed out") from exc
-        return result.stdout
+        return result.stdout.strip()
