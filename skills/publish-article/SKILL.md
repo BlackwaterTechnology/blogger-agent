@@ -14,11 +14,13 @@ It supports both **Rich Text Articles (普通图文)** and **WeChat Photo Messag
 
 在执行发布命令之前，**必须**帮用户确认以下几项。如果前置不满足，`blogger` CLI 可能会中途崩溃。
 
-1. **Chrome 必须开启「允许 Apple 事件中的 JavaScript」**（默认关闭）——CLI 走 osascript 调 JS 操作微信编辑器，开关没开会抛 `通过 AppleScript 执行 JavaScript 的功能已关闭`。让用户去 **Chrome 菜单栏 → View / 查看 → Developer / 开发者 → Allow JavaScript from Apple Events / 允许 Apple 事件中的 JavaScript**，勾上即可。
-2. **Chrome 当前已登录微信公众号后台**（任意 tab 打开 `mp.weixin.qq.com` 即可）。CLI 会自动复用已有 session，未登录就只能让用户先去登录一次。
-3. **确认目标 Payload 路径**：确保你要发布的文章目录存在且包含 `article.md` 及相关图片。
+1. **双 Chrome 实例分工（CRITICAL）**：
+   - **微信公众号 (`wechat`)**：使用系统**日常 Chrome** 实例（通过 JXA/AppleScript 控制，避开微信反爬检测）。前置要求：日常 Chrome 必须勾选 **View / 查看 → Developer / 开发者 → Allow JavaScript from Apple Events / 允许 Apple 事件中的 JavaScript**，且已打开并登录 `mp.weixin.qq.com`。
+   - **掘金 (`juejin`) 与 CSDN (`csdn`)**：使用**独立的 CDP Chrome 实例**（通过 `tools/launch-chrome-cdp.sh` 启动，端口 `9222`，用户目录 `~/.blogger-chrome-cdp`）。掘金与 CSDN 的会话常驻在此实例中，严禁在日常 Chrome 中寻找或误判两者状态。若未启动，运行 `bash tools/launch-chrome-cdp.sh`。
+2. **确认目标 Payload 路径**：确保你要发布的文章目录存在且包含 `article.md` 及相关图片。
 
 > ⚠️ 这几条只需在当前会话的**第一次**发布前确认。如果用户之前已经发过，可以假定满足。
+
 
 ## Workflow
 

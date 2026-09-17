@@ -16,7 +16,9 @@ The project offers core capabilities for:
 This tool uses Python and AppleScript to interact with a running instance of Google Chrome on macOS. It finds the target platform's tab and injects content using a combination of JavaScript execution and simulated keystrokes.
 
 ### Key Components
-- **Chrome Controllers**: Specialized controllers in `src/blogger/core/` (`cdp_chrome.py`, `jxa_chrome.py`, `chrome.py`) handle different aspects of browser interaction. CDP-based controllers allow for deeper interaction, while JXA handles macOS focus management.
+- **Chrome Controllers & Dual Browser Architecture**:
+  - **日常 Chrome (JXA / AppleScript)**: 专门用于 **微信公众号 (`wechat.py`)**。微信后台 (`mp.weixin.qq.com`) 对 CDP 自动化有反爬检测（会弹出“插件存在安全隐患”拦截），因此微信发布强制使用系统的日常 Chrome 实例，通过 `JxaChromeController` 驱动。
+  - **CDP Chrome 专用实例 (`cdp_chrome.py`, port 9222)**: 专门用于 **掘金 (`juejin.py`)** 和 **CSDN (`csdn.py`)**。该实例由 `tools/launch-chrome-cdp.sh` 启动，运行在独立目录 `~/.blogger-chrome-cdp`，开启 `--remote-debugging-port=9222`，支持 `DOM.setFileInputFiles` 上传封面和精确的 CDP 控制。掘金和 CSDN 的登录会话常驻在此 CDP 实例中，绝不要去日常 Chrome 中查找或误判其状态。
 - **Markdown Parser**: `src/blogger/core/markdown_parser.py` uses `python-frontmatter` to parse articles, handling metadata and local image path rewriting.
 - **Visual & Video Generators**: `src/blogger/core/` houses `photo_card_generator.py`, `cover_generator.py`, `dual_sub_video.py`, and `diagrams.py`.
 - **Platform Publishers**: Platform-specific state machines in `src/blogger/platforms/` manage the complex UI flows for each site.
