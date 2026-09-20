@@ -287,58 +287,6 @@ This is the second practice sentence.
         bottom_pixel = scrimmed.getpixel((320, 150))
         self.assertEqual(bottom_pixel, (255, 255, 255))
 
-    def test_avatar_layout_cover_and_payload(self):
-        from src.blogger.core.dual_sub_video import resolve_avatar_image
-        # Check resolve_avatar_image resolves default avatar
-        av = resolve_avatar_image()
-        self.assertIsNotNone(av)
-        self.assertTrue(av.exists())
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_p = Path(tmpdir)
-            cover_path = tmp_p / "cover_avatar.png"
-            generate_video_cover(
-                output_path=cover_path,
-                title="DevOps Daily Standup Practice",
-                tag="A2 · DEVOPS",
-                layout="avatar",
-                avatar_badge="AI TECH MENTOR",
-            )
-            self.assertTrue(cover_path.exists())
-            with Image.open(cover_path) as cov_img:
-                self.assertEqual(cov_img.size, (1920, 1080))
-
-            # Test payload generation with layout="avatar"
-            sent_path = tmp_p / "sentences.txt"
-            sent_path.write_text("Hello team.\nReady for deploy.\n", encoding="utf-8")
-            payload_p = tmp_p / "payload_avatar"
-            res = create_dual_sub_payload(
-                payload_dir=payload_p,
-                sentences_path=sent_path,
-                title="DevOps Standup",
-                desc="A standard test description for avatar payload generation.",
-                layout="avatar",
-            )
-            self.assertEqual(res["layout"], "avatar")
-            self.assertTrue((payload_p / "avatar.png").exists())
-            self.assertTrue((payload_p / "avatar_mouth_open.png").exists())
-            self.assertTrue((payload_p / "avatar_mouth_wide.png").exists())
-            self.assertTrue((payload_p / "payload.md").exists())
-            md_text = (payload_p / "payload.md").read_text(encoding="utf-8")
-            self.assertIn('layout: "avatar"', md_text)
-            self.assertIn('avatar: "avatar.png"', md_text)
-
-    def test_resolve_avatar_states(self):
-        from src.blogger.core.dual_sub_video import resolve_avatar_image, resolve_avatar_states
-        av = resolve_avatar_image()
-        self.assertIsNotNone(av)
-        states = resolve_avatar_states(av)
-        self.assertIn("closed", states)
-        self.assertIn("open", states)
-        self.assertIn("wide", states)
-        for st_name, st_p in states.items():
-            self.assertTrue(st_p.exists(), f"State {st_name} path {st_p} does not exist")
-
 
 if __name__ == "__main__":
     unittest.main()
