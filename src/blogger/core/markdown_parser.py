@@ -38,22 +38,150 @@ def render_math_formula(formula: str, output_path: Path):
 
 def latex_to_unicode(latex_str: str) -> str:
     text = latex_str
-    replacements = {
-        r'\Delta': 'Δ',
-        r'\approx': '≈',
-        r'\leq': '≤',
-        r'\le': '≤',
-        r'\geq': '≥',
-        r'\ge': '≥',
-        r'\times': '×',
-        r'\%': '%',
-        r'\_': '_',
-    }
-    for k, v in replacements.items():
+
+    # 1. Strip sizing/delimiter modifiers
+    text = re.sub(r'\\(left|right|big|Big|bigg|Bigg)', '', text)
+
+    # 2. Text and styling wrappers
+    text = re.sub(r'\\(text|mathrm|mathbf|mathit|mathsf|mathtt|operatorname)\{([^}]*)\}', r'\2', text)
+
+    # 3. Fractions \frac{a}{b} -> (a / b)
+    text = re.sub(r'\\frac\{([^}]+)\}\{([^}]+)\}', r'(\1 / \2)', text)
+
+    # 4. Symbol replacements (ordered from longer to shorter to avoid partial prefix collisions)
+    replacements = [
+        # Operators & Relations
+        (r'\sum', '∑'),
+        (r'\prod', '∏'),
+        (r'\simeq', '≃'),
+        (r'\sim', '~'),
+        (r'\approx', '≈'),
+        (r'\equiv', '≡'),
+        (r'\cong', '≅'),
+        (r'\propto', '∝'),
+        (r'\neq', '≠'),
+        (r'\ne', '≠'),
+        (r'\leq', '≤'),
+        (r'\le', '≤'),
+        (r'\geq', '≥'),
+        (r'\ge', '≥'),
+        (r'\ll', '≪'),
+        (r'\gg', '≫'),
+        (r'\pm', '±'),
+        (r'\mp', '∓'),
+        (r'\times', '×'),
+        (r'\div', '÷'),
+        (r'\cdot', '·'),
+        (r'\circ', '°'),
+        (r'\bullet', '•'),
+        (r'\infty', '∞'),
+        (r'\partial', '∂'),
+        (r'\nabla', '∇'),
+
+        # Arrows
+        (r'\longleftrightarrow', '⇔'),
+        (r'\longrightarrow', '→'),
+        (r'\longleftarrow', '←'),
+        (r'\Leftrightarrow', '⇔'),
+        (r'\Rightarrow', '⇒'),
+        (r'\Leftarrow', '⇐'),
+        (r'\rightarrow', '→'),
+        (r'\leftarrow', '←'),
+        (r'\to', '→'),
+        (r'\iff', '⇔'),
+        (r'\uparrow', '↑'),
+        (r'\downarrow', '↓'),
+
+        # Set theory & Logic
+        (r'\forall', '∀'),
+        (r'\exists', '∃'),
+        (r'\notin', '∉'),
+        (r'\in', '∈'),
+        (r'\subseteq', '⊆'),
+        (r'\subset', '⊂'),
+        (r'\supseteq', '⊇'),
+        (r'\supset', '⊃'),
+        (r'\cap', '∩'),
+        (r'\cup', '∪'),
+        (r'\emptyset', '∅'),
+
+        # Greek Uppercase
+        (r'\Gamma', 'Γ'),
+        (r'\Delta', 'Δ'),
+        (r'\Theta', 'Θ'),
+        (r'\Lambda', 'Λ'),
+        (r'\Xi', 'Ξ'),
+        (r'\Pi', 'Π'),
+        (r'\Sigma', 'Σ'),
+        (r'\Upsilon', 'Υ'),
+        (r'\Phi', 'Φ'),
+        (r'\Psi', 'Ψ'),
+        (r'\Omega', 'Ω'),
+
+        # Greek Lowercase
+        (r'\alpha', 'α'),
+        (r'\beta', 'β'),
+        (r'\gamma', 'γ'),
+        (r'\delta', 'δ'),
+        (r'\varepsilon', 'ε'),
+        (r'\epsilon', 'ε'),
+        (r'\zeta', 'ζ'),
+        (r'\eta', 'η'),
+        (r'\vartheta', 'θ'),
+        (r'\theta', 'θ'),
+        (r'\iota', 'ι'),
+        (r'\kappa', 'κ'),
+        (r'\lambda', 'λ'),
+        (r'\mu', 'μ'),
+        (r'\nu', 'ν'),
+        (r'\xi', 'ξ'),
+        (r'\pi', 'π'),
+        (r'\rho', 'ρ'),
+        (r'\sigma', 'σ'),
+        (r'\tau', 'τ'),
+        (r'\upsilon', 'υ'),
+        (r'\varphi', 'φ'),
+        (r'\phi', 'φ'),
+        (r'\chi', 'χ'),
+        (r'\psi', 'ψ'),
+        (r'\omega', 'ω'),
+
+        # Named functions
+        (r'\max', 'max'),
+        (r'\min', 'min'),
+        (r'\log', 'log'),
+        (r'\ln', 'ln'),
+        (r'\exp', 'exp'),
+        (r'\sin', 'sin'),
+        (r'\cos', 'cos'),
+        (r'\tan', 'tan'),
+
+        # Escaped characters
+        (r'\%', '%'),
+        (r'\_', '_'),
+        (r'\$', '$'),
+        (r'\&', '&'),
+        (r'\#', '#'),
+        (r'\{', '{'),
+        (r'\}', '}'),
+    ]
+    for k, v in replacements:
         text = text.replace(k, v)
-    text = re.sub(r'\\text\{([^}]+)\}', r'\1', text)
+
+    # 5. Clean subscripts and superscripts: _{entry} -> _entry, ^{2} -> ^2
     text = re.sub(r'_\{([^}]+)\}', r'_\1', text)
+    text = re.sub(r'\^\{([^}]+)\}', r'^\1', text)
+
+    # 6. Remove remaining braces
     text = text.replace('{', '').replace('}', '')
+
+    # 7. Strip any remaining unknown LaTeX backslash commands (e.g. \something -> something)
+    text = re.sub(r'\\([a-zA-Z]+)', r'\1', text)
+    # Strip any stray isolated backslashes
+    text = text.replace('\\', '')
+
+    # 8. Clean up extra whitespaces
+    text = re.sub(r'\s{2,}', ' ', text).strip()
     return text
 
 def render_markdown_to_clean_text(md: str) -> str:

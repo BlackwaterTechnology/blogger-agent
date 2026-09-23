@@ -393,8 +393,8 @@ class BloggerPublisher:
             const inputs = Array.from(document.querySelectorAll('input[aria-label="Title"]'));
             const titleInput = inputs.find(el => el.offsetWidth > 0 && el.offsetHeight > 0);
             if (titleInput) {
-                titleInput.select();
                 titleInput.focus();
+                titleInput.select();
                 titleInput.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
                 titleInput.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
                 titleInput.click();
@@ -406,15 +406,12 @@ class BloggerPublisher:
         focus_res = self.chrome.execute_javascript(w_idx, t_idx, js_focus_title, settle_seconds=0.5)
         if focus_res != "FOCUSED":
             raise SystemExit(f"Failed to focus title input: {focus_res}")
-            
-        subprocess.run(["pbcopy"], input=title.encode('utf-8'), check=True)
-        self.chrome.run_in_chrome_process('''
-            keystroke "a" using {command down}
-            delay 0.1
-            keystroke "v" using {command down}
-            delay 0.2
-        ''')
-            
+
+        # Native CDP text insertion: fires native beforeinput/input/change,
+        # avoids OS clipboard collisions, and triggers Google Closure dirty state.
+        self.chrome.insert_text(t_idx, title)
+        time.sleep(0.5)
+
         # Verify title is set
         js_verify_title = """
         (function() {
@@ -427,16 +424,29 @@ class BloggerPublisher:
         if actual_title != title:
             raise SystemExit(f"Title verification failed! Expected: {title!r}, Got: {actual_title!r}")
         logger.info("Title successfully set and verified.")
-        
+
         if collection:
             logger.info(f"Setting labels: {collection}")
+            # Ensure Labels accordion section is expanded
+            js_expand_labels = """
+            (function() {
+                const textarea = document.querySelector('textarea[aria-label="Separate labels by commas"]');
+                if (!textarea || textarea.offsetWidth === 0) {
+                    const labelHeader = Array.from(document.querySelectorAll('div[role="button"], div[role="heading"], div'))
+                        .find(el => el.innerText && el.innerText.trim().startsWith('Labels') && el.offsetWidth > 0);
+                    if (labelHeader) labelHeader.click();
+                }
+            })()
+            """
+            self.chrome.execute_javascript(w_idx, t_idx, js_expand_labels, settle_seconds=0.5)
+
             js_focus_labels = """
             (function() {
                 const textareas = Array.from(document.querySelectorAll('textarea[aria-label="Separate labels by commas"]'));
                 const labelTextarea = textareas.find(el => el.offsetWidth > 0 && el.offsetHeight > 0);
                 if (labelTextarea) {
-                    labelTextarea.select();
                     labelTextarea.focus();
+                    labelTextarea.select();
                     labelTextarea.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
                     labelTextarea.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
                     labelTextarea.click();
@@ -446,17 +456,10 @@ class BloggerPublisher:
             })();
             """
             focus_labels_res = self.chrome.execute_javascript(w_idx, t_idx, js_focus_labels, settle_seconds=0.5)
-            if focus_labels_res != "FOCUSED":
-                raise SystemExit(f"Failed to focus labels input: {focus_labels_res}")
-                
-            subprocess.run(["pbcopy"], input=collection.encode('utf-8'), check=True)
-            self.chrome.run_in_chrome_process('''
-                keystroke "a" using {command down}
-                delay 0.1
-                keystroke "v" using {command down}
-                delay 0.2
-            ''')
-                
+            if focus_labels_res == "FOCUSED":
+                self.chrome.insert_text(t_idx, collection)
+                time.sleep(0.5)
+
             # Verify labels are set
             js_verify_labels = """
             (function() {
@@ -469,7 +472,7 @@ class BloggerPublisher:
             if actual_labels != collection:
                 raise SystemExit(f"Labels verification failed! Expected: {collection!r}, Got: {actual_labels!r}")
             logger.info("Labels successfully set and verified.")
-        
+
         # 9. Save or Publish
         if dry_run:
             logger.info("Saving draft...")

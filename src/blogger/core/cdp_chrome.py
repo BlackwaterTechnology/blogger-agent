@@ -353,6 +353,12 @@ class CdpChromeController:
             except Exception:
                 pass
 
+    def insert_text(self, tab_id: str, text: str) -> dict:
+        """Type `text` into the currently focused element via CDP Input.insertText.
+        Fires native beforeinput/input/change events and updates framework internal state
+        without relying on OS clipboard or AppleScript keystrokes."""
+        return self._call_on(tab_id, "Input.insertText", {"text": text})
+
     # ---- Side helpers for the legacy keystroke paths -------------------
 
     def _chrome_pid(self) -> int | None:
