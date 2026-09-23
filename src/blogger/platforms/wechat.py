@@ -793,7 +793,56 @@ class WechatPublisher:
                         keystroke "v" using {command down}
                     ''')
                     logger.info("Successfully pasted HTML content via OS clipboard.")
-                    time.sleep(2.0)
+                    
+                    # Wait for main editor to finish rendering pasted content, and auto-dismiss "Content Structure Check" dialog if it pops up
+                    rendered = False
+                    for poll_idx in range(15):
+                        time.sleep(0.5)
+                        check_js = """
+                        (function() {
+                            // 1. Detect and auto-confirm "Content Structure Check" (内容结构检查 / 排版检查) modal
+                            const dialogs = Array.from(document.querySelectorAll('.weui-desktop-dialog'));
+                            for (const d of dialogs) {
+                                if (d.clientHeight > 0 && d.offsetWidth > 0) {
+                                    const title = (d.querySelector('.weui-desktop-dialog__title') || {}).innerText || '';
+                                    const text = d.innerText || '';
+                                    if (title.includes('Content Structure') || title.includes('结构') || title.includes('排版') ||
+                                        text.includes('Content Structure') || text.includes('行高') || text.includes('line-height') || text.includes('文字重叠')) {
+                                        const btns = Array.from(d.querySelectorAll('button'));
+                                        const confirmBtn = btns.find(b => {
+                                            const bt = (b.innerText || '').trim();
+                                            return bt.includes('Continue') || bt.includes('继续') || bt.includes('确定') || b.classList.contains('weui-desktop-btn_primary');
+                                        });
+                                        if (confirmBtn) {
+                                            confirmBtn.click();
+                                            return "DISMISSED_STRUCTURE_CHECK";
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 2. Check if editor has finished rendering
+                            const allEditors = Array.from(document.querySelectorAll('.ProseMirror, input:not([type="hidden"]), textarea')).filter(e => e.clientHeight > 0);
+                            const pmEditors = allEditors.filter(e => e.classList && e.classList.contains('ProseMirror'));
+                            const getPh = (e) => (e.getAttribute('placeholder') || e.placeholder || e.getAttribute('data-placeholder') || '').toLowerCase();
+                            let tInput = allEditors.find(e => e.id === 'title' || getPh(e).includes('标题') || getPh(e).includes('title')) || pmEditors[0];
+                            let aInput = allEditors.find(e => e !== tInput && (e.id === 'author' || getPh(e).includes('作者') || getPh(e).includes('author')));
+                            let mainEditor = allEditors.find(e => e.id === 'js_editor') || pmEditors.filter(e => e !== tInput && e !== aInput).pop();
+                            if (mainEditor && (mainEditor.innerText || '').length > 50) return "RENDERED";
+                            return "WAITING";
+                        })();
+                        """
+                        poll_res = self.chrome.execute_javascript(w_idx, t_idx, check_js, settle_seconds=0.2)
+                        if poll_res == "DISMISSED_STRUCTURE_CHECK":
+                            logger.info("Detected 'Content Structure Check' dialog; clicked 'Continue Inserting'.")
+                            time.sleep(1.0)
+                            continue
+                        elif poll_res == "RENDERED":
+                            rendered = True
+                            logger.info(f"Editor content rendered after {(poll_idx + 1) * 0.5:.1f}s.")
+                            break
+                    if not rendered:
+                        logger.warning("Editor content may not have finished rendering after paste; proceeding anyway.")
                 except Exception as e:
                     logger.warning(f"Failed to paste HTML via OS clipboard: {e}")
         except Exception as e:
@@ -830,21 +879,29 @@ class WechatPublisher:
                                 if (unassigned.length > 0) mainEditor = unassigned[unassigned.length - 1];
                             }}
                             
-                            // Find the deepest element containing the placeholder text
-                            const elements = Array.from(document.body.querySelectorAll('*'));
-                            let targetEl = elements.find(el => 
+                            if (!mainEditor) {{
+                                return JSON.stringify({{ status: "ERROR", message: "Main editor not found" }});
+                            }}
+                            
+                            // Find the deepest element containing the placeholder text strictly inside mainEditor
+                            const editorElements = Array.from(mainEditor.querySelectorAll('*'));
+                            let targetEl = editorElements.find(el => 
                                 el.textContent && el.textContent.includes(placeholder) && 
                                 Array.from(el.children).every(c => !c.textContent || !c.textContent.includes(placeholder))
                             );
                             
-                            let editor = targetEl ? (targetEl.closest('.ProseMirror') || targetEl.closest('[contenteditable="true"]')) : mainEditor;
-                            if (!editor) return "Editor not found";
+                            if (!targetEl) {{
+                                return JSON.stringify({{ status: "NOT_FOUND", message: "Placeholder not found in editor" }});
+                            }}
                             
-                            editor.focus();
+                            mainEditor.focus();
                             const selection = window.getSelection();
                             const range = document.createRange();
                             
-                            if (targetEl) {{
+                            const p = targetEl.closest('p');
+                            if (p && p.textContent.trim() === placeholder) {{
+                                range.selectNode(p);
+                            }} else {{
                                 const meaningful = Array.from(targetEl.childNodes).filter(n => {{
                                     if (n.nodeType === 3) return n.nodeValue.trim().length > 0;
                                     if (n.nodeType === 1) return n.tagName !== 'BR';
@@ -865,32 +922,34 @@ class WechatPublisher:
                                         range.selectNode(targetEl);
                                     }}
                                 }}
-                                selection.removeAllRanges();
-                                selection.addRange(range);
-                                return "SELECTED";
-                            }} else {{
-                                // Fallback: If no placeholder found (e.g. legacy front-matter illustration)
-                                const h1 = editor.querySelector('h1, h2, h3');
-                                if (h1) {{
-                                    range.setStartBefore(h1);
-                                    range.collapse(true);
-                                }} else {{
-                                    range.selectNodeContents(editor);
-                                    range.collapse(true);
-                                }}
-                                selection.removeAllRanges();
-                                selection.addRange(range);
-                                return "FALLBACK_MOVED";
                             }}
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                            return JSON.stringify({{ status: "SELECTED", selectedText: selection.toString() }});
                         }} catch(e) {{
-                            return e.message;
+                            return JSON.stringify({{ status: "ERROR", message: e.message }});
                         }}
                     }})();
                     """
                     js_find_and_select = js_find_and_select.replace('"__PLACEHOLDER__"', json.dumps(placeholder))
                     
-                    res = self.chrome.execute_javascript(w_idx, t_idx, js_find_and_select, settle_seconds=0.5)
-                    logger.info(f"Select placeholder result: {res}")
+                    selected = False
+                    for select_attempt in range(4):
+                        res = self.chrome.execute_javascript(w_idx, t_idx, js_find_and_select, settle_seconds=0.3)
+                        logger.info(f"Select placeholder attempt {select_attempt + 1}: {res}")
+                        try:
+                            res_data = json.loads(res) if res else {}
+                        except Exception:
+                            res_data = {}
+                        
+                        if res_data.get("status") == "SELECTED":
+                            selected = True
+                            break
+                        time.sleep(0.5)
+                    
+                    if not selected:
+                        logger.error(f"Failed to locate and select placeholder for {img_path.name}. Skipping paste to avoid inserting at wrong position.")
+                        continue
                     
                     # ProseMirror's paste handler reads the TIFF off the OS
                     # clipboard and uploads to WeChat's CDN. The osascript
@@ -906,7 +965,7 @@ class WechatPublisher:
                     logger.info("Successfully initiated image paste/upload.")
                     time.sleep(2.5) # Wait for upload to complete
                 except Exception as e:
-                    logger.warning(f"Failed to insert image {{img_path}}: {e}")
+                    logger.warning(f"Failed to insert image {img_path}: {e}")
 
             # 图片块后处理:ProseMirror 在每个 image <section> 后面会强制补一个
             # 空 <p>(里面是 ProseMirror-trailingBreak),即使下一个已经是可写 <p>
@@ -1837,3 +1896,30 @@ class WechatPublisher:
         """
         save_res = self.chrome.execute_javascript(w_idx, t_idx, js_save_draft, settle_seconds=1.0)
         logger.info(f"Save as draft result: {save_res}")
+        
+        # Check if any confirmation dialog appeared after clicking Save as draft
+        time.sleep(1.0)
+        js_confirm_save = """
+        (function() {
+            const dialogs = Array.from(document.querySelectorAll('.weui-desktop-dialog'));
+            for (const d of dialogs) {
+                if (d.clientHeight > 0 && d.offsetWidth > 0) {
+                    const text = d.innerText || '';
+                    if (text.includes('结构') || text.includes('排版') || text.includes('风险') || text.includes('确定') || text.includes('保存') || text.includes('Continue')) {
+                        const confirmBtn = Array.from(d.querySelectorAll('button')).find(b => {
+                            const bt = (b.innerText || '').trim();
+                            return bt.includes('继续保存') || bt.includes('确定') || bt.includes('Continue') || b.classList.contains('weui-desktop-btn_primary');
+                        });
+                        if (confirmBtn) {
+                            confirmBtn.click();
+                            return "CONFIRMED_DIALOG: " + confirmBtn.innerText.trim();
+                        }
+                    }
+                }
+            }
+            return "NO_DIALOG";
+        })();
+        """
+        conf_res = self.chrome.execute_javascript(w_idx, t_idx, js_confirm_save, settle_seconds=0.5)
+        if conf_res and conf_res.startswith("CONFIRMED_DIALOG"):
+            logger.info(f"Save as draft confirmation dialog dismissed: {conf_res}")

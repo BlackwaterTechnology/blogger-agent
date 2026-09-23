@@ -375,7 +375,10 @@ def parse_markdown_payload(md_path: Path | str) -> dict:
         # 在 Safari/iOS 微信里被忽略仍然糊掉(2026-05-10 实测),只能直接关掉两端对齐。
         # inline style 优先级高于阅读器类样式,跨浏览器都生效。视觉上右边沿会从齐变锯齿,
         # 但比字间距撑开可读性更好。
-        html_content = html_content.replace('<p>', '<p style="text-align: left;">')
+        html_content = html_content.replace('<p>', '<p style="text-align: left; line-height: 1.75;">')
+        html_content = html_content.replace('<table>', '<table style="border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px; line-height: 1.6;">')
+        html_content = html_content.replace('<th>', '<th style="border: 1px solid #dfe2e5; padding: 8px 12px; background-color: #f6f8fa; font-weight: bold; text-align: left; line-height: 1.6;">')
+        html_content = html_content.replace('<td>', '<td style="border: 1px solid #dfe2e5; padding: 8px 12px; text-align: left; line-height: 1.6;">')
     except Exception as e:
         logger.warning(f"Failed to parse markdown, falling back to raw text: {e}")
         html_content = f"<p>{wechat_content.replace(chr(10), '<br>')}</p>"
